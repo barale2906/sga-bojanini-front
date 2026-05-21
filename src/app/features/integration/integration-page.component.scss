@@ -1,0 +1,13 @@
+.tab-body { padding: 1.5rem 0; }
+.tab-toolbar { display: flex; gap: 0.75rem; margin-bottom: 1rem; }
+.table-wrap { border-radius: 8px; overflow: hidden; background: #fff; }
+.code-tag { background:#EDF2F7; color:#4a5568; padding:0.15rem 0.5rem; border-radius:4px; font-size:0.8rem; font-family:monospace; }
+.badge { display:inline-flex;padding:0.15rem 0.6rem;border-radius:9999px;font-size:0.75rem;font-weight:600;background:#e2e8f0;color:#4a5568; &--on{background:#c6f6d5;color:#276749;} &--error{background:#fed7d7;color:#c53030;} }
+.no-data { text-align:center;padding:2.5rem;color:#a0aec0; }
+h3 { font-size:0.9rem;font-weight:600;margin:0 0 0.75rem; }
+h4 { font-size:0.8rem;font-weight:600;margin:0 0 0.5rem;color:#718096; }
+.int-form { display:grid;grid-template-columns:1fr 1fr;gap:0.25rem 0.75rem; .span2{grid-column:span 2;} }
+.cons-form { display:grid;grid-template-columns:1fr 1fr;gap:0.25rem 0.75rem; .span-full{grid-column:span 2;} }
+.cons-item { display:flex;gap:0.5rem;align-items:flex-end;margin-bottom:0.25rem; .flex2{flex:2;} .qty{width:100px;} }
+.demand-summary { background:#fffbf0;border:1px solid #f6e05e;border-radius:8px;padding:0.75rem 1rem;margin-bottom:1rem;font-size:0.875rem; }
+.test-result { background:#f0fff4;border:1px solid #9ae6b4;border-radius:8px;padding:0.75rem;margin-bottom:1rem;font-size:0.875rem;color:#276749; }

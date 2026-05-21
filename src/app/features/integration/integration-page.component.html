@@ -1,0 +1,127 @@
+<app-page-header title="Integraciones" subtitle="Sistemas externos, citas médicas y consumos" icon="integration_instructions"></app-page-header>
+
+<mat-tab-group color="primary" animationDuration="200ms">
+
+  <!-- Config Integraciones -->
+  <mat-tab label="Configuración">
+    <div class="tab-body">
+      @if (testResult()) { <div class="test-result">{{ testResult() }}</div> }
+      <div class="table-wrap mat-elevation-z1" *ngIf="integrations().length > 0" style="margin-bottom:1.5rem;">
+        <table mat-table [dataSource]="integrations()">
+          <ng-container matColumnDef="name"><th mat-header-cell *matHeaderCellDef>Nombre</th><td mat-cell *matCellDef="let i">{{ i.name }}</td></ng-container>
+          <ng-container matColumnDef="type"><th mat-header-cell *matHeaderCellDef>Tipo</th><td mat-cell *matCellDef="let i"><code class="code-tag">{{ i.type }}</code></td></ng-container>
+          <ng-container matColumnDef="base_url"><th mat-header-cell *matHeaderCellDef>URL</th><td mat-cell *matCellDef="let i">{{ i.base_url }}</td></ng-container>
+          <ng-container matColumnDef="is_active"><th mat-header-cell *matHeaderCellDef>Activo</th><td mat-cell *matCellDef="let i"><span class="badge" [class.badge--on]="i.is_active">{{ i.is_active ? 'Sí' : 'No' }}</span></td></ng-container>
+          <ng-container matColumnDef="actions"><th mat-header-cell *matHeaderCellDef>Test</th>
+            <td mat-cell *matCellDef="let i"><button mat-icon-button color="primary" (click)="testIntegration(i.id)" matTooltip="Probar conexión"><mat-icon>wifi_tethering</mat-icon></button></td>
+          </ng-container>
+          <tr mat-header-row *matHeaderRowDef="intCols"></tr>
+          <tr mat-row *matRowDef="let r; columns: intCols;"></tr>
+        </table>
+      </div>
+
+      <h3>Nueva Integración</h3>
+      <form [formGroup]="intForm" class="int-form">
+        <mat-form-field appearance="outline"><mat-label>Nombre *</mat-label><input matInput formControlName="name" /></mat-form-field>
+        <mat-form-field appearance="outline"><mat-label>Tipo</mat-label>
+          <mat-select formControlName="type"><mat-option value="scheduling">Agendamiento</mat-option><mat-option value="emr">HCE</mat-option></mat-select>
+        </mat-form-field>
+        <mat-form-field appearance="outline" class="span2"><mat-label>URL base *</mat-label><input matInput formControlName="base_url" placeholder="https://sistema.ejemplo.com" /></mat-form-field>
+        <mat-form-field appearance="outline"><mat-label>Autenticación</mat-label>
+          <mat-select formControlName="auth_type"><mat-option value="bearer">Bearer Token</mat-option><mat-option value="basic">Basic Auth</mat-option></mat-select>
+        </mat-form-field>
+        <mat-form-field appearance="outline"><mat-label>Token / Credencial</mat-label><input matInput formControlName="token" type="password" /></mat-form-field>
+        <div class="span2">
+          <mat-slide-toggle formControlName="is_active" color="primary">Activa</mat-slide-toggle>
+          <button mat-raised-button color="primary" type="button" (click)="saveIntegration()" [disabled]="intForm.invalid" style="margin-left:1rem;">Guardar</button>
+        </div>
+      </form>
+    </div>
+  </mat-tab>
+
+  <!-- Citas -->
+  <mat-tab label="Citas Médicas">
+    <div class="tab-body">
+      <div class="tab-toolbar">
+        <button mat-stroked-button (click)="loadAppointments()"><mat-icon>refresh</mat-icon> Actualizar</button>
+        <button mat-stroked-button (click)="loadDemand()"><mat-icon>analytics</mat-icon> Analizar Demanda</button>
+      </div>
+      @if (demandData()) {
+        <div class="demand-summary">
+          <strong>Análisis de demanda ({{ daysAhead() }} días):</strong>
+          {{ demandData().total_appointments }} citas | {{ demandData().deficit_products?.length || 0 }} productos en déficit
+        </div>
+      }
+      <div class="table-wrap mat-elevation-z1">
+        <table mat-table [dataSource]="appointments()">
+          <ng-container matColumnDef="appointment_id"><th mat-header-cell *matHeaderCellDef>ID Cita</th><td mat-cell *matCellDef="let a"><code class="code-tag">{{ a.appointment_id }}</code></td></ng-container>
+          <ng-container matColumnDef="patient_name"><th mat-header-cell *matHeaderCellDef>Paciente</th><td mat-cell *matCellDef="let a">{{ a.patient_name }}</td></ng-container>
+          <ng-container matColumnDef="service_type"><th mat-header-cell *matHeaderCellDef>Servicio</th><td mat-cell *matCellDef="let a">{{ a.service_type }}</td></ng-container>
+          <ng-container matColumnDef="scheduled_at"><th mat-header-cell *matHeaderCellDef>Fecha</th><td mat-cell *matCellDef="let a">{{ a.scheduled_at | dateFormat:'datetime' }}</td></ng-container>
+          <ng-container matColumnDef="status"><th mat-header-cell *matHeaderCellDef>Estado</th><td mat-cell *matCellDef="let a"><span class="badge badge--on">{{ a.status }}</span></td></ng-container>
+          <tr mat-header-row *matHeaderRowDef="apptCols"></tr>
+          <tr mat-row *matRowDef="let r; columns: apptCols;"></tr>
+          <tr class="mat-row" *matNoDataRow><td class="no-data" [attr.colspan]="apptCols.length">Sin citas disponibles</td></tr>
+        </table>
+      </div>
+    </div>
+  </mat-tab>
+
+  <!-- Consumos -->
+  <mat-tab label="Consumos">
+    <div class="tab-body">
+      <h3>Registrar Consumo</h3>
+      <form [formGroup]="consumptionForm" class="cons-form">
+        <mat-form-field appearance="outline"><mat-label>ID Cita</mat-label><input matInput formControlName="appointment_id" /></mat-form-field>
+        <mat-form-field appearance="outline"><mat-label>Paciente</mat-label><input matInput formControlName="patient_identifier" /></mat-form-field>
+        <mat-form-field appearance="outline"><mat-label>Servicio</mat-label><input matInput formControlName="service_type" /></mat-form-field>
+        <mat-form-field appearance="outline"><mat-label>Almacén *</mat-label>
+          <mat-select formControlName="warehouse_id">
+            @for (w of warehouses(); track w.id) { <mat-option [value]="w.id">{{ w.name }}</mat-option> }
+          </mat-select>
+        </mat-form-field>
+        <div class="span-full">
+          <h4>Materiales consumidos</h4>
+          <div formArrayName="items">
+            @for (item of consItems.controls; track $index) {
+              <div [formGroupName]="$index" class="cons-item">
+                <mat-form-field appearance="outline" class="flex2"><mat-label>Producto</mat-label>
+                  <mat-select formControlName="product_id">
+                    @for (p of products(); track p.id) { <mat-option [value]="p.id">{{ p.code }} — {{ p.name }}</mat-option> }
+                  </mat-select>
+                </mat-form-field>
+                <mat-form-field appearance="outline" class="qty"><mat-label>Cantidad</mat-label><input matInput type="number" formControlName="quantity" min="1" /></mat-form-field>
+                <button mat-icon-button color="warn" type="button" (click)="removeConsItem($index)"><mat-icon>remove</mat-icon></button>
+              </div>
+            }
+          </div>
+          <button mat-stroked-button type="button" (click)="addConsItem()"><mat-icon>add</mat-icon> Agregar ítem</button>
+          <button mat-raised-button color="primary" type="button" (click)="saveConsumption()" [disabled]="consumptionForm.invalid || consItems.length === 0" style="margin-left:0.75rem;">Registrar Consumo</button>
+        </div>
+      </form>
+
+      <div class="table-wrap mat-elevation-z1" style="margin-top:1.5rem;">
+        <table mat-table [dataSource]="consumptions()">
+          <ng-container matColumnDef="appointment_id"><th mat-header-cell *matHeaderCellDef>Cita</th><td mat-cell *matCellDef="let c"><code class="code-tag">{{ c.appointment_id || '—' }}</code></td></ng-container>
+          <ng-container matColumnDef="service_type"><th mat-header-cell *matHeaderCellDef>Servicio</th><td mat-cell *matCellDef="let c">{{ c.service_type || '—' }}</td></ng-container>
+          <ng-container matColumnDef="warehouse"><th mat-header-cell *matHeaderCellDef>Almacén</th><td mat-cell *matCellDef="let c">{{ c.warehouse?.name || '—' }}</td></ng-container>
+          <ng-container matColumnDef="sync_status"><th mat-header-cell *matHeaderCellDef>Sincronización</th>
+            <td mat-cell *matCellDef="let c"><span class="badge" [class.badge--on]="c.sync_status === 'synced'" [class.badge--error]="c.sync_status === 'failed'">{{ c.sync_status || 'pending' }}</span></td>
+          </ng-container>
+          <ng-container matColumnDef="created_at"><th mat-header-cell *matHeaderCellDef>Fecha</th><td mat-cell *matCellDef="let c">{{ c.created_at | dateFormat:'datetime' }}</td></ng-container>
+          <ng-container matColumnDef="actions"><th mat-header-cell *matHeaderCellDef>Acciones</th>
+            <td mat-cell *matCellDef="let c">
+              @if (c.sync_status === 'failed') {
+                <button mat-icon-button color="warn" (click)="retrySync(c.id)" matTooltip="Reintentar sincronización"><mat-icon>replay</mat-icon></button>
+              }
+            </td>
+          </ng-container>
+          <tr mat-header-row *matHeaderRowDef="consCols"></tr>
+          <tr mat-row *matRowDef="let r; columns: consCols;"></tr>
+          <tr class="mat-row" *matNoDataRow><td class="no-data" [attr.colspan]="consCols.length">Sin consumos registrados</td></tr>
+        </table>
+        <mat-paginator [length]="consumptionMeta().total" [pageSize]="consumptionMeta().per_page" [pageIndex]="consumptionMeta().current_page - 1" [pageSizeOptions]="[10,25,50]" (page)="onConsPage($event)" showFirstLastButtons></mat-paginator>
+      </div>
+    </div>
+  </mat-tab>
+</mat-tab-group>

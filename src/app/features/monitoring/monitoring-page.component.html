@@ -1,0 +1,101 @@
+<app-page-header title="Monitoreo Ambiental" subtitle="Sensores, lecturas y control estadístico" icon="thermostat">
+</app-page-header>
+
+<mat-tab-group color="primary" animationDuration="200ms">
+
+  <!-- Sensores -->
+  <mat-tab label="Sensores">
+    <div class="tab-body">
+      <div class="tab-toolbar" [formGroup]="sensorFilters">
+        <mat-form-field appearance="outline" class="sel"><mat-label>Zona</mat-label>
+          <mat-select formControlName="zone_id">
+            <mat-option value="">Todas</mat-option>
+            @for (z of zones(); track z.id) { <mat-option [value]="z.id">{{ z.name }}</mat-option> }
+          </mat-select>
+        </mat-form-field>
+        <mat-form-field appearance="outline" class="sel"><mat-label>Tipo</mat-label>
+          <mat-select formControlName="type">
+            <mat-option value="">Todos</mat-option>
+            <mat-option value="temperature">Temperatura</mat-option>
+            <mat-option value="humidity">Humedad</mat-option>
+            <mat-option value="pressure">Presión</mat-option>
+          </mat-select>
+        </mat-form-field>
+        <button *sgaPermission="'sensors.create'" mat-raised-button color="primary" (click)="openSensorForm()">
+          <mat-icon>add</mat-icon> Nuevo Sensor
+        </button>
+      </div>
+
+      <div class="table-wrap mat-elevation-z1">
+        <table mat-table [dataSource]="sensors()">
+          <ng-container matColumnDef="code"><th mat-header-cell *matHeaderCellDef>Código</th><td mat-cell *matCellDef="let s"><code class="code-tag">{{ s.code }}</code></td></ng-container>
+          <ng-container matColumnDef="name"><th mat-header-cell *matHeaderCellDef>Nombre</th><td mat-cell *matCellDef="let s">{{ s.name }}</td></ng-container>
+          <ng-container matColumnDef="zone"><th mat-header-cell *matHeaderCellDef>Zona</th><td mat-cell *matCellDef="let s">{{ s.zone?.name || '—' }}</td></ng-container>
+          <ng-container matColumnDef="type"><th mat-header-cell *matHeaderCellDef>Tipo</th><td mat-cell *matCellDef="let s"><span class="type-badge type-{{ s.type }}">{{ s.type }}</span></td></ng-container>
+          <ng-container matColumnDef="is_active"><th mat-header-cell *matHeaderCellDef>Estado</th>
+            <td mat-cell *matCellDef="let s"><span class="badge" [class.badge--on]="s.is_active" [class.badge--off]="!s.is_active">{{ s.is_active ? 'Activo' : 'Inactivo' }}</span></td>
+          </ng-container>
+          <ng-container matColumnDef="actions"><th mat-header-cell *matHeaderCellDef class="act">Acciones</th>
+            <td mat-cell *matCellDef="let s" class="act">
+              <button *sgaPermission="'readings.create'" mat-icon-button color="accent" (click)="openReading(s)" matTooltip="Registrar lectura"><mat-icon>add_chart</mat-icon></button>
+              <button mat-icon-button color="primary" (click)="selectSensorForChart(s)" matTooltip="Ver gráfico SPC"><mat-icon>show_chart</mat-icon></button>
+              <button *sgaPermission="'sensors.update'" mat-icon-button color="primary" (click)="openSensorForm(s)" matTooltip="Editar"><mat-icon>edit</mat-icon></button>
+              <button *sgaPermission="'sensors.delete'" mat-icon-button color="warn" (click)="deleteSensor(s)" matTooltip="Eliminar"><mat-icon>delete</mat-icon></button>
+            </td>
+          </ng-container>
+          <tr mat-header-row *matHeaderRowDef="sensorCols"></tr>
+          <tr mat-row *matRowDef="let r; columns: sensorCols;"></tr>
+          <tr class="mat-row" *matNoDataRow><td class="no-data" [attr.colspan]="sensorCols.length">Sin sensores registrados</td></tr>
+        </table>
+      </div>
+    </div>
+  </mat-tab>
+
+  <!-- Gráfico SPC -->
+  <mat-tab label="Control Estadístico (SPC)">
+    <div class="tab-body">
+      @if (!selectedSensor()) {
+        <div class="empty-state">
+          <mat-icon>show_chart</mat-icon>
+          <p>Selecciona un sensor en la pestaña anterior para ver el gráfico de control.</p>
+        </div>
+      } @else {
+        <div class="chart-header">
+          <div>
+            <h3>{{ selectedSensor()!.name }}</h3>
+            <p class="hint">{{ selectedSensor()!.code }} — {{ selectedSensor()!.type }} ({{ selectedSensor()!.unit }})</p>
+          </div>
+          <div class="chart-date-form" [formGroup]="chartDateForm">
+            <mat-form-field appearance="outline" class="sm"><mat-label>Desde</mat-label><input matInput type="date" formControlName="date_from" /></mat-form-field>
+            <mat-form-field appearance="outline" class="sm"><mat-label>Hasta</mat-label><input matInput type="date" formControlName="date_to" /></mat-form-field>
+            <button mat-raised-button color="primary" (click)="loadStats()" [disabled]="chartDateForm.invalid || loadingStats()">
+              <mat-icon>refresh</mat-icon> Actualizar
+            </button>
+          </div>
+        </div>
+
+        <app-loading-spinner [loading]="loadingStats()" [inline]="true"></app-loading-spinner>
+
+        @if (stats()) {
+          <!-- KPIs estadísticos -->
+          <div class="stat-cards">
+            <div class="stat-card"><span class="label">Media</span><strong>{{ stats()!.mean | number:'1.2-2' }}</strong></div>
+            <div class="stat-card"><span class="label">Desv. Estándar</span><strong>{{ stats()!.std_dev | number:'1.2-2' }}</strong></div>
+            <div class="stat-card"><span class="label">Cp</span><strong [class.cp-ok]="stats()!.cp >= 1.33" [class.cp-warn]="stats()!.cp < 1.33">{{ stats()!.cp | number:'1.2-2' }}</strong></div>
+            <div class="stat-card"><span class="label">Cpk</span><strong [class.cp-ok]="stats()!.cpk >= 1.33" [class.cp-warn]="stats()!.cpk < 1.33">{{ stats()!.cpk | number:'1.2-2' }}</strong></div>
+            <div class="stat-card"><span class="label">Fuera de control</span><strong [class.cp-warn]="stats()!.out_of_control_count > 0">{{ stats()!.out_of_control_count }}</strong></div>
+            <div class="stat-card stat-card--wide">
+              <span class="label">Proceso</span>
+              <strong [class.cp-ok]="stats()!.process_capable" [class.cp-warn]="!stats()!.process_capable">
+                {{ stats()!.process_capable ? '✅ Capaz' : '⚠️ No capaz' }}
+              </strong>
+            </div>
+          </div>
+
+          <!-- Gráfico SPC -->
+          <app-spc-chart [stats]="stats()!" [sensor]="selectedSensor()!"></app-spc-chart>
+        }
+      }
+    </div>
+  </mat-tab>
+</mat-tab-group>

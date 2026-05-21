@@ -1,4 +1,9 @@
 import { Routes } from '@angular/router';
+
 export const auditRoutes: Routes = [
-  { path: '', loadComponent: () => import('./audit.component').then(m => m.AuditComponent) },
+  {
+    path: '',
+    loadComponent: () =>
+      import('./audit-page.component').then((m) => m.AuditPageComponent),
+  },
 ];

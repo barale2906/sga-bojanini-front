@@ -1,0 +1,14 @@
+.reports-layout { display: grid; grid-template-columns: 320px 1fr; gap: 1.5rem; align-items: flex-start; }
+.report-types { h3 { font-size: 0.875rem; font-weight: 600; color: #4a5568; text-transform: uppercase; letter-spacing: 0.05em; margin: 0 0 0.75rem; } }
+.report-card { display: flex; gap: 0.75rem; align-items: flex-start; padding: 0.875rem; border-radius: 8px; border: 1px solid #e2e8f0; cursor: pointer; margin-bottom: 0.5rem; transition: all 150ms; background: #fff;
+  mat-icon { color: #C02F86; flex-shrink: 0; }
+  strong { font-size: 0.875rem; color: #2d3748; }
+  p { font-size: 0.75rem; color: #718096; margin: 0.1rem 0 0; }
+  &:hover { border-color: #FFCF01; background: #fffbf0; }
+  &.selected { border-color: #C02F86; background: #faf5ff; mat-icon { color: #553c9a; } }
+}
+.empty-state { text-align: center; padding: 4rem 2rem; color: #a0aec0; mat-icon { font-size: 4rem; width: 4rem; height: 4rem; display: block; margin: 0 auto 1rem; } }
+.w-full { width: 100%; margin-bottom: 0.25rem; }
+h4 { font-size: 0.875rem; font-weight: 600; color: #4a5568; margin: 0 0 0.5rem; }
+.format-label { font-size: 0.875rem; color: #718096; margin: 0 0.5rem 0 0; }
+mat-card-actions { display: flex; align-items: center; gap: 0.5rem; padding: 1rem 1rem 0.5rem; }

@@ -1,0 +1,8 @@
+.filters-bar { display:flex; gap:0.75rem; align-items:flex-end; flex-wrap:wrap; margin-bottom:1rem; .sel{width:160px;} .date{width:150px;} }
+.table-wrap { border-radius:8px; overflow:hidden; background:#fff; }
+.code-tag { background:#EDF2F7;color:#4a5568;padding:0.15rem 0.5rem;border-radius:4px;font-size:0.8rem;font-family:monospace; }
+.a-badge { display:inline-flex;padding:0.15rem 0.6rem;border-radius:9999px;font-size:0.75rem;font-weight:600; }
+.a-create { background:#c6f6d5;color:#276749; } .a-update { background:#bee3f8;color:#2b6cb0; }
+.a-delete { background:#fed7d7;color:#c53030; } .a-access { background:#e2e8f0;color:#4a5568; }
+.act { width:60px;text-align:right; }
+.no-data { text-align:center;padding:2.5rem;color:#a0aec0; }

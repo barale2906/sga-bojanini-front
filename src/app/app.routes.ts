@@ -110,7 +110,7 @@ export const routes: Routes = [
       {
         path: 'audit',
         loadComponent: () =>
-          import('./features/audit/audit-list.component').then((m) => m.AuditListComponent),
+          import('./features/audit/audit-page.component').then((m) => m.AuditPageComponent),
         data: { permission: 'audit.view' },
       },
 
@@ -126,7 +126,7 @@ export const routes: Routes = [
       {
         path: 'reports',
         loadComponent: () =>
-          import('./features/reports/reports.component').then((m) => m.ReportsComponent),
+          import('./features/reports/reports-page.component').then((m) => m.ReportsPageComponent),
         data: { permission: 'reports.view' },
       },
 
