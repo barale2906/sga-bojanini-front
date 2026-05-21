@@ -4,6 +4,6 @@ export const warehouseRoutes: Routes = [
   {
     path: '',
     loadComponent: () =>
-      import('./warehouse-list.component').then((m) => m.WarehouseListComponent),
+      import('./warehouses/warehouse-page.component').then((m) => m.WarehousePageComponent),
   },
 ];

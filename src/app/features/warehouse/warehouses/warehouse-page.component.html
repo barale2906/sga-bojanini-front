@@ -1,0 +1,157 @@
+<app-page-header title="Almacenes" subtitle="Gestión de almacenes, zonas y ubicaciones" icon="warehouse">
+</app-page-header>
+
+<mat-tab-group color="primary" animationDuration="200ms">
+
+  <!-- ── TAB 1: ALMACENES ── -->
+  <mat-tab label="Almacenes">
+    <div class="tab-body">
+      <div class="tab-toolbar" [formGroup]="whFilters">
+        <mat-form-field appearance="outline" class="search-field">
+          <mat-label>Buscar almacén</mat-label>
+          <mat-icon matPrefix>search</mat-icon>
+          <input matInput formControlName="search" placeholder="Nombre o código..." />
+        </mat-form-field>
+        <mat-form-field appearance="outline" class="select-field">
+          <mat-label>Estado</mat-label>
+          <mat-select formControlName="is_active">
+            <mat-option value="">Todos</mat-option>
+            <mat-option value="true">Activos</mat-option>
+            <mat-option value="false">Inactivos</mat-option>
+          </mat-select>
+        </mat-form-field>
+        <button *sgaPermission="'warehouses.create'" mat-raised-button color="primary" (click)="openWarehouseForm()">
+          <mat-icon>add</mat-icon> Nuevo Almacén
+        </button>
+      </div>
+
+      <app-loading-spinner [loading]="loading()" [inline]="true"></app-loading-spinner>
+
+      <div class="table-wrap mat-elevation-z1">
+        <table mat-table [dataSource]="warehouses()">
+          <ng-container matColumnDef="code">
+            <th mat-header-cell *matHeaderCellDef>Código</th>
+            <td mat-cell *matCellDef="let w"><code class="code-tag">{{ w.code }}</code></td>
+          </ng-container>
+          <ng-container matColumnDef="name">
+            <th mat-header-cell *matHeaderCellDef>Nombre</th>
+            <td mat-cell *matCellDef="let w">{{ w.name }}</td>
+          </ng-container>
+          <ng-container matColumnDef="address">
+            <th mat-header-cell *matHeaderCellDef>Dirección</th>
+            <td mat-cell *matCellDef="let w">{{ w.address || '—' }}</td>
+          </ng-container>
+          <ng-container matColumnDef="is_active">
+            <th mat-header-cell *matHeaderCellDef>Estado</th>
+            <td mat-cell *matCellDef="let w">
+              <span class="badge" [class.badge--on]="w.is_active" [class.badge--off]="!w.is_active">
+                {{ w.is_active ? 'Activo' : 'Inactivo' }}
+              </span>
+            </td>
+          </ng-container>
+          <ng-container matColumnDef="actions">
+            <th mat-header-cell *matHeaderCellDef class="act">Acciones</th>
+            <td mat-cell *matCellDef="let w" class="act">
+              <button *sgaPermission="'warehouses.update'" mat-icon-button color="primary" (click)="openWarehouseForm(w)" matTooltip="Editar"><mat-icon>edit</mat-icon></button>
+              <button *sgaPermission="'warehouses.delete'" mat-icon-button color="warn" (click)="deleteWarehouse(w)" matTooltip="Eliminar"><mat-icon>delete</mat-icon></button>
+            </td>
+          </ng-container>
+          <tr mat-header-row *matHeaderRowDef="whCols"></tr>
+          <tr mat-row *matRowDef="let row; columns: whCols;"></tr>
+          <tr class="mat-row" *matNoDataRow><td class="no-data" [attr.colspan]="whCols.length">Sin almacenes registrados</td></tr>
+        </table>
+      </div>
+    </div>
+  </mat-tab>
+
+  <!-- ── TAB 2: ZONAS ── -->
+  <mat-tab label="Zonas">
+    <div class="tab-body">
+      <div class="tab-toolbar" [formGroup]="zoneFilters">
+        <mat-form-field appearance="outline" class="select-field">
+          <mat-label>Almacén</mat-label>
+          <mat-select formControlName="warehouse_id">
+            <mat-option value="">Todos</mat-option>
+            @for (w of warehouses(); track w.id) {
+              <mat-option [value]="w.id">{{ w.name }}</mat-option>
+            }
+          </mat-select>
+        </mat-form-field>
+        <mat-form-field appearance="outline" class="select-field">
+          <mat-label>Tipo</mat-label>
+          <mat-select formControlName="type">
+            <mat-option value="">Todos</mat-option>
+            @for (t of zoneTypes; track t.value) {
+              <mat-option [value]="t.value">{{ t.label }}</mat-option>
+            }
+          </mat-select>
+        </mat-form-field>
+        <mat-form-field appearance="outline" class="search-field">
+          <mat-label>Buscar zona</mat-label>
+          <mat-icon matPrefix>search</mat-icon>
+          <input matInput formControlName="search" />
+        </mat-form-field>
+        <button *sgaPermission="'zones.create'" mat-raised-button color="primary" (click)="openZoneForm()">
+          <mat-icon>add</mat-icon> Nueva Zona
+        </button>
+      </div>
+
+      <div class="table-wrap mat-elevation-z1">
+        <table mat-table [dataSource]="zones()">
+          <ng-container matColumnDef="code"><th mat-header-cell *matHeaderCellDef>Código</th><td mat-cell *matCellDef="let z"><code class="code-tag">{{ z.code }}</code></td></ng-container>
+          <ng-container matColumnDef="name"><th mat-header-cell *matHeaderCellDef>Nombre</th><td mat-cell *matCellDef="let z">{{ z.name }}</td></ng-container>
+          <ng-container matColumnDef="type"><th mat-header-cell *matHeaderCellDef>Tipo</th><td mat-cell *matCellDef="let z"><span class="type-badge type-badge--{{ z.type }}">{{ getZoneTypeBadge(z.type) }}</span></td></ng-container>
+          <ng-container matColumnDef="temp_range"><th mat-header-cell *matHeaderCellDef>Temperatura</th><td mat-cell *matCellDef="let z">{{ getTempRange(z) }}</td></ng-container>
+          <ng-container matColumnDef="is_active"><th mat-header-cell *matHeaderCellDef>Estado</th><td mat-cell *matCellDef="let z"><span class="badge" [class.badge--on]="z.is_active" [class.badge--off]="!z.is_active">{{ z.is_active ? 'Activa' : 'Inactiva' }}</span></td></ng-container>
+          <ng-container matColumnDef="actions"><th mat-header-cell *matHeaderCellDef class="act">Acciones</th>
+            <td mat-cell *matCellDef="let z" class="act">
+              <button *sgaPermission="'zones.update'" mat-icon-button color="primary" (click)="openZoneForm(z)" matTooltip="Editar"><mat-icon>edit</mat-icon></button>
+              <button *sgaPermission="'zones.delete'" mat-icon-button color="warn" (click)="deleteZone(z)" matTooltip="Eliminar"><mat-icon>delete</mat-icon></button>
+            </td>
+          </ng-container>
+          <tr mat-header-row *matHeaderRowDef="zoneCols"></tr>
+          <tr mat-row *matRowDef="let row; columns: zoneCols;"></tr>
+          <tr class="mat-row" *matNoDataRow><td class="no-data" [attr.colspan]="zoneCols.length">Sin zonas registradas</td></tr>
+        </table>
+      </div>
+    </div>
+  </mat-tab>
+
+  <!-- ── TAB 3: UBICACIONES ── -->
+  <mat-tab label="Ubicaciones">
+    <div class="tab-body">
+      <div class="tab-toolbar" [formGroup]="locFilters">
+        <mat-form-field appearance="outline" class="select-field">
+          <mat-label>Filtrar por zona</mat-label>
+          <mat-select formControlName="zone_id">
+            <mat-option value="">Todas las zonas</mat-option>
+            @for (z of zones(); track z.id) {
+              <mat-option [value]="z.id">{{ z.name }}</mat-option>
+            }
+          </mat-select>
+        </mat-form-field>
+        <button *sgaPermission="'locations.create'" mat-raised-button color="primary" (click)="openLocationForm()">
+          <mat-icon>add</mat-icon> Nueva Ubicación
+        </button>
+      </div>
+
+      <div class="table-wrap mat-elevation-z1">
+        <table mat-table [dataSource]="locations()">
+          <ng-container matColumnDef="code"><th mat-header-cell *matHeaderCellDef>Código</th><td mat-cell *matCellDef="let l"><code class="code-tag">{{ l.code }}</code></td></ng-container>
+          <ng-container matColumnDef="name"><th mat-header-cell *matHeaderCellDef>Nombre</th><td mat-cell *matCellDef="let l">{{ l.name }}</td></ng-container>
+          <ng-container matColumnDef="capacity"><th mat-header-cell *matHeaderCellDef>Capacidad</th><td mat-cell *matCellDef="let l">{{ l.capacity || '—' }}</td></ng-container>
+          <ng-container matColumnDef="is_active"><th mat-header-cell *matHeaderCellDef>Estado</th><td mat-cell *matCellDef="let l"><span class="badge" [class.badge--on]="l.is_active" [class.badge--off]="!l.is_active">{{ l.is_active ? 'Activa' : 'Inactiva' }}</span></td></ng-container>
+          <ng-container matColumnDef="actions"><th mat-header-cell *matHeaderCellDef class="act">Acciones</th>
+            <td mat-cell *matCellDef="let l" class="act">
+              <button *sgaPermission="'locations.update'" mat-icon-button color="primary" (click)="openLocationForm(l)" matTooltip="Editar"><mat-icon>edit</mat-icon></button>
+              <button *sgaPermission="'locations.delete'" mat-icon-button color="warn" (click)="deleteLocation(l)" matTooltip="Eliminar"><mat-icon>delete</mat-icon></button>
+            </td>
+          </ng-container>
+          <tr mat-header-row *matHeaderRowDef="locCols"></tr>
+          <tr mat-row *matRowDef="let row; columns: locCols;"></tr>
+          <tr class="mat-row" *matNoDataRow><td class="no-data" [attr.colspan]="locCols.length">Sin ubicaciones registradas</td></tr>
+        </table>
+      </div>
+    </div>
+  </mat-tab>
+</mat-tab-group>
