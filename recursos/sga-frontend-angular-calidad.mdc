@@ -1,0 +1,666 @@
+---
+description: Estándares de calidad de código, UI/UX y mejores prácticas Angular
+alwaysApply: true
+---
+
+# SGA Bojanini — Calidad Frontend Angular
+
+## Estructura de Componentes (obligatorio)
+
+### Anatomía de un componente
+
+```typescript
+// user-list.component.ts
+import { Component, OnInit, ChangeDetectionStrategy, signal } from '@angular/core';
+import { CommonModule } from '@angular/common';
+import { RouterLink } from '@angular/router';
+import { UserService } from '@core/services/user.service';
+import { User } from '@core/models/user.interface';
+
+@Component({
+  selector: 'sga-user-list',
+  standalone: true,
+  imports: [CommonModule, RouterLink],
+  templateUrl: './user-list.component.html',
+  styleUrls: ['./user-list.component.scss'],
+  changeDetection: ChangeDetectionStrategy.OnPush
+})
+export class UserListComponent implements OnInit {
+  // Signals para estado reactivo
+  users = signal<User[]>([]);
+  loading = signal(false);
+  error = signal<string | null>(null);
+  
+  // Servicios inyectados
+  constructor(private userService: UserService) {}
+  
+  ngOnInit(): void {
+    this.loadUsers();
+  }
+  
+  // Métodos públicos (usados en template)
+  loadUsers(): void {
+    this.loading.set(true);
+    this.userService.getUsers().subscribe({
+      next: (response) => {
+        this.users.set(response.data);
+        this.loading.set(false);
+      },
+      error: (error) => {
+        this.error.set('Error al cargar usuarios');
+        this.loading.set(false);
+      }
+    });
+  }
+  
+  trackByUserId(index: number, user: User): number {
+    return user.id;
+  }
+  
+  // Métodos privados (lógica interna)
+  private processUsers(users: User[]): User[] {
+    return users.filter(u => u.active);
+  }
+}
+```
+
+### Orden de elementos en clase
+
+1. Decoradores del componente
+2. Signals y propiedades públicas
+3. Inputs
+4. Outputs
+5. ViewChild/ContentChild
+6. Propiedades privadas
+7. Constructor
+8. Lifecycle hooks (en orden: ngOnChanges, ngOnInit, ngOnDestroy, etc.)
+9. Métodos públicos
+10. Métodos privados
+
+## Patrones de Componentes
+
+### Smart Components (Containers)
+
+- Contienen lógica de negocio y estado
+- Se comunican con servicios
+- Pasan datos a componentes presentacionales
+- Manejan routing
+
+```typescript
+// users-page.component.ts (SMART)
+@Component({
+  selector: 'sga-users-page',
+  standalone: true,
+  template: `
+    <sga-page-header 
+      title="Usuarios" 
+      [actions]="headerActions">
+    </sga-page-header>
+    
+    <sga-user-list 
+      [users]="users()" 
+      [loading]="loading()"
+      (userSelected)="onUserSelected($event)"
+      (userDeleted)="onUserDeleted($event)">
+    </sga-user-list>
+  `
+})
+export class UsersPageComponent {
+  users = signal<User[]>([]);
+  loading = signal(false);
+  
+  constructor(
+    private userService: UserService,
+    private router: Router
+  ) {}
+  
+  onUserSelected(user: User): void {
+    this.router.navigate(['/users', user.id]);
+  }
+  
+  onUserDeleted(userId: number): void {
+    this.userService.deleteUser(userId).subscribe(() => {
+      this.loadUsers();
+    });
+  }
+}
+```
+
+### Dumb Components (Presentational)
+
+- Solo presentan datos
+- Reciben datos vía @Input
+- Emiten eventos vía @Output
+- Sin dependencias de servicios
+- Reutilizables
+
+```typescript
+// user-card.component.ts (DUMB)
+@Component({
+  selector: 'sga-user-card',
+  standalone: true,
+  template: `
+    <div class="user-card" (click)="selected.emit(user)">
+      <img [src]="user.avatar" [alt]="user.name">
+      <h3>{{ user.name }}</h3>
+      <p>{{ user.email }}</p>
+      <button (click)="onDelete($event)">Eliminar</button>
+    </div>
+  `
+})
+export class UserCardComponent {
+  @Input({ required: true }) user!: User;
+  @Output() selected = new EventEmitter<User>();
+  @Output() deleted = new EventEmitter<number>();
+  
+  onDelete(event: Event): void {
+    event.stopPropagation();
+    this.deleted.emit(this.user.id);
+  }
+}
+```
+
+## Manejo de Estado
+
+### Estado Local (Signals)
+
+```typescript
+// Para estado simple de componente
+export class CounterComponent {
+  count = signal(0);
+  doubled = computed(() => this.count() * 2);
+  
+  increment(): void {
+    this.count.update(c => c + 1);
+  }
+}
+```
+
+### Estado Global (Service + Signals)
+
+```typescript
+// auth.service.ts
+@Injectable({ providedIn: 'root' })
+export class AuthService {
+  private userSignal = signal<User | null>(null);
+  private isAuthenticatedSignal = signal(false);
+  
+  // Exponemos como readonly
+  readonly user = this.userSignal.asReadonly();
+  readonly isAuthenticated = this.isAuthenticatedSignal.asReadonly();
+  
+  login(credentials: LoginCredentials): Observable<void> {
+    return this.http.post<ApiResponse<User>>('/auth/login', credentials).pipe(
+      tap(response => {
+        this.userSignal.set(response.data);
+        this.isAuthenticatedSignal.set(true);
+      }),
+      map(() => void 0)
+    );
+  }
+  
+  logout(): void {
+    this.userSignal.set(null);
+    this.isAuthenticatedSignal.set(false);
+  }
+}
+```
+
+## Manejo de Errores
+
+### Error Interceptor
+
+```typescript
+// error.interceptor.ts
+export const errorInterceptor: HttpInterceptorFn = (req, next) => {
+  const notificationService = inject(NotificationService);
+  
+  return next(req).pipe(
+    catchError((error: HttpErrorResponse) => {
+      let errorMessage = 'Ha ocurrido un error';
+      
+      if (error.error?.message) {
+        errorMessage = error.error.message;
+      } else if (error.status === 0) {
+        errorMessage = 'No se pudo conectar con el servidor';
+      } else if (error.status === 401) {
+        errorMessage = 'No autorizado';
+      } else if (error.status === 403) {
+        errorMessage = 'No tienes permisos para esta acción';
+      } else if (error.status === 404) {
+        errorMessage = 'Recurso no encontrado';
+      } else if (error.status >= 500) {
+        errorMessage = 'Error del servidor';
+      }
+      
+      notificationService.error(errorMessage);
+      return throwError(() => error);
+    })
+  );
+};
+```
+
+### Component Error Handling
+
+```typescript
+export class UserFormComponent {
+  formErrors = signal<Record<string, string>>({});
+  
+  onSubmit(): void {
+    this.userService.createUser(this.form.value).subscribe({
+      next: () => this.router.navigate(['/users']),
+      error: (error: HttpErrorResponse) => {
+        if (error.status === 422 && error.error?.errors) {
+          // Errores de validación del backend
+          this.formErrors.set(error.error.errors);
+        }
+      }
+    });
+  }
+}
+```
+
+## Validaciones de Formularios
+
+### Validadores Personalizados
+
+```typescript
+// validators/custom-validators.ts
+export class CustomValidators {
+  static nit(control: AbstractControl): ValidationErrors | null {
+    const value = control.value;
+    if (!value) return null;
+    
+    // Lógica de validación NIT colombiano
+    const nitRegex = /^\d{9}-\d$/;
+    return nitRegex.test(value) ? null : { nit: true };
+  }
+  
+  static phoneNumber(control: AbstractControl): ValidationErrors | null {
+    const value = control.value;
+    if (!value) return null;
+    
+    const phoneRegex = /^(\+57)?[0-9]{10}$/;
+    return phoneRegex.test(value) ? null : { phoneNumber: true };
+  }
+}
+
+// Uso en componente
+this.form = this.fb.group({
+  nit: ['', [Validators.required, CustomValidators.nit]],
+  phone: ['', CustomValidators.phoneNumber]
+});
+```
+
+### Mensajes de Error
+
+```typescript
+// Template
+<input formControlName="email" />
+@if (form.controls.email.invalid && form.controls.email.touched) {
+  <div class="error-message">
+    @if (form.controls.email.hasError('required')) {
+      El email es requerido
+    }
+    @if (form.controls.email.hasError('email')) {
+      El email no es válido
+    }
+  </div>
+}
+```
+
+## Optimización de Performance
+
+### Change Detection
+
+```typescript
+// Usar OnPush siempre que sea posible
+@Component({
+  changeDetection: ChangeDetectionStrategy.OnPush
+})
+export class OptimizedComponent {
+  // Usar signals para reactividad automática
+  data = signal([]);
+  
+  // O usar immutability con observables + async pipe
+  data$ = this.service.getData();
+}
+```
+
+### TrackBy en listas
+
+```typescript
+// SIEMPRE usar trackBy en ngFor
+@Component({
+  template: `
+    <div *ngFor="let item of items; trackBy: trackById">
+      {{ item.name }}
+    </div>
+  `
+})
+export class ListComponent {
+  trackById(index: number, item: any): number {
+    return item.id;
+  }
+}
+```
+
+### Lazy Loading de Imágenes
+
+```typescript
+// Usar loading="lazy" en imágenes
+<img [src]="imageUrl" loading="lazy" alt="Description">
+
+// O usar CDK para virtual scrolling en listas largas
+import { ScrollingModule } from '@angular/cdk/scrolling';
+
+<cdk-virtual-scroll-viewport itemSize="50" class="viewport">
+  <div *cdkVirtualFor="let item of items">{{ item }}</div>
+</cdk-virtual-scroll-viewport>
+```
+
+## Pipes
+
+### Pipes Puros
+
+```typescript
+// date-format.pipe.ts
+@Pipe({
+  name: 'dateFormat',
+  standalone: true,
+  pure: true // Default, asegura que el pipe no se re-ejecute innecesariamente
+})
+export class DateFormatPipe implements PipeTransform {
+  transform(value: Date | string, format: string = 'dd/MM/yyyy'): string {
+    if (!value) return '';
+    const date = typeof value === 'string' ? new Date(value) : value;
+    return formatDate(date, format, 'es-CO');
+  }
+}
+```
+
+## Guards
+
+### Auth Guard
+
+```typescript
+// auth.guard.ts
+export const authGuard: CanActivateFn = (route, state) => {
+  const authService = inject(AuthService);
+  const router = inject(Router);
+  
+  if (authService.isAuthenticated()) {
+    return true;
+  }
+  
+  // Redirigir a login con returnUrl
+  return router.createUrlTree(['/login'], {
+    queryParams: { returnUrl: state.url }
+  });
+};
+```
+
+### Role Guard
+
+```typescript
+// role.guard.ts
+export function roleGuard(...allowedRoles: string[]): CanActivateFn {
+  return (route, state) => {
+    const authService = inject(AuthService);
+    const router = inject(Router);
+    
+    const user = authService.user();
+    if (!user) {
+      return router.createUrlTree(['/login']);
+    }
+    
+    if (allowedRoles.includes(user.role)) {
+      return true;
+    }
+    
+    return router.createUrlTree(['/unauthorized']);
+  };
+}
+
+// Uso en rutas
+{
+  path: 'admin',
+  canActivate: [authGuard, roleGuard('admin', 'superadmin')],
+  loadComponent: () => import('./admin.component')
+}
+```
+
+## Directivas
+
+### Custom Directives
+
+```typescript
+// has-permission.directive.ts
+@Directive({
+  selector: '[sgaHasPermission]',
+  standalone: true
+})
+export class HasPermissionDirective implements OnInit {
+  @Input('sgaHasPermission') permission!: string;
+  
+  constructor(
+    private templateRef: TemplateRef<any>,
+    private viewContainer: ViewContainerRef,
+    private authService: AuthService
+  ) {}
+  
+  ngOnInit(): void {
+    if (this.authService.hasPermission(this.permission)) {
+      this.viewContainer.createEmbeddedView(this.templateRef);
+    } else {
+      this.viewContainer.clear();
+    }
+  }
+}
+
+// Uso
+<button *sgaHasPermission="'users.delete'" (click)="delete()">
+  Eliminar
+</button>
+```
+
+## Buenas Prácticas UI/UX
+
+### Loading States
+
+```typescript
+@Component({
+  template: `
+    @if (loading()) {
+      <div class="loading-spinner">
+        <mat-spinner></mat-spinner>
+        <p>Cargando...</p>
+      </div>
+    } @else if (error()) {
+      <div class="error-state">
+        <p>{{ error() }}</p>
+        <button (click)="retry()">Reintentar</button>
+      </div>
+    } @else {
+      <div class="content">
+        <!-- Contenido -->
+      </div>
+    }
+  `
+})
+export class DataComponent {
+  loading = signal(false);
+  error = signal<string | null>(null);
+}
+```
+
+### Feedback al Usuario
+
+```typescript
+// notification.service.ts
+@Injectable({ providedIn: 'root' })
+export class NotificationService {
+  constructor(private snackBar: MatSnackBar) {}
+  
+  success(message: string): void {
+    this.snackBar.open(message, 'Cerrar', {
+      duration: 3000,
+      panelClass: ['success-snackbar']
+    });
+  }
+  
+  error(message: string): void {
+    this.snackBar.open(message, 'Cerrar', {
+      duration: 5000,
+      panelClass: ['error-snackbar']
+    });
+  }
+  
+  info(message: string): void {
+    this.snackBar.open(message, 'Cerrar', {
+      duration: 3000,
+      panelClass: ['info-snackbar']
+    });
+  }
+}
+```
+
+### Confirmaciones
+
+```typescript
+// Usar MatDialog o servicio custom para confirmaciones
+confirm(message: string): Observable<boolean> {
+  return this.dialog.open(ConfirmDialogComponent, {
+    data: { message }
+  }).afterClosed();
+}
+
+// Uso
+deleteUser(user: User): void {
+  this.dialogService.confirm('¿Estás seguro de eliminar este usuario?')
+    .pipe(
+      filter(confirmed => confirmed),
+      switchMap(() => this.userService.delete(user.id))
+    )
+    .subscribe(() => {
+      this.notificationService.success('Usuario eliminado');
+      this.loadUsers();
+    });
+}
+```
+
+## Internacionalización (i18n)
+
+```typescript
+// Si el proyecto requiere múltiples idiomas
+// app.config.ts
+import { provideTransloco } from '@ngneat/transloco';
+
+export const appConfig: ApplicationConfig = {
+  providers: [
+    provideTransloco({
+      config: {
+        availableLangs: ['es', 'en'],
+        defaultLang: 'es',
+        reRenderOnLangChange: true
+      }
+    })
+  ]
+};
+
+// Uso en template
+<h1>{{ 'home.title' | transloco }}</h1>
+```
+
+## Testing
+
+### Component Testing
+
+```typescript
+describe('UserListComponent', () => {
+  let component: UserListComponent;
+  let fixture: ComponentFixture<UserListComponent>;
+  let userService: jasmine.SpyObj<UserService>;
+  
+  beforeEach(async () => {
+    const userServiceSpy = jasmine.createSpyObj('UserService', ['getUsers']);
+    
+    await TestBed.configureTestingModule({
+      imports: [UserListComponent],
+      providers: [
+        { provide: UserService, useValue: userServiceSpy }
+      ]
+    }).compileComponents();
+    
+    fixture = TestBed.createComponent(UserListComponent);
+    component = fixture.componentInstance;
+    userService = TestBed.inject(UserService) as jasmine.SpyObj<UserService>;
+  });
+  
+  it('should load users on init', () => {
+    const mockUsers = [{ id: 1, name: 'Test' }];
+    userService.getUsers.and.returnValue(of({ 
+      success: true, 
+      data: mockUsers 
+    }));
+    
+    component.ngOnInit();
+    
+    expect(component.users()).toEqual(mockUsers);
+  });
+});
+```
+
+## Documentación en Código
+
+```typescript
+/**
+ * Componente para gestionar la lista de usuarios del sistema.
+ * 
+ * @example
+ * <sga-user-list 
+ *   [users]="users" 
+ *   (userSelected)="onSelect($event)">
+ * </sga-user-list>
+ */
+@Component({
+  selector: 'sga-user-list',
+  // ...
+})
+export class UserListComponent {
+  /**
+   * Lista de usuarios a mostrar
+   */
+  @Input() users: User[] = [];
+  
+  /**
+   * Evento emitido cuando se selecciona un usuario
+   */
+  @Output() userSelected = new EventEmitter<User>();
+  
+  /**
+   * Carga la lista de usuarios desde el servidor
+   * @throws {Error} Si hay un error en la comunicación con el API
+   */
+  loadUsers(): void {
+    // ...
+  }
+}
+```
+
+## Checklist antes de commit
+
+- [ ] Código compilado sin errores ni warnings
+- [ ] Tests pasando
+- [ ] Código formateado (Prettier/ESLint)
+- [ ] No hay console.logs innecesarios
+- [ ] Interfaces y tipos definidos
+- [ ] Manejo de errores implementado
+- [ ] Loading states agregados
+- [ ] TrackBy en ngFor
+- [ ] OnPush change detection cuando sea posible
+- [ ] Subscripciones limpias (async pipe o takeUntilDestroyed)
+- [ ] Validaciones de formularios
+- [ ] Mensajes de error amigables
+- [ ] Componentes pequeños y enfocados
+- [ ] Nombres descriptivos y consistentes

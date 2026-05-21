@@ -1,0 +1,151 @@
+.loading-center {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 4rem;
+  gap: 1rem;
+  color: #718096;
+}
+
+.welcome-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: linear-gradient(135deg, #1E2A3B, #2d3e54);
+  color: #fff;
+  border-radius: 12px;
+  padding: 1.5rem 2rem;
+  margin-bottom: 2rem;
+
+  h2 {
+    font-size: 1.25rem;
+    font-weight: 700;
+    margin: 0 0 0.25rem 0;
+    color: #FFCF01;
+  }
+
+  p {
+    margin: 0;
+    color: rgba(255, 255, 255, 0.6);
+    font-size: 0.875rem;
+    text-transform: capitalize;
+  }
+}
+
+.welcome-icon {
+  font-size: 3rem;
+  width: 3rem;
+  height: 3rem;
+  color: #FFCF01;
+}
+
+.section-title {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 1rem;
+  font-weight: 600;
+  color: #4a5568;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin: 1.5rem 0 1rem 0;
+
+  mat-icon {
+    font-size: 1.25rem;
+    width: 1.25rem;
+    height: 1.25rem;
+    color: #C02F86;
+  }
+}
+
+.kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.kpi-card {
+  background: #fff;
+  border-radius: 12px;
+  padding: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.5rem;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+  border: 1px solid #e2e8f0;
+  transition: transform 150ms, box-shadow 150ms;
+
+  &:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  }
+
+  &--primary {
+    background: linear-gradient(135deg, #FFCF01, #ffd633);
+    border-color: #FFCF01;
+
+    mat-icon, .kpi-card__label {
+      color: #1E2A3B;
+    }
+
+    .kpi-card__value {
+      color: #1E2A3B;
+    }
+  }
+
+  &--alert {
+    border-color: #fc8181;
+  }
+
+  &--wide {
+    grid-column: span 2;
+
+    @media (max-width: 600px) {
+      grid-column: span 1;
+    }
+  }
+
+  mat-icon {
+    font-size: 1.75rem;
+    width: 1.75rem;
+    height: 1.75rem;
+    color: #718096;
+  }
+
+  &__value {
+    font-size: 2rem;
+    font-weight: 800;
+    color: #1a202c;
+    line-height: 1;
+
+    &--success { color: #276749; }
+    &--warn { color: #c05621; }
+    &--error { color: #c53030; }
+  }
+
+  &__label {
+    font-size: 0.8rem;
+    color: #718096;
+    font-weight: 500;
+  }
+}
+
+.icon-success { color: #38a169 !important; }
+.icon-warn { color: #dd6b20 !important; }
+.icon-error { color: #e53e3e !important; }
+
+.quick-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-bottom: 2rem;
+}
+
+.quick-action {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}

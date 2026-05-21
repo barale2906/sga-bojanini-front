@@ -1,0 +1,76 @@
+<app-page-header title="Roles" subtitle="Gestión de roles y permisos" icon="manage_accounts">
+  <button
+    *sgaPermission="'roles.create'"
+    mat-raised-button
+    color="primary"
+    (click)="openForm()"
+  >
+    <mat-icon>add</mat-icon>
+    Nuevo Rol
+  </button>
+</app-page-header>
+
+<app-loading-spinner [loading]="loading()" [inline]="true"></app-loading-spinner>
+
+<div class="table-container mat-elevation-z1">
+  <table mat-table [dataSource]="roles()">
+
+    <ng-container matColumnDef="name">
+      <th mat-header-cell *matHeaderCellDef>Nombre del Rol</th>
+      <td mat-cell *matCellDef="let role">
+        <span class="role-name">{{ role.name }}</span>
+      </td>
+    </ng-container>
+
+    <ng-container matColumnDef="permissions_count">
+      <th mat-header-cell *matHeaderCellDef>Permisos</th>
+      <td mat-cell *matCellDef="let role">
+        <span class="count-badge count-badge--blue">
+          {{ role.permissions.length }} permisos
+        </span>
+      </td>
+    </ng-container>
+
+    <ng-container matColumnDef="users_count">
+      <th mat-header-cell *matHeaderCellDef>Usuarios</th>
+      <td mat-cell *matCellDef="let role">
+        <span class="count-badge count-badge--gray">
+          {{ role.users_count }} usuario(s)
+        </span>
+      </td>
+    </ng-container>
+
+    <ng-container matColumnDef="actions">
+      <th mat-header-cell *matHeaderCellDef class="actions-col">Acciones</th>
+      <td mat-cell *matCellDef="let role" class="actions-col">
+        <button
+          *sgaPermission="'roles.update'"
+          mat-icon-button
+          color="primary"
+          (click)="openForm(role)"
+          matTooltip="Editar permisos"
+        >
+          <mat-icon>edit</mat-icon>
+        </button>
+        <button
+          *sgaPermission="'roles.delete'"
+          mat-icon-button
+          color="warn"
+          (click)="confirmDelete(role)"
+          matTooltip="Eliminar rol"
+        >
+          <mat-icon>delete</mat-icon>
+        </button>
+      </td>
+    </ng-container>
+
+    <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+    <tr mat-row *matRowDef="let row; columns: displayedColumns;"></tr>
+
+    <tr class="mat-row" *matNoDataRow>
+      <td class="mat-cell no-data" [attr.colspan]="displayedColumns.length">
+        <p>No hay roles configurados</p>
+      </td>
+    </tr>
+  </table>
+</div>

@@ -1,0 +1,63 @@
+<app-page-header title="Notificaciones" subtitle="Centro de notificaciones del sistema" icon="notifications">
+  @if (notifications().some(n => !n.read_at)) {
+    <button mat-stroked-button (click)="markAllAsRead()">
+      <mat-icon>done_all</mat-icon>
+      Marcar todas como leídas
+    </button>
+  }
+</app-page-header>
+
+<div class="filter-bar">
+  <mat-slide-toggle
+    [checked]="unreadOnly()"
+    (change)="unreadOnly.set($event.checked); load(1)"
+    color="primary"
+  >
+    Solo no leídas
+  </mat-slide-toggle>
+  <span class="total">{{ meta().total }} notificación(es)</span>
+</div>
+
+<div class="notifications-list">
+  @for (notif of notifications(); track notif.id) {
+    <div
+      class="notif-item"
+      [class.unread]="!notif.read_at"
+      [class]="getSeverityClass(notif.severity)"
+    >
+      <mat-icon class="notif-icon">
+        {{ notif.severity === 'critical' ? 'error' : notif.severity === 'warning' ? 'warning' : 'info' }}
+      </mat-icon>
+      <div class="notif-body">
+        <div class="notif-header">
+          <strong>{{ notif.title }}</strong>
+          <small>{{ notif.created_at | dateFormat:'relative' }}</small>
+        </div>
+        <p>{{ notif.message }}</p>
+        <mat-chip [class]="'chip-' + notif.severity" disableRipple>{{ notif.severity }}</mat-chip>
+      </div>
+      @if (!notif.read_at) {
+        <button mat-icon-button (click)="markAsRead(notif.id)" matTooltip="Marcar como leída">
+          <mat-icon>check_circle_outline</mat-icon>
+        </button>
+      } @else {
+        <mat-icon class="read-icon">check_circle</mat-icon>
+      }
+    </div>
+  }
+  @if (notifications().length === 0 && !loading()) {
+    <div class="empty-state">
+      <mat-icon>notifications_none</mat-icon>
+      <p>No hay notificaciones</p>
+    </div>
+  }
+</div>
+
+<mat-paginator
+  [length]="meta().total"
+  [pageSize]="meta().per_page"
+  [pageIndex]="meta().current_page - 1"
+  [pageSizeOptions]="[10, 25, 50]"
+  (page)="onPageChange($event)"
+  showFirstLastButtons
+></mat-paginator>

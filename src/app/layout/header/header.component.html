@@ -1,0 +1,89 @@
+<mat-toolbar class="header">
+  <!-- Toggle sidebar -->
+  <button mat-icon-button (click)="toggleSidebar.emit()" class="header__toggle" aria-label="Menú">
+    <mat-icon>menu</mat-icon>
+  </button>
+
+  <span class="header__spacer"></span>
+
+  <!-- Notifications -->
+  <button
+    mat-icon-button
+    [matMenuTriggerFor]="notifMenu"
+    (click)="loadRecentNotifications()"
+    aria-label="Notificaciones"
+  >
+    @if (notifService.count() > 0) {
+      <mat-icon
+        [matBadge]="notifService.count()"
+        matBadgeColor="warn"
+        matBadgeSize="small"
+      >notifications</mat-icon>
+    } @else {
+      <mat-icon>notifications_none</mat-icon>
+    }
+  </button>
+
+  <mat-menu #notifMenu="matMenu" class="notification-menu">
+    <div class="notif-header">
+      <strong>Notificaciones</strong>
+      @if (notifService.count() > 0) {
+        <span class="notif-badge">{{ notifService.count() }} nuevas</span>
+      }
+    </div>
+    <mat-divider></mat-divider>
+
+    @if (recentNotifications.length === 0) {
+      <div class="notif-empty">
+        <mat-icon>notifications_none</mat-icon>
+        <p>Sin notificaciones recientes</p>
+      </div>
+    }
+
+    @for (notif of recentNotifications; track notif.id) {
+      <div
+        class="notif-item"
+        [class.notif-item--unread]="!notif.read_at"
+        [class.notif-item--critical]="notif.severity === 'critical'"
+        (click)="markAsRead(notif.id)"
+      >
+        <mat-icon class="notif-icon" [class]="'notif-icon--' + notif.severity">
+          {{ notif.severity === 'critical' ? 'error' : notif.severity === 'warning' ? 'warning' : 'info' }}
+        </mat-icon>
+        <div class="notif-content">
+          <p class="notif-title">{{ notif.title }}</p>
+          <p class="notif-msg">{{ notif.message }}</p>
+          <small class="notif-time">{{ notif.created_at | dateFormat:'relative' }}</small>
+        </div>
+      </div>
+    }
+
+    <mat-divider></mat-divider>
+    <a mat-button routerLink="/notifications" class="notif-all-link">
+      Ver todas las notificaciones
+    </a>
+  </mat-menu>
+
+  <!-- User menu -->
+  <button mat-button [matMenuTriggerFor]="userMenu" class="header__user-btn">
+    <mat-icon>account_circle</mat-icon>
+    <span class="header__user-name">{{ auth.userName() }}</span>
+    <mat-icon>arrow_drop_down</mat-icon>
+  </button>
+
+  <mat-menu #userMenu="matMenu">
+    <a mat-menu-item routerLink="/profile">
+      <mat-icon>person</mat-icon>
+      <span>Mi Perfil</span>
+    </a>
+    <a mat-menu-item routerLink="/profile/password">
+      <mat-icon>lock</mat-icon>
+      <span>Cambiar Contraseña</span>
+    </a>
+    <mat-divider></mat-divider>
+    <button mat-menu-item (click)="logout()">
+      <mat-icon>logout</mat-icon>
+      <span>Cerrar Sesión</span>
+    </button>
+  </mat-menu>
+</mat-toolbar>

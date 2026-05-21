@@ -1,0 +1,43 @@
+.table-container {
+  border-radius: 8px;
+  overflow: hidden;
+  background: #fff;
+}
+
+.role-name {
+  font-weight: 600;
+  font-family: monospace;
+  background: #EDF2F7;
+  padding: 0.2rem 0.5rem;
+  border-radius: 4px;
+  font-size: 0.875rem;
+}
+
+.count-badge {
+  display: inline-flex;
+  padding: 0.15rem 0.6rem;
+  border-radius: 9999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+
+  &--blue {
+    background: #bee3f8;
+    color: #2b6cb0;
+  }
+
+  &--gray {
+    background: #e2e8f0;
+    color: #4a5568;
+  }
+}
+
+.actions-col {
+  width: 100px;
+  text-align: right;
+}
+
+.no-data {
+  text-align: center;
+  padding: 3rem;
+  color: #a0aec0;
+}

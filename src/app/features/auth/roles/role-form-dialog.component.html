@@ -1,0 +1,75 @@
+<h2 mat-dialog-title>
+  <mat-icon>{{ data ? 'edit' : 'add' }}</mat-icon>
+  {{ data ? 'Editar Rol: ' + data.name : 'Nuevo Rol' }}
+</h2>
+
+<mat-dialog-content class="dialog-content">
+
+  <app-form-errors [errors]="validationErrors()"></app-form-errors>
+
+  <form [formGroup]="form" novalidate>
+    <mat-form-field appearance="outline" class="w-full">
+      <mat-label>Nombre del rol *</mat-label>
+      <input matInput formControlName="name" placeholder="ej: supervisor" />
+      @if (form.get('name')?.hasError('required') && form.get('name')?.touched) {
+        <mat-error>El nombre es requerido</mat-error>
+      }
+    </mat-form-field>
+  </form>
+
+  <h3 class="permissions-title">Permisos</h3>
+
+  @if (loading()) {
+    <div class="loading-center">
+      <mat-spinner diameter="32"></mat-spinner>
+    </div>
+  }
+
+  <div class="permissions-grid">
+    @for (module of moduleNames; track module) {
+      <div class="permission-module">
+        <div class="permission-module__header">
+          <mat-checkbox
+            [checked]="isModuleSelected(module)"
+            [indeterminate]="isModuleIndeterminate(module)"
+            (change)="toggleModule(module)"
+            color="primary"
+          >
+            <span class="module-label">{{ moduleLabels[module] || module }}</span>
+          </mat-checkbox>
+        </div>
+        <div class="permission-module__items">
+          @for (perm of permissionsGrouped()[module]; track perm.id) {
+            <mat-checkbox
+              [checked]="selectedPermissions().has(perm.id)"
+              (change)="togglePermission(perm)"
+              color="primary"
+              class="perm-item"
+            >
+              {{ getPermissionLabel(perm.name) }}
+            </mat-checkbox>
+          }
+        </div>
+      </div>
+      <mat-divider></mat-divider>
+    }
+  </div>
+
+</mat-dialog-content>
+
+<mat-dialog-actions align="end">
+  <button mat-button [mat-dialog-close]="false" [disabled]="saving()">
+    Cancelar
+  </button>
+  <button
+    mat-raised-button
+    color="primary"
+    (click)="onSubmit()"
+    [disabled]="form.invalid || saving()"
+  >
+    @if (saving()) {
+      <mat-spinner diameter="18" color="accent"></mat-spinner>
+    }
+    {{ data ? 'Guardar Cambios' : 'Crear Rol' }}
+  </button>
+</mat-dialog-actions>

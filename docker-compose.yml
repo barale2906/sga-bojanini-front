@@ -1,0 +1,24 @@
+services:
+  angular:
+    build:
+      context: .
+      dockerfile: docker/angular.Dockerfile
+    volumes:
+      - .:/app
+      - angular_node_modules:/app/node_modules
+    working_dir: /app
+    command: npm run start -- --host 0.0.0.0 --port 4200 --poll 2000 --proxy-config proxy.docker.conf.json
+    ports:
+      - "4202:4200"
+    environment:
+      - NODE_ENV=development
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    networks:
+      - sga
+
+volumes:
+  angular_node_modules:
+
+networks:
+  sga:

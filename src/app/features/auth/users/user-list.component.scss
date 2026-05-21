@@ -1,0 +1,97 @@
+.filters-bar {
+  display: flex;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+  flex-wrap: wrap;
+
+  &__search {
+    flex: 1;
+    min-width: 200px;
+  }
+
+  &__select {
+    width: 160px;
+  }
+}
+
+.table-container {
+  border-radius: 8px;
+  overflow: hidden;
+  background: #fff;
+}
+
+.user-name {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.user-avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: #FFCF01;
+  color: #1E2A3B;
+  font-weight: 700;
+  font-size: 0.875rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.role-chip {
+  font-size: 0.7rem !important;
+  min-height: 22px !important;
+  padding: 0 8px !important;
+  background: #EDF2F7 !important;
+  color: #4A5568 !important;
+  margin-right: 4px !important;
+}
+
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.15rem 0.6rem;
+  border-radius: 9999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+
+  &--active {
+    background: #c6f6d5;
+    color: #276749;
+  }
+
+  &--inactive {
+    background: #fed7d7;
+    color: #c53030;
+  }
+}
+
+.actions-col {
+  width: 100px;
+  text-align: right;
+}
+
+.no-data {
+  text-align: center;
+  padding: 3rem 1rem;
+  color: #a0aec0;
+
+  mat-icon {
+    font-size: 3rem;
+    width: 3rem;
+    height: 3rem;
+    display: block;
+    margin: 0 auto 0.5rem;
+  }
+
+  p { margin: 0; }
+}
+
+.text-muted {
+  color: #a0aec0;
+  font-size: 0.875rem;
+}
+
+.w-full { width: 100%; }

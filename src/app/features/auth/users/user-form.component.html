@@ -1,0 +1,118 @@
+<app-page-header
+  [title]="isEdit() ? 'Editar Usuario' : 'Nuevo Usuario'"
+  [subtitle]="isEdit() ? 'Modifica los datos del usuario' : 'Crea un nuevo usuario del sistema'"
+  icon="person"
+>
+  <button mat-button routerLink="/users">
+    <mat-icon>arrow_back</mat-icon>
+    Volver
+  </button>
+</app-page-header>
+
+<div class="form-container">
+  <mat-card>
+    <mat-card-content>
+
+      <app-form-errors [errors]="validationErrors()"></app-form-errors>
+
+      @if (loading()) {
+        <div class="loading-center">
+          <mat-spinner diameter="40"></mat-spinner>
+        </div>
+      }
+
+      <form [formGroup]="form" (ngSubmit)="onSubmit()" novalidate>
+        <div class="form-grid">
+
+          <!-- Nombre -->
+          <mat-form-field appearance="outline" class="col-span-2">
+            <mat-label>Nombre completo *</mat-label>
+            <mat-icon matPrefix>badge</mat-icon>
+            <input matInput formControlName="name" placeholder="Juan Pérez" />
+            @if (form.get('name')?.hasError('required') && form.get('name')?.touched) {
+              <mat-error>El nombre es requerido</mat-error>
+            }
+            @if (fieldErrors()['name']) {
+              <mat-error>{{ fieldErrors()['name'][0] }}</mat-error>
+            }
+          </mat-form-field>
+
+          <!-- Email -->
+          <mat-form-field appearance="outline">
+            <mat-label>Correo electrónico *</mat-label>
+            <mat-icon matPrefix>email</mat-icon>
+            <input matInput type="email" formControlName="email" placeholder="usuario@bojanini.com" />
+            @if (form.get('email')?.hasError('email') && form.get('email')?.touched) {
+              <mat-error>Ingresa un email válido</mat-error>
+            }
+            @if (fieldErrors()['email']) {
+              <mat-error>{{ fieldErrors()['email'][0] }}</mat-error>
+            }
+          </mat-form-field>
+
+          <!-- Teléfono -->
+          <mat-form-field appearance="outline">
+            <mat-label>Teléfono</mat-label>
+            <mat-icon matPrefix>phone</mat-icon>
+            <input matInput formControlName="phone" placeholder="+573001234567" />
+          </mat-form-field>
+
+          <!-- Contraseña -->
+          <mat-form-field appearance="outline">
+            <mat-label>{{ isEdit() ? 'Nueva contraseña (dejar vacío para no cambiar)' : 'Contraseña *' }}</mat-label>
+            <mat-icon matPrefix>lock</mat-icon>
+            <input matInput [type]="showPassword() ? 'text' : 'password'" formControlName="password" />
+            <button mat-icon-button matSuffix type="button" (click)="showPassword.update(v => !v)">
+              <mat-icon>{{ showPassword() ? 'visibility_off' : 'visibility' }}</mat-icon>
+            </button>
+            @if (form.get('password')?.hasError('minlength') && form.get('password')?.touched) {
+              <mat-error>Mínimo 8 caracteres</mat-error>
+            }
+            @if (fieldErrors()['password']) {
+              <mat-error>{{ fieldErrors()['password'][0] }}</mat-error>
+            }
+          </mat-form-field>
+
+          <!-- Roles -->
+          <mat-form-field appearance="outline">
+            <mat-label>Roles</mat-label>
+            <mat-icon matPrefix>manage_accounts</mat-icon>
+            <mat-select formControlName="role_ids" multiple>
+              @for (role of roles(); track role.id) {
+                <mat-option [value]="role.id">{{ role.name }}</mat-option>
+              }
+            </mat-select>
+          </mat-form-field>
+
+          <!-- Estado -->
+          <div class="toggle-field">
+            <label>Estado</label>
+            <mat-slide-toggle formControlName="is_active" color="primary">
+              {{ form.get('is_active')?.value ? 'Activo' : 'Inactivo' }}
+            </mat-slide-toggle>
+          </div>
+
+        </div>
+
+        <!-- Actions -->
+        <div class="form-actions">
+          <button mat-button type="button" routerLink="/users" [disabled]="saving()">
+            Cancelar
+          </button>
+          <button
+            mat-raised-button
+            color="primary"
+            type="submit"
+            [disabled]="form.invalid || saving()"
+          >
+            @if (saving()) {
+              <mat-spinner diameter="18" color="accent"></mat-spinner>
+            }
+            {{ isEdit() ? 'Guardar Cambios' : 'Crear Usuario' }}
+          </button>
+        </div>
+
+      </form>
+    </mat-card-content>
+  </mat-card>
+</div>

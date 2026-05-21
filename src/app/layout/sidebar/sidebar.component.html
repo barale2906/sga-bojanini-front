@@ -1,0 +1,41 @@
+<aside class="sidebar" [class.sidebar--collapsed]="collapsed">
+  <!-- Logo -->
+  <div class="sidebar__logo">
+    @if (!collapsed) {
+      <div class="sidebar__brand">
+        <span class="sidebar__brand-name">SGA</span>
+        <span class="sidebar__brand-sub">Bojanini</span>
+      </div>
+    } @else {
+      <span class="sidebar__brand-icon">SGA</span>
+    }
+  </div>
+
+  <!-- Navigation -->
+  <nav class="sidebar__nav">
+    @for (item of visibleItems; track item.label) {
+      <a
+        class="sidebar__item"
+        [class.sidebar__item--active]="isActive(item.route || '')"
+        [routerLink]="item.route"
+        [matTooltip]="collapsed ? item.label : ''"
+        matTooltipPosition="right"
+      >
+        <mat-icon class="sidebar__item-icon">{{ item.icon }}</mat-icon>
+        @if (!collapsed) {
+          <span class="sidebar__item-label">{{ item.label }}</span>
+        }
+      </a>
+    }
+  </nav>
+
+  <!-- User info at bottom -->
+  @if (!collapsed) {
+    <div class="sidebar__footer">
+      <div class="sidebar__user">
+        <mat-icon>person</mat-icon>
+        <span class="sidebar__user-name">{{ auth.userName() }}</span>
+      </div>
+    </div>
+  }
+</aside>

@@ -1,0 +1,410 @@
+---
+description: Premisas globales para desarrollo frontend Angular del SGA Bojanini
+alwaysApply: true
+---
+
+# SGA Bojanini — Premisas Frontend Angular
+
+## Rol y calidad
+
+- Actúa como desarrollador frontend senior especializado en Angular (versión 16+).
+- Domina TypeScript, RxJS, arquitectura de componentes, state management y mejores prácticas de UX/UI.
+- El código debe ser profesional, limpio, tipado, optimizado, escalable y reutilizable.
+- Respuestas y documentación técnica en **español**; nombres de código (variables, clases, archivos) en **inglés** según convenciones Angular.
+
+## Git y control de cambios
+
+- **Los commits los crea y aprueba el usuario.** No ejecutes `git commit`, `git push` ni abras PRs salvo petición explícita.
+- Puedes preparar cambios en el working tree y sugerir mensaje de commit; el usuario decide cuándo versionar.
+- Nunca commitear `node_modules/`, archivos de build (`dist/`), `.env`, credenciales ni secretos.
+- El `.gitignore` debe excluir: `node_modules/`, `dist/`, `.angular/cache/`, `*.log`, `.env*`, IDE configs.
+
+## Arquitectura y estructura del proyecto
+
+### Organización de carpetas
+
+```
+src/
+├── app/
+│   ├── core/                    # Servicios singleton, guards, interceptors
+│   │   ├── guards/
+│   │   ├── interceptors/
+│   │   ├── services/           # Auth, API, config services
+│   │   └── models/             # Interfaces y tipos globales
+│   ├── shared/                 # Componentes, pipes, directivas reutilizables
+│   │   ├── components/
+│   │   ├── directives/
+│   │   ├── pipes/
+│   │   └── utils/
+│   ├── features/               # Módulos por funcionalidad
+│   │   ├── inventario/
+│   │   │   ├── components/
+│   │   │   ├── services/
+│   │   │   ├── models/
+│   │   │   ├── pages/
+│   │   │   └── inventario.routes.ts
+│   │   ├── presentaciones/
+│   │   └── productos/
+│   ├── layouts/                # Layouts principales (admin, auth, public)
+│   └── app.config.ts           # Configuración principal
+├── assets/
+├── environments/
+└── styles/
+```
+
+### Principios arquitectónicos
+
+- **Standalone Components:** usar componentes standalone (sin módulos) para Angular 16+.
+- **Smart/Dumb Pattern:** componentes contenedores (smart) con lógica y presentacionales (dumb) sin estado.
+- **Lazy Loading:** cargar features bajo demanda mediante rutas lazy.
+- **Signals:** preferir signals sobre RxJS para estado local cuando sea apropiado (Angular 16+).
+- **Dependency Injection:** usar el sistema de DI de Angular correctamente con providers apropiados.
+
+## Convenciones de código
+
+### TypeScript
+
+- **Tipado estricto:** habilitar `strict: true` en `tsconfig.json`.
+- **Interfaces sobre types:** preferir `interface` para contratos de datos.
+- **Enums para constantes:** usar enums TypeScript para valores fijos (estados, roles, etc.).
+- **No usar `any`:** especificar tipos explícitos; usar `unknown` si es necesario.
+
+```typescript
+// ✅ CORRECTO
+interface User {
+  id: number;
+  name: string;
+  role: UserRole;
+}
+
+enum UserRole {
+  Admin = 'admin',
+  User = 'user',
+  Guest = 'guest'
+}
+
+// ❌ INCORRECTO
+const user: any = { ... };
+```
+
+### Nomenclatura
+
+- **Archivos:** kebab-case (ej: `user-profile.component.ts`)
+- **Clases:** PascalCase (ej: `UserProfileComponent`)
+- **Variables/funciones:** camelCase (ej: `getUserData()`)
+- **Constantes:** UPPER_SNAKE_CASE (ej: `API_BASE_URL`)
+- **Interfaces:** PascalCase con prefijo `I` opcional (ej: `User` o `IUser`)
+- **Observables:** sufijo `$` (ej: `users$`, `loading$`)
+- **Signals:** sin sufijo especial (ej: `count`, `isLoading`)
+
+### Componentes
+
+- **Selectores:** prefijo del proyecto (ej: `sga-user-card`)
+- **Un componente = un archivo:** mantener componentes enfocados y pequeños
+- **OnPush Change Detection:** usar `ChangeDetectionStrategy.OnPush` por defecto
+- **Standalone:** todos los componentes nuevos deben ser standalone
+
+```typescript
+@Component({
+  selector: 'sga-user-card',
+  standalone: true,
+  imports: [CommonModule, ReactiveFormsModule],
+  templateUrl: './user-card.component.html',
+  styleUrls: ['./user-card.component.scss'],
+  changeDetection: ChangeDetectionStrategy.OnPush
+})
+export class UserCardComponent {
+  // Usar signals para estado local
+  count = signal(0);
+  
+  // Inputs/Outputs con tipos
+  @Input() user!: User;
+  @Output() userSelected = new EventEmitter<User>();
+}
+```
+
+## Servicios e HTTP
+
+### Servicios
+
+- **Injectable:** todos los servicios deben usar `@Injectable({ providedIn: 'root' })` salvo casos especiales
+- **Separación de responsabilidades:** un servicio = una responsabilidad
+- **Inyección de dependencias:** usar constructor injection
+
+```typescript
+@Injectable({ providedIn: 'root' })
+export class UserService {
+  private readonly apiUrl = environment.apiUrl;
+  
+  constructor(private http: HttpClient) {}
+  
+  getUsers(): Observable<ApiResponse<User[]>> {
+    return this.http.get<ApiResponse<User[]>>(`${this.apiUrl}/users`);
+  }
+}
+```
+
+### Comunicación con API
+
+- **Interfaces para respuestas:** definir interfaces para todas las respuestas de API
+- **Manejo de errores centralizado:** usar interceptor para errores HTTP
+- **Loading states:** gestionar estados de carga consistentemente
+- **Formato de respuesta API:** seguir el formato definido en backend
+
+```typescript
+interface ApiResponse<T> {
+  success: boolean;
+  message: string;
+  data: T;
+  errors?: Record<string, string[]>;
+}
+```
+
+### RxJS Best Practices
+
+- **Unsubscribe:** usar `takeUntilDestroyed()` o `async pipe` para evitar memory leaks
+- **Operators:** preferir operators puros (map, filter, switchMap)
+- **Subject types:** usar el Subject apropiado (BehaviorSubject, ReplaySubject, etc.)
+
+```typescript
+export class MyComponent {
+  private destroy$ = new Subject<void>();
+  
+  ngOnInit() {
+    this.service.getData()
+      .pipe(takeUntil(this.destroy$))
+      .subscribe(data => this.processData(data));
+  }
+  
+  ngOnDestroy() {
+    this.destroy$.next();
+    this.destroy$.complete();
+  }
+}
+
+// O mejor aún con async pipe
+export class MyComponent {
+  data$ = this.service.getData();
+}
+```
+
+## Formularios
+
+- **Reactive Forms:** usar formularios reactivos (`ReactiveFormsModule`) sobre template-driven
+- **Validaciones:** definir validadores personalizados cuando sea necesario
+- **Tipado:** tipar los FormGroups con interfaces
+
+```typescript
+export class UserFormComponent {
+  userForm = this.fb.group({
+    name: ['', [Validators.required, Validators.minLength(3)]],
+    email: ['', [Validators.required, Validators.email]],
+    role: ['', Validators.required]
+  });
+  
+  constructor(private fb: FormBuilder) {}
+  
+  onSubmit() {
+    if (this.userForm.valid) {
+      const userData = this.userForm.value;
+      // ...
+    }
+  }
+}
+```
+
+## Routing y Guards
+
+- **Lazy Loading:** todas las features deben cargarse lazy
+- **Guards:** proteger rutas con guards (auth, roles, etc.)
+- **Resolvers:** usar resolvers para pre-cargar datos cuando sea necesario
+
+```typescript
+// app.routes.ts
+export const routes: Routes = [
+  {
+    path: 'inventario',
+    loadChildren: () => import('./features/inventario/inventario.routes')
+      .then(m => m.INVENTARIO_ROUTES),
+    canActivate: [authGuard]
+  }
+];
+```
+
+## Estado y State Management
+
+- **Signals para estado local:** usar signals de Angular para estado de componente
+- **Services para estado compartido:** usar servicios con BehaviorSubject/signals para estado global simple
+- **NgRx/NGRX Signal Store:** considerar para aplicaciones complejas con estado global extenso
+- **Inmutabilidad:** nunca mutar estado directamente
+
+## Estilos y UI
+
+- **SCSS:** usar SCSS para estilos
+- **BEM o similar:** seguir metodología de nomenclatura CSS consistente
+- **Variables CSS:** usar variables CSS para temas y valores reutilizables
+- **Component styles:** preferir estilos encapsulados por componente
+- **Responsive:** mobile-first approach con breakpoints claros
+
+```scss
+// Usar variables
+:host {
+  --primary-color: #007bff;
+  --spacing: 1rem;
+}
+
+// Nomenclatura clara
+.user-card {
+  padding: var(--spacing);
+  
+  &__header {
+    background: var(--primary-color);
+  }
+  
+  &__content {
+    margin-top: var(--spacing);
+  }
+}
+```
+
+## Testing
+
+- **Unit Tests:** escribir tests para componentes, servicios y pipes críticos
+- **Jasmine + Karma:** usar el setup por defecto de Angular
+- **Coverage:** apuntar a >80% de cobertura en lógica de negocio
+- **Mocks:** usar mocks para dependencias externas
+
+```typescript
+describe('UserService', () => {
+  let service: UserService;
+  let httpMock: HttpTestingController;
+  
+  beforeEach(() => {
+    TestBed.configureTestingModule({
+      imports: [HttpClientTestingModule]
+    });
+    service = TestBed.inject(UserService);
+    httpMock = TestBed.inject(HttpTestingController);
+  });
+  
+  it('should fetch users', () => {
+    const mockUsers = [{ id: 1, name: 'Test' }];
+    
+    service.getUsers().subscribe(response => {
+      expect(response.data).toEqual(mockUsers);
+    });
+    
+    const req = httpMock.expectOne(`${environment.apiUrl}/users`);
+    expect(req.request.method).toBe('GET');
+    req.flush({ success: true, data: mockUsers });
+  });
+});
+```
+
+## Performance
+
+- **OnPush Change Detection:** usar por defecto
+- **TrackBy:** siempre usar trackBy en *ngFor
+- **Lazy loading:** cargar módulos y componentes bajo demanda
+- **Memoization:** usar pipes puros y memoization cuando sea apropiado
+- **Virtual Scrolling:** usar CDK Virtual Scrolling para listas largas
+
+```typescript
+// TrackBy function
+trackByUserId(index: number, user: User): number {
+  return user.id;
+}
+
+// Template
+<div *ngFor="let user of users; trackBy: trackByUserId">
+  {{ user.name }}
+</div>
+```
+
+## Seguridad
+
+- **XSS Prevention:** confiar en la sanitización de Angular, no usar innerHTML sin sanitizar
+- **CSRF Protection:** incluir tokens CSRF en requests
+- **Auth Tokens:** almacenar tokens JWT de forma segura (httpOnly cookies preferible)
+- **Interceptors:** usar interceptores para agregar headers de autenticación
+- **Guards:** proteger rutas sensibles con guards
+
+## Accesibilidad (a11y)
+
+- **Atributos ARIA:** usar cuando sea necesario
+- **Keyboard Navigation:** asegurar navegación por teclado
+- **Semantic HTML:** usar elementos HTML semánticos
+- **Contrast:** cumplir ratios de contraste WCAG
+
+## Logging y manejo de errores
+
+- **Error Handler global:** implementar ErrorHandler personalizado
+- **Logging service:** centralizar logging
+- **User-friendly messages:** mostrar mensajes claros al usuario
+- **No exponer detalles técnicos:** sanitizar mensajes de error en producción
+
+```typescript
+@Injectable()
+export class GlobalErrorHandler implements ErrorHandler {
+  constructor(
+    private notificationService: NotificationService,
+    private logger: LoggerService
+  ) {}
+  
+  handleError(error: Error): void {
+    this.logger.error('Application error:', error);
+    this.notificationService.showError(
+      'Ha ocurrido un error. Por favor intenta de nuevo.'
+    );
+  }
+}
+```
+
+## Environments
+
+- **Múltiples environments:** dev, staging, producción
+- **No commitear secrets:** usar variables de entorno para valores sensibles
+- **API URLs:** definir base URLs en environment files
+
+```typescript
+// environment.ts
+export const environment = {
+  production: false,
+  apiUrl: 'http://localhost:8000/api/v1',
+  appName: 'SGA Bojanini'
+};
+
+// environment.prod.ts
+export const environment = {
+  production: true,
+  apiUrl: 'https://api.sga.bojanini.com/api/v1',
+  appName: 'SGA Bojanini'
+};
+```
+
+## Build y Deployment
+
+- **Optimización:** usar build de producción con AOT, tree-shaking, minification
+- **Source maps:** generar source maps para debugging en staging
+- **Zona horaria:** configurar timezone a `America/Bogota`
+- **Compatibilidad:** definir browserslist según requerimientos
+
+## Alcance de trabajo
+
+- Cambios acotados a la tarea; sin refactors masivos no solicitados.
+- Avanzar por fases del plan; no implementar features futuras sin completar las previas.
+- Mantener consistencia con el diseño y arquitectura establecida.
+- Documentar decisiones arquitectónicas importantes en comentarios o docs.
+
+## Integración con Backend
+
+- **Seguir contratos de API:** respetar el formato de respuesta del backend (`ApiResponse`)
+- **Manejo de errores:** procesar errores según formato del backend
+- **Autorización:** implementar guards que validen roles/permisos según backend
+- **Timezone:** manejar fechas en timezone `America/Bogota` consistente con backend
+
+## Acceso y Roles
+
+- **Protección de rutas:** todas las rutas protegidas con guards apropiados
+- **UI condicional:** mostrar/ocultar elementos según roles del usuario
+- **Permisos granulares:** verificar permisos a nivel de acción cuando sea necesario

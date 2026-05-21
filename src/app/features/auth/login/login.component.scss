@@ -1,0 +1,107 @@
+.login-page {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #1E2A3B 0%, #2d3e54 50%, #1E2A3B 100%);
+  padding: 1rem;
+}
+
+.login-card {
+  background: #fff;
+  border-radius: 16px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+  padding: 2.5rem 2rem;
+  width: 100%;
+  max-width: 420px;
+
+  &__brand {
+    text-align: center;
+    margin-bottom: 2rem;
+  }
+
+  &__logo {
+    width: 72px;
+    height: 72px;
+    background: #FFCF01;
+    border-radius: 50%;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.5rem;
+    font-weight: 900;
+    color: #1E2A3B;
+    margin-bottom: 1rem;
+    letter-spacing: 0.05em;
+    box-shadow: 0 4px 15px rgba(255, 207, 1, 0.4);
+  }
+
+  &__title {
+    font-size: 1.125rem;
+    font-weight: 700;
+    color: #1a202c;
+    margin: 0 0 0.25rem 0;
+    line-height: 1.3;
+  }
+
+  &__subtitle {
+    font-size: 0.8rem;
+    color: #718096;
+    margin: 0;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+  }
+
+  &__form {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+  }
+
+  &__error {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    background: #fff5f5;
+    border: 1px solid #fed7d7;
+    border-radius: 8px;
+    padding: 0.75rem;
+    margin-bottom: 0.5rem;
+    color: #c53030;
+    font-size: 0.875rem;
+
+    mat-icon {
+      font-size: 1.125rem;
+      width: 1.125rem;
+      height: 1.125rem;
+      flex-shrink: 0;
+    }
+  }
+
+  &__submit {
+    width: 100%;
+    height: 48px;
+    font-size: 1rem;
+    font-weight: 600;
+    margin-top: 0.5rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+
+    mat-spinner {
+      display: inline-block;
+    }
+  }
+
+  &__version {
+    text-align: center;
+    color: #a0aec0;
+    font-size: 0.7rem;
+    margin: 1.5rem 0 0 0;
+  }
+}
+
+.w-full {
+  width: 100%;
+}

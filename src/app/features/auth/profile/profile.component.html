@@ -1,0 +1,145 @@
+<app-page-header title="Mi Perfil" subtitle="Información personal y configuración de cuenta" icon="account_circle">
+</app-page-header>
+
+<div class="profile-container">
+  <mat-tab-group [(selectedIndex)]="selectedTab" color="primary">
+
+    <!-- Tab: Información -->
+    <mat-tab label="Información">
+      <div class="tab-content">
+        <mat-card>
+          <mat-card-content>
+            <div class="profile-info">
+
+              <div class="profile-avatar">
+                {{ auth.userName().charAt(0).toUpperCase() }}
+              </div>
+
+              <div class="profile-details">
+                <h2>{{ auth.user()?.name }}</h2>
+                <p class="profile-email">
+                  <mat-icon>email</mat-icon>
+                  {{ auth.user()?.email }}
+                </p>
+                @if (auth.user()?.phone) {
+                  <p class="profile-phone">
+                    <mat-icon>phone</mat-icon>
+                    {{ auth.user()?.phone }}
+                  </p>
+                }
+              </div>
+            </div>
+
+            <mat-divider class="divider"></mat-divider>
+
+            <div class="roles-section">
+              <h3>Roles asignados</h3>
+              <div class="roles-list">
+                @for (role of auth.user()?.roles; track role.id) {
+                  <mat-chip disableRipple>{{ role.name }}</mat-chip>
+                }
+                @if (!auth.user()?.roles?.length) {
+                  <span class="text-muted">Sin roles asignados</span>
+                }
+              </div>
+            </div>
+
+            <div class="permissions-section">
+              <h3>Permisos ({{ auth.user()?.permissions?.length || 0 }})</h3>
+              <div class="permissions-tags">
+                @for (perm of auth.user()?.permissions?.slice(0, 20); track perm) {
+                  <code class="perm-tag">{{ perm }}</code>
+                }
+                @if ((auth.user()?.permissions?.length || 0) > 20) {
+                  <code class="perm-tag perm-tag--more">
+                    +{{ (auth.user()?.permissions?.length || 0) - 20 }} más
+                  </code>
+                }
+              </div>
+            </div>
+
+          </mat-card-content>
+        </mat-card>
+      </div>
+    </mat-tab>
+
+    <!-- Tab: Cambiar Contraseña -->
+    <mat-tab label="Cambiar Contraseña">
+      <div class="tab-content">
+        <mat-card class="password-card">
+          <mat-card-header>
+            <mat-card-title>
+              <mat-icon>lock</mat-icon>
+              Cambiar Contraseña
+            </mat-card-title>
+            <mat-card-subtitle>
+              Usa una contraseña fuerte de mínimo 8 caracteres con una mayúscula y un número.
+            </mat-card-subtitle>
+          </mat-card-header>
+          <mat-card-content>
+
+            <app-form-errors [errors]="passwordErrors()"></app-form-errors>
+
+            <form [formGroup]="passwordForm" (ngSubmit)="onChangePassword()" novalidate class="password-form">
+
+              <mat-form-field appearance="outline" class="w-full">
+                <mat-label>Contraseña actual</mat-label>
+                <mat-icon matPrefix>lock_outline</mat-icon>
+                <input matInput [type]="showCurrent() ? 'text' : 'password'" formControlName="current_password" />
+                <button mat-icon-button matSuffix type="button" (click)="showCurrent.update(v => !v)">
+                  <mat-icon>{{ showCurrent() ? 'visibility_off' : 'visibility' }}</mat-icon>
+                </button>
+                @if (fieldErrors()['current_password']) {
+                  <mat-error>{{ fieldErrors()['current_password'][0] }}</mat-error>
+                }
+              </mat-form-field>
+
+              <mat-form-field appearance="outline" class="w-full">
+                <mat-label>Nueva contraseña</mat-label>
+                <mat-icon matPrefix>lock</mat-icon>
+                <input matInput [type]="showNew() ? 'text' : 'password'" formControlName="new_password" />
+                <button mat-icon-button matSuffix type="button" (click)="showNew.update(v => !v)">
+                  <mat-icon>{{ showNew() ? 'visibility_off' : 'visibility' }}</mat-icon>
+                </button>
+                @if (passwordForm.get('new_password')?.hasError('minlength') && passwordForm.get('new_password')?.touched) {
+                  <mat-error>Mínimo 8 caracteres</mat-error>
+                }
+                @if (passwordForm.get('new_password')?.hasError('strongPassword') && passwordForm.get('new_password')?.touched) {
+                  <mat-error>{{ passwordForm.get('new_password')?.getError('strongPassword') }}</mat-error>
+                }
+              </mat-form-field>
+
+              <mat-form-field appearance="outline" class="w-full">
+                <mat-label>Confirmar nueva contraseña</mat-label>
+                <mat-icon matPrefix>lock</mat-icon>
+                <input matInput [type]="showConfirm() ? 'text' : 'password'" formControlName="new_password_confirmation" />
+                <button mat-icon-button matSuffix type="button" (click)="showConfirm.update(v => !v)">
+                  <mat-icon>{{ showConfirm() ? 'visibility_off' : 'visibility' }}</mat-icon>
+                </button>
+                @if (passwordForm.get('new_password_confirmation')?.hasError('mustMatch') && passwordForm.get('new_password_confirmation')?.touched) {
+                  <mat-error>Las contraseñas no coinciden</mat-error>
+                }
+              </mat-form-field>
+
+              <div class="form-actions">
+                <button
+                  mat-raised-button
+                  color="primary"
+                  type="submit"
+                  [disabled]="passwordForm.invalid || saving()"
+                >
+                  @if (saving()) {
+                    <mat-spinner diameter="18" color="accent"></mat-spinner>
+                  }
+                  Cambiar Contraseña
+                </button>
+              </div>
+
+            </form>
+          </mat-card-content>
+        </mat-card>
+      </div>
+    </mat-tab>
+
+  </mat-tab-group>
+</div>

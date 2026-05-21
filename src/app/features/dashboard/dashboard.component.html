@@ -1,0 +1,158 @@
+<app-page-header
+  title="Dashboard"
+  subtitle="Resumen ejecutivo del sistema de almacén"
+  icon="dashboard"
+>
+  <button mat-stroked-button (click)="loadDashboard()">
+    <mat-icon>refresh</mat-icon>
+    Actualizar
+  </button>
+</app-page-header>
+
+@if (loading()) {
+  <div class="loading-center">
+    <mat-spinner diameter="48"></mat-spinner>
+    <p>Cargando datos...</p>
+  </div>
+}
+
+@if (!loading()) {
+  <!-- Welcome banner -->
+  <div class="welcome-banner">
+    <div>
+      <h2>¡Bienvenido, {{ auth.userName() }}!</h2>
+      <p>{{ getTodayDate() }}</p>
+    </div>
+    <mat-icon class="welcome-icon">waving_hand</mat-icon>
+  </div>
+
+  <!-- Inventory KPIs -->
+  @if (inventory()) {
+    <h3 class="section-title">
+      <mat-icon>inventory_2</mat-icon> Inventario
+    </h3>
+    <div class="kpi-grid">
+      <div class="kpi-card kpi-card--primary">
+        <mat-icon>inventory</mat-icon>
+        <div class="kpi-card__value">{{ inventory()!.total_products }}</div>
+        <div class="kpi-card__label">Productos</div>
+      </div>
+
+      <div class="kpi-card">
+        <mat-icon>check_circle</mat-icon>
+        <div class="kpi-card__value kpi-card__value--success">{{ inventory()!.stock_ok_count }}</div>
+        <div class="kpi-card__label">Stock OK</div>
+      </div>
+
+      <div class="kpi-card">
+        <mat-icon class="icon-warn">warning</mat-icon>
+        <div class="kpi-card__value kpi-card__value--warn">{{ inventory()!.stock_low_count }}</div>
+        <div class="kpi-card__label">Stock Bajo</div>
+      </div>
+
+      <div class="kpi-card">
+        <mat-icon class="icon-error">error</mat-icon>
+        <div class="kpi-card__value kpi-card__value--error">{{ inventory()!.stock_critical_count }}</div>
+        <div class="kpi-card__label">Stock Crítico</div>
+      </div>
+
+      <div class="kpi-card">
+        <mat-icon class="icon-warn">schedule</mat-icon>
+        <div class="kpi-card__value kpi-card__value--warn">{{ inventory()!.expiring_7_days }}</div>
+        <div class="kpi-card__label">Vencen en 7 días</div>
+      </div>
+
+      <div class="kpi-card">
+        <mat-icon>today</mat-icon>
+        <div class="kpi-card__value">{{ inventory()!.movements_today }}</div>
+        <div class="kpi-card__label">Movimientos Hoy</div>
+      </div>
+    </div>
+  }
+
+  <!-- Purchasing KPIs -->
+  @if (purchasing()) {
+    <h3 class="section-title">
+      <mat-icon>shopping_cart</mat-icon> Compras
+    </h3>
+    <div class="kpi-grid">
+      <div class="kpi-card">
+        <mat-icon class="icon-warn">pending_actions</mat-icon>
+        <div class="kpi-card__value kpi-card__value--warn">{{ purchasing()!.pending_orders }}</div>
+        <div class="kpi-card__label">OC Pendientes</div>
+      </div>
+
+      <div class="kpi-card">
+        <mat-icon class="icon-success">task_alt</mat-icon>
+        <div class="kpi-card__value kpi-card__value--success">{{ purchasing()!.approved_orders }}</div>
+        <div class="kpi-card__label">OC Aprobadas</div>
+      </div>
+
+      <div class="kpi-card kpi-card--wide">
+        <mat-icon>payments</mat-icon>
+        <div class="kpi-card__value">{{ formatCurrency(purchasing()!.total_month) }}</div>
+        <div class="kpi-card__label">Gasto del Mes</div>
+      </div>
+    </div>
+  }
+
+  <!-- Monitoring KPIs -->
+  @if (conditions()) {
+    <h3 class="section-title">
+      <mat-icon>thermostat</mat-icon> Monitoreo Ambiental
+    </h3>
+    <div class="kpi-grid">
+      <div class="kpi-card">
+        <mat-icon class="icon-success">sensors</mat-icon>
+        <div class="kpi-card__value kpi-card__value--success">{{ conditions()!.active_sensors }}</div>
+        <div class="kpi-card__label">Sensores Activos</div>
+      </div>
+
+      <div class="kpi-card" [class.kpi-card--alert]="conditions()!.alerts_today > 0">
+        <mat-icon [class.icon-error]="conditions()!.alerts_today > 0">notifications</mat-icon>
+        <div class="kpi-card__value" [class.kpi-card__value--error]="conditions()!.alerts_today > 0">
+          {{ conditions()!.alerts_today }}
+        </div>
+        <div class="kpi-card__label">Alertas Hoy</div>
+      </div>
+
+      <div class="kpi-card">
+        <mat-icon>data_usage</mat-icon>
+        <div class="kpi-card__value">{{ conditions()!.readings_today }}</div>
+        <div class="kpi-card__label">Lecturas Hoy</div>
+      </div>
+    </div>
+  }
+
+  <!-- Quick actions -->
+  <h3 class="section-title">
+    <mat-icon>bolt</mat-icon> Accesos Rápidos
+  </h3>
+  <div class="quick-actions">
+    <a mat-stroked-button routerLink="/inventory/movements/entry" class="quick-action">
+      <mat-icon>add_box</mat-icon>
+      Registrar Entrada
+    </a>
+    <a mat-stroked-button routerLink="/inventory/movements/exit" class="quick-action">
+      <mat-icon>output</mat-icon>
+      Registrar Salida
+    </a>
+    <a mat-stroked-button routerLink="/inventory/stock" class="quick-action">
+      <mat-icon>layers</mat-icon>
+      Ver Stock
+    </a>
+    <a mat-stroked-button routerLink="/purchasing" class="quick-action">
+      <mat-icon>shopping_cart</mat-icon>
+      Órdenes de Compra
+    </a>
+    <a mat-stroked-button routerLink="/inventory/batches" class="quick-action">
+      <mat-icon>schedule</mat-icon>
+      Lotes por Vencer
+    </a>
+    <a mat-stroked-button routerLink="/monitoring" class="quick-action">
+      <mat-icon>thermostat</mat-icon>
+      Monitoreo
+    </a>
+  </div>
+
+}

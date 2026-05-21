@@ -1,0 +1,122 @@
+<app-page-header title="Usuarios" subtitle="Gestión de usuarios del sistema" icon="people">
+  <button
+    *sgaPermission="'users.create'"
+    mat-raised-button
+    color="primary"
+    routerLink="/users/new"
+  >
+    <mat-icon>add</mat-icon>
+    Nuevo Usuario
+  </button>
+</app-page-header>
+
+<!-- Filters -->
+<div class="filters-bar" [formGroup]="filters">
+  <mat-form-field appearance="outline" class="filters-bar__search">
+    <mat-label>Buscar por nombre o email</mat-label>
+    <mat-icon matPrefix>search</mat-icon>
+    <input matInput formControlName="search" placeholder="Buscar..." />
+  </mat-form-field>
+
+  <mat-form-field appearance="outline" class="filters-bar__select">
+    <mat-label>Estado</mat-label>
+    <mat-select formControlName="is_active">
+      <mat-option value="">Todos</mat-option>
+      <mat-option value="true">Activos</mat-option>
+      <mat-option value="false">Inactivos</mat-option>
+    </mat-select>
+  </mat-form-field>
+</div>
+
+<!-- Loading -->
+<app-loading-spinner [loading]="loading()" [inline]="true"></app-loading-spinner>
+
+<!-- Table -->
+<div class="table-container mat-elevation-z1">
+  <table mat-table [dataSource]="users()" class="w-full">
+
+    <ng-container matColumnDef="name">
+      <th mat-header-cell *matHeaderCellDef>Nombre</th>
+      <td mat-cell *matCellDef="let user">
+        <div class="user-name">
+          <div class="user-avatar">{{ user.name.charAt(0).toUpperCase() }}</div>
+          <span>{{ user.name }}</span>
+        </div>
+      </td>
+    </ng-container>
+
+    <ng-container matColumnDef="email">
+      <th mat-header-cell *matHeaderCellDef>Email</th>
+      <td mat-cell *matCellDef="let user">{{ user.email }}</td>
+    </ng-container>
+
+    <ng-container matColumnDef="roles">
+      <th mat-header-cell *matHeaderCellDef>Roles</th>
+      <td mat-cell *matCellDef="let user">
+        @for (role of user.roles; track role.id) {
+          <mat-chip class="role-chip" disableRipple>{{ role.name }}</mat-chip>
+        }
+        @if (user.roles.length === 0) {
+          <span class="text-muted">Sin rol</span>
+        }
+      </td>
+    </ng-container>
+
+    <ng-container matColumnDef="is_active">
+      <th mat-header-cell *matHeaderCellDef>Estado</th>
+      <td mat-cell *matCellDef="let user">
+        <span class="status-badge" [class.status-badge--active]="user.is_active" [class.status-badge--inactive]="!user.is_active">
+          {{ user.is_active ? 'Activo' : 'Inactivo' }}
+        </span>
+      </td>
+    </ng-container>
+
+    <ng-container matColumnDef="created_at">
+      <th mat-header-cell *matHeaderCellDef>Creado</th>
+      <td mat-cell *matCellDef="let user">{{ user.created_at | dateFormat }}</td>
+    </ng-container>
+
+    <ng-container matColumnDef="actions">
+      <th mat-header-cell *matHeaderCellDef class="actions-col">Acciones</th>
+      <td mat-cell *matCellDef="let user" class="actions-col">
+        <button
+          *sgaPermission="'users.update'"
+          mat-icon-button
+          color="primary"
+          [routerLink]="['/users', user.id, 'edit']"
+          matTooltip="Editar"
+        >
+          <mat-icon>edit</mat-icon>
+        </button>
+        <button
+          *sgaPermission="'users.delete'"
+          mat-icon-button
+          color="warn"
+          (click)="confirmDelete(user)"
+          matTooltip="Eliminar"
+        >
+          <mat-icon>delete</mat-icon>
+        </button>
+      </td>
+    </ng-container>
+
+    <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+    <tr mat-row *matRowDef="let row; columns: displayedColumns;"></tr>
+
+    <tr class="mat-row" *matNoDataRow>
+      <td class="mat-cell no-data" [attr.colspan]="displayedColumns.length">
+        <mat-icon>people_outline</mat-icon>
+        <p>No se encontraron usuarios</p>
+      </td>
+    </tr>
+  </table>
+
+  <mat-paginator
+    [length]="meta().total"
+    [pageSize]="meta().per_page"
+    [pageIndex]="meta().current_page - 1"
+    [pageSizeOptions]="[10, 25, 50, 100]"
+    (page)="onPageChange($event)"
+    showFirstLastButtons
+  ></mat-paginator>
+</div>
