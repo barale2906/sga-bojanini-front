@@ -1,0 +1,92 @@
+<h2 mat-dialog-title>
+  <mat-icon>{{ isEntry ? 'add_box' : isExit ? 'output' : isTransfer ? 'swap_horiz' : isAdjustment ? 'tune' : 'undo' }}</mat-icon>
+  {{ typeLabel }}
+</h2>
+
+<mat-dialog-content>
+  <app-form-errors [errors]="errors()"></app-form-errors>
+
+  <form [formGroup]="form" class="form-grid">
+    <!-- Producto -->
+    <mat-form-field appearance="outline" class="span2">
+      <mat-label>Producto *</mat-label>
+      <mat-select formControlName="product_id">
+        @for (p of data.products; track p.id) { <mat-option [value]="p.id">{{ p.code }} — {{ p.name }}</mat-option> }
+      </mat-select>
+    </mat-form-field>
+
+    <!-- Almacén -->
+    <mat-form-field appearance="outline" class="span2">
+      <mat-label>Almacén *</mat-label>
+      <mat-select formControlName="warehouse_id">
+        @for (w of data.warehouses; track w.id) { <mat-option [value]="w.id">{{ w.name }}</mat-option> }
+      </mat-select>
+    </mat-form-field>
+
+    <!-- ENTRADA: lot, fecha, cantidad -->
+    @if (isEntry) {
+      <mat-form-field appearance="outline"><mat-label>N° de Lote</mat-label><input matInput formControlName="lot_number" placeholder="LOT-2026-001" /></mat-form-field>
+      <mat-form-field appearance="outline"><mat-label>Fecha de Vencimiento</mat-label><input matInput type="date" formControlName="expiration_date" /></mat-form-field>
+      <mat-form-field appearance="outline"><mat-label>Fecha de Fabricación</mat-label><input matInput type="date" formControlName="manufacturing_date" /></mat-form-field>
+      <mat-form-field appearance="outline"><mat-label>Ubicación</mat-label>
+        <mat-select formControlName="location_id">
+          <mat-option [value]="null">Sin ubicación</mat-option>
+          @for (l of locations(); track l.id) { <mat-option [value]="l.id">{{ l.name }}</mat-option> }
+        </mat-select>
+      </mat-form-field>
+
+      <div class="span2 mode-toggle">
+        <label>Modo de ingreso:</label>
+        <button mat-stroked-button type="button" [class.active]="!usePresentationMode()" (click)="usePresentationMode.set(false)">Unidad base</button>
+        <button mat-stroked-button type="button" [class.active]="usePresentationMode()" (click)="usePresentationMode.set(true)">Por presentación</button>
+      </div>
+
+      @if (!usePresentationMode()) {
+        <mat-form-field appearance="outline" class="span2"><mat-label>Cantidad en unidad base *</mat-label><input matInput type="number" formControlName="quantity_base" min="1" /></mat-form-field>
+      } @else {
+        <mat-form-field appearance="outline"><mat-label>Presentación</mat-label>
+          <mat-select formControlName="product_presentation_id">
+            @for (pr of presentations(); track pr.id) { <mat-option [value]="pr.id">{{ pr.name }} (× {{ pr.factor_to_base }})</mat-option> }
+          </mat-select>
+        </mat-form-field>
+        <mat-form-field appearance="outline"><mat-label>Cantidad en presentación *</mat-label><input matInput type="number" formControlName="quantity_in_presentation" min="1" /></mat-form-field>
+      }
+      <mat-form-field appearance="outline" class="span2"><mat-label>Notas</mat-label><textarea matInput formControlName="notes" rows="2"></textarea></mat-form-field>
+    }
+
+    <!-- TRANSFERENCIA: ubicación origen y destino -->
+    @if (isTransfer) {
+      <mat-form-field appearance="outline"><mat-label>Ubicación origen</mat-label>
+        <mat-select formControlName="location_from_id">
+          @for (l of locations(); track l.id) { <mat-option [value]="l.id">{{ l.name }}</mat-option> }
+        </mat-select>
+      </mat-form-field>
+      <mat-form-field appearance="outline"><mat-label>Ubicación destino</mat-label>
+        <mat-select formControlName="location_to_id">
+          @for (l of locations(); track l.id) { <mat-option [value]="l.id">{{ l.name }}</mat-option> }
+        </mat-select>
+      </mat-form-field>
+      <mat-form-field appearance="outline" class="span2"><mat-label>Cantidad *</mat-label><input matInput type="number" formControlName="quantity" min="1" /></mat-form-field>
+      <mat-form-field appearance="outline" class="span2"><mat-label>Motivo</mat-label><input matInput formControlName="reason" /></mat-form-field>
+    }
+
+    <!-- AJUSTE: cantidad positiva o negativa -->
+    @if (isAdjustment) {
+      <mat-form-field appearance="outline"><mat-label>Cantidad (+ agregar / - quitar) *</mat-label><input matInput type="number" formControlName="quantity" /></mat-form-field>
+      <mat-form-field appearance="outline"><mat-label>Motivo *</mat-label><input matInput formControlName="reason" placeholder="Ajuste por conteo físico" /></mat-form-field>
+    }
+
+    <!-- SALIDA / DEVOLUCIÓN -->
+    @if (isExit || isReturn) {
+      <mat-form-field appearance="outline" class="span2"><mat-label>Cantidad *</mat-label><input matInput type="number" formControlName="quantity" min="1" /></mat-form-field>
+      <mat-form-field appearance="outline" class="span2"><mat-label>Motivo</mat-label><input matInput formControlName="reason" /></mat-form-field>
+    }
+  </form>
+</mat-dialog-content>
+
+<mat-dialog-actions align="end">
+  <button mat-button [mat-dialog-close]="false">Cancelar</button>
+  <button mat-raised-button color="primary" (click)="save()" [disabled]="form.invalid || saving()">
+    @if (saving()) { <mat-spinner diameter="18"></mat-spinner> } Registrar
+  </button>
+</mat-dialog-actions>
