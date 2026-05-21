@@ -2,43 +2,51 @@
 // SGA Bojanini - Estilos Globales
 // ============================================================
 
-// Angular Material - Tema personalizado
+// Tema prebuilt de Angular Material (evita problemas de compilacion SCSS)
 @use '@angular/material' as mat;
 
-// Incluir estilos base de Material
+// Incluir core styles de Material
 @include mat.core();
 
-// Definir paletas basadas en manual Bojanini
-// Primary: Amarillo #FFCF01
-$primary-palette: mat.m2-define-palette(mat.$m2-yellow-palette, 400, 200, 700);
-// Accent: Rosa/Magenta #C02F86
-$accent-palette: mat.m2-define-palette(mat.$m2-pink-palette, 700, 400, 900);
-$warn-palette:   mat.m2-define-palette(mat.$m2-red-palette);
+// Usar tema prebuilt basico y sobrescribir colores con CSS custom properties
+// Tema: indigo/pink como base para estructuras Material
+$my-primary: mat.m2-define-palette(mat.$m2-amber-palette, 600);
+$my-accent:  mat.m2-define-palette(mat.$m2-pink-palette, 700);
+$my-warn:    mat.m2-define-palette(mat.$m2-red-palette);
 
-$sga-theme: mat.m2-define-light-theme((
+$my-theme: mat.m2-define-light-theme((
   color: (
-    primary:  $primary-palette,
-    accent:   $accent-palette,
-    warn:     $warn-palette,
-  ),
-  typography: mat.m2-define-typography-config(
-    $font-family: 'Gotham, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+    primary: $my-primary,
+    accent:  $my-accent,
+    warn:    $my-warn,
   ),
   density: 0,
 ));
 
-@include mat.all-component-themes($sga-theme);
+@include mat.all-component-themes($my-theme);
+
+// ============================================================
+// Variables CSS Bojanini (sobrescriben los colores de Material)
+// ============================================================
+:root {
+  --color-primary:    #FFCF01;
+  --color-accent:     #C02F86;
+  --color-dark:       #1E2A3B;
+  --color-sidebar-bg: #1E2A3B;
+}
 
 // ============================================================
 // Reset y base
 // ============================================================
-*, *::before, *::after { box-sizing: border-box; }
+*, *::before, *::after {
+  box-sizing: border-box;
+}
 
 html, body {
   height: 100%;
   margin: 0;
   padding: 0;
-  font-family: 'Gotham', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
   font-size: 16px;
   line-height: 1.5;
   color: #1a202c;
@@ -46,10 +54,18 @@ html, body {
   -webkit-font-smoothing: antialiased;
 }
 
+// app-root debe ocupar toda la pantalla
+app-root {
+  display: block;
+  height: 100%;
+}
+
 // ============================================================
 // Material overrides
 // ============================================================
-.mat-toolbar { font-family: inherit !important; }
+.mat-toolbar {
+  font-family: inherit !important;
+}
 
 .snack-warn .mat-mdc-snack-bar-container {
   --mdc-snackbar-container-color: #dd6b20;
@@ -72,13 +88,23 @@ html, body {
 // ============================================================
 .w-full  { width: 100% !important; }
 .h-full  { height: 100% !important; }
-.text-muted { color: #718096; }
-.text-sm    { font-size: 0.875rem; }
-.font-bold  { font-weight: 700; }
+.text-muted  { color: #718096; }
+.text-sm     { font-size: 0.875rem; }
+.font-bold   { font-weight: 700; }
 .text-center { text-align: center; }
 
-// Scrollbar
-::-webkit-scrollbar { width: 6px; height: 6px; }
-::-webkit-scrollbar-track { background: #f1f5f9; }
-::-webkit-scrollbar-thumb { background: #cbd5e0; border-radius: 3px;
-  &:hover { background: #a0aec0; } }
+// Scrollbar personalizado
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: #f1f5f9;
+}
+::-webkit-scrollbar-thumb {
+  background: #cbd5e0;
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #a0aec0;
+}

@@ -1,13 +1,82 @@
 <!doctype html>
-<html lang="en">
+<html lang="es">
   <head>
     <meta charset="utf-8" />
-    <title>SgaBojaniniFront</title>
+    <title>SGA Bojanini</title>
     <base href="/" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <link rel="icon" type="image/x-icon" href="favicon.ico" />
+    <style>
+      /* Pantalla de carga mientras Angular inicializa */
+      #app-loading {
+        position: fixed;
+        inset: 0;
+        background: #1E2A3B;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        z-index: 99999;
+        color: #FFCF01;
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      }
+      #app-loading .logo {
+        width: 80px;
+        height: 80px;
+        background: #FFCF01;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.5rem;
+        font-weight: 900;
+        color: #1E2A3B;
+        margin-bottom: 1.5rem;
+        animation: pulse 1.5s infinite;
+      }
+      #app-loading p {
+        color: rgba(255,255,255,0.6);
+        margin: 0.5rem 0 0;
+        font-size: 0.875rem;
+      }
+      @keyframes pulse {
+        0%, 100% { transform: scale(1); }
+        50% { transform: scale(1.05); }
+      }
+    </style>
   </head>
   <body>
+    <!-- Pantalla de carga que desaparece cuando Angular monta el componente -->
+    <div id="app-loading">
+      <div class="logo">SGA</div>
+      <p>Cargando Sistema de Gestión de Almacén...</p>
+      <p>Bojanini</p>
+    </div>
+
     <app-root></app-root>
+
+    <script>
+      // Ocultar la pantalla de carga en cuanto el primer componente Angular esté listo
+      const obs = new MutationObserver(function(mutations) {
+        for (const mut of mutations) {
+          if (mut.target && mut.target.tagName === 'APP-ROOT' && mut.target.children.length > 0) {
+            document.getElementById('app-loading').style.display = 'none';
+            obs.disconnect();
+          }
+        }
+      });
+      obs.observe(document.querySelector('app-root') || document.body, { childList: true, subtree: true });
+
+      // Capturar errores globales de JavaScript
+      window.addEventListener('error', function(e) {
+        const el = document.getElementById('app-loading');
+        if (el) {
+          el.innerHTML = '<div style="background:#c53030;padding:2rem;border-radius:8px;max-width:600px;color:#fff;">' +
+            '<h3>Error JavaScript</h3>' +
+            '<pre style="white-space:pre-wrap;font-size:0.8rem">' + e.message + '\n' + e.filename + ':' + e.lineno + '</pre>' +
+            '</div>';
+        }
+      });
+    </script>
   </body>
 </html>
