@@ -1,0 +1,8 @@
+.form-layout { display: flex; flex-direction: column; gap: 0.5rem; padding: 0.5rem 0; }
+.header-row { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 0.5rem; }
+.w-full { width: 100%; }
+.item-row { display: flex; gap: 0.5rem; align-items: flex-start; margin-bottom: 0.25rem;
+  .item-product { flex: 3; } .item-pres { flex: 2; } .item-qty { width: 90px; } .item-price { width: 130px; }
+}
+h3 { font-size: 0.9rem; font-weight: 600; margin: 0.5rem 0; }
+.total-row { display: flex; justify-content: flex-end; align-items: center; gap: 1rem; padding: 0.75rem 0; font-size: 1rem; border-top: 1px solid #e2e8f0; }

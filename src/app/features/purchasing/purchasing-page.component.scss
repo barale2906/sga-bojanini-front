@@ -1,0 +1,17 @@
+.tab-body { padding: 1.5rem 0; }
+.tab-toolbar { display: flex; gap: 0.75rem; align-items: flex-end; margin-bottom: 1rem; .sel { width: 200px; } }
+.table-wrap { border-radius: 8px; overflow: hidden; background: #fff; }
+.code-tag { background:#EDF2F7; color:#4a5568; padding:0.15rem 0.5rem; border-radius:4px; font-size:0.8rem; font-family:monospace; }
+.st-badge { display:inline-flex; padding:0.15rem 0.6rem; border-radius:9999px; font-size:0.75rem; font-weight:600; }
+.st-draft { background:#e2e8f0; color:#4a5568; }
+.st-pending { background:#fefcbf; color:#744210; }
+.st-approved { background:#c6f6d5; color:#276749; }
+.st-sent { background:#bee3f8; color:#2b6cb0; }
+.st-partial { background:#fed7aa; color:#7b341e; }
+.st-done { background:#c6f6d5; color:#276749; }
+.st-rejected { background:#fed7d7; color:#c53030; }
+.st-cancelled { background:#e2e8f0; color:#718096; }
+.act { width: 80px; text-align: right; }
+.no-data, .empty-state { text-align: center; padding: 2.5rem; color: #a0aec0; mat-icon { font-size: 3rem; width: 3rem; height: 3rem; display: block; margin: 0 auto 0.5rem; } }
+.hint { color: #718096; font-size: 0.875rem; margin: 0 0 1rem; }
+.qty-warn { color: #c05621; }
