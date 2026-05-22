@@ -74,8 +74,8 @@ export class IntegrationPageComponent implements OnInit {
   get consItems() { return this.consumptionForm.get('items') as any; }
 
   daysAhead = signal(7);
-  dateFrom = signal(new Date().toISOString().split('T')[0]);
-  dateTo = signal(new Date(Date.now() + 7 * 86400000).toISOString().split('T')[0]);
+  dateFrom = signal(this.localDate());
+  dateTo = signal(this.localDate(new Date(Date.now() + 7 * 86400000)));
 
   ngOnInit(): void {
     this.loadIntegrations(); this.loadAppointments(); this.loadDemand(); this.loadConsumptions();
@@ -146,4 +146,10 @@ export class IntegrationPageComponent implements OnInit {
   }
 
   onConsPage(e: PageEvent): void { this.loadConsumptions(e.pageIndex + 1); }
+
+  /** Fecha LOCAL en YYYY-MM-DD (no UTC) para evitar desfase de timezone */
+  private localDate(d = new Date()): string {
+    const p = (n: number) => String(n).padStart(2, '0');
+    return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
+  }
 }

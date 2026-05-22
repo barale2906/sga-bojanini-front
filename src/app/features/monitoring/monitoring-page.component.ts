@@ -101,10 +101,17 @@ export class MonitoringPageComponent implements OnInit {
     });
   }
 
-  getDefaultDateFrom(): string {
-    const d = new Date(); d.setMonth(d.getMonth() - 1);
-    return d.toISOString().split('T')[0];
+  /** Fecha LOCAL en formato YYYY-MM-DD (no UTC) */
+  private localDateStr(d = new Date()): string {
+    const p = (n: number) => String(n).padStart(2, '0');
+    return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
   }
 
-  getTodayDate(): string { return new Date().toISOString().split('T')[0]; }
+  getDefaultDateFrom(): string {
+    const d = new Date();
+    d.setMonth(d.getMonth() - 1);
+    return this.localDateStr(d);
+  }
+
+  getTodayDate(): string { return this.localDateStr(); }
 }

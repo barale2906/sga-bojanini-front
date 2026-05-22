@@ -89,7 +89,13 @@ export class AuditPageComponent implements OnInit {
     if (date_from) p = p.set('date_from', date_from);
     if (date_to) p = p.set('date_to', date_to);
     this.http.get(`${this.api}/audit-logs/export`, { params: p, responseType: 'blob' }).subscribe({
-      next: blob => { saveAs(blob, `auditoria_${new Date().toISOString().split('T')[0]}.${format === 'excel' ? 'xlsx' : 'csv'}`); this.exporting.set(false); },
+      next: blob => {
+        const d = new Date();
+        const p = (n: number) => String(n).padStart(2, '0');
+        const dateStr = `${d.getFullYear()}${p(d.getMonth()+1)}${p(d.getDate())}`;
+        saveAs(blob, `auditoria_${dateStr}.${format === 'excel' ? 'xlsx' : 'csv'}`);
+        this.exporting.set(false);
+      },
       error: () => this.exporting.set(false),
     });
   }
