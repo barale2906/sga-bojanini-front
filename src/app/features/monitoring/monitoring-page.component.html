@@ -77,18 +77,49 @@
         <app-loading-spinner [loading]="loadingStats()" [inline]="true"></app-loading-spinner>
 
         @if (stats()) {
-          <!-- KPIs estadísticos -->
+          <!-- KPIs estadísticos con nombres completos -->
           <div class="stat-cards">
-            <div class="stat-card"><span class="label">Media</span><strong>{{ stats()!.mean | number:'1.2-2' }}</strong></div>
-            <div class="stat-card"><span class="label">Desv. Estándar</span><strong>{{ stats()!.std_dev | number:'1.2-2' }}</strong></div>
-            <div class="stat-card"><span class="label">Cp</span><strong [class.cp-ok]="stats()!.cp >= 1.33" [class.cp-warn]="stats()!.cp < 1.33">{{ stats()!.cp | number:'1.2-2' }}</strong></div>
-            <div class="stat-card"><span class="label">Cpk</span><strong [class.cp-ok]="stats()!.cpk >= 1.33" [class.cp-warn]="stats()!.cpk < 1.33">{{ stats()!.cpk | number:'1.2-2' }}</strong></div>
-            <div class="stat-card"><span class="label">Fuera de control</span><strong [class.cp-warn]="stats()!.out_of_control_count > 0">{{ stats()!.out_of_control_count }}</strong></div>
-            <div class="stat-card stat-card--wide">
-              <span class="label">Proceso</span>
-              <strong [class.cp-ok]="stats()!.process_capable" [class.cp-warn]="!stats()!.process_capable">
-                {{ stats()!.process_capable ? '✅ Capaz' : '⚠️ No capaz' }}
+            <div class="stat-card">
+              <span class="label">Promedio (X̄)</span>
+              <strong>{{ stats()!.mean | number:'1.2-2' }}</strong>
+              <span class="sub">Media del proceso</span>
+            </div>
+            <div class="stat-card">
+              <span class="label">Desviación Estándar (σ)</span>
+              <strong>{{ stats()!.std_dev | number:'1.2-2' }}</strong>
+              <span class="sub">Variabilidad del proceso</span>
+            </div>
+            <div class="stat-card" [matTooltip]="'Cp ≥ 1.33 indica proceso capaz. Mide si la variación cabe dentro de los límites de especificación.'">
+              <span class="label">Cp — Capacidad del Proceso</span>
+              <strong [class.cp-ok]="stats()!.cp >= 1.33" [class.cp-warn]="stats()!.cp < 1.33">
+                {{ stats()!.cp | number:'1.2-2' }}
               </strong>
+              <span class="sub">{{ stats()!.cp >= 1.33 ? 'Aceptable (≥ 1.33)' : 'Insuficiente (< 1.33)' }}</span>
+            </div>
+            <div class="stat-card" [matTooltip]="'Cpk ≥ 1.33 indica proceso capaz y centrado. Considera el descentramiento respecto al valor nominal.'">
+              <span class="label">Cpk — Capacidad Real</span>
+              <strong [class.cp-ok]="stats()!.cpk >= 1.33" [class.cp-warn]="stats()!.cpk < 1.33">
+                {{ stats()!.cpk | number:'1.2-2' }}
+              </strong>
+              <span class="sub">{{ stats()!.cpk >= 1.33 ? 'Proceso centrado' : 'Proceso descentrado' }}</span>
+            </div>
+            <div class="stat-card" [class.stat-card--alert]="stats()!.out_of_control_count > 0">
+              <span class="label">Puntos Fuera de Control</span>
+              <strong [class.cp-warn]="stats()!.out_of_control_count > 0">
+                {{ stats()!.out_of_control_count }}
+              </strong>
+              <span class="sub">Lecturas sobre LCS o bajo LCI</span>
+            </div>
+            <div class="stat-card stat-card--wide">
+              <span class="label">Estado del Proceso</span>
+              <strong [class.cp-ok]="stats()!.process_capable" [class.cp-warn]="!stats()!.process_capable">
+                {{ stats()!.process_capable ? '✅ Proceso Capaz' : '⚠️ Proceso No Capaz' }}
+              </strong>
+              <span class="sub">
+                {{ stats()!.process_capable
+                  ? 'El proceso opera dentro de los límites aceptables'
+                  : 'Se requiere intervención para ajustar el proceso' }}
+              </span>
             </div>
           </div>
 
