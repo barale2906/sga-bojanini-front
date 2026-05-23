@@ -69,7 +69,7 @@ export class DashboardComponent implements OnInit {
     this.loading.set(true);
     let pending = 0;
 
-    if (this.auth.hasPermission('dashboard.ver')) {
+    if (this.auth.hasPermission('tablero.ver')) {
       pending = 3;
 
       this.http.get<ApiResponse<DashboardInventory>>(`${this.api}/dashboard/inventory`).subscribe({

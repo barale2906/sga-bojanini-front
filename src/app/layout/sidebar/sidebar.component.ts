@@ -33,7 +33,7 @@ export class SidebarComponent implements OnInit {
       label: 'Dashboard',
       icon: 'dashboard',
       route: '/dashboard',
-      permission: 'dashboard.ver',
+      permission: 'tablero.ver',
     },
     {
       label: 'Almacenes',

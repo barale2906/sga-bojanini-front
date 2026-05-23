@@ -43,7 +43,7 @@ export const routes: Routes = [
         path: 'users/:id/edit',
         loadComponent: () =>
           import('./features/auth/users/user-form.component').then((m) => m.UserFormComponent),
-        data: { title: 'Editar Usuario', permission: 'usuarios.actualizar' },
+        data: { title: 'Editar Usuario', permission: 'usuarios.editar' },
       },
 
       // Roles

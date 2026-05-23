@@ -39,7 +39,7 @@
             <td mat-cell *matCellDef="let s" class="act">
               <button *sgaPermission="'lecturas.crear'" mat-icon-button color="accent" (click)="openReading(s)" matTooltip="Registrar lectura"><mat-icon>add_chart</mat-icon></button>
               <button mat-icon-button color="primary" (click)="selectSensorForChart(s)" matTooltip="Ver gráfico SPC"><mat-icon>show_chart</mat-icon></button>
-              <button *sgaPermission="'sensores.actualizar'" mat-icon-button color="primary" (click)="openSensorForm(s)" matTooltip="Editar"><mat-icon>edit</mat-icon></button>
+              <button *sgaPermission="'sensores.editar'" mat-icon-button color="primary" (click)="openSensorForm(s)" matTooltip="Editar"><mat-icon>edit</mat-icon></button>
               <button *sgaPermission="'sensores.eliminar'" mat-icon-button color="warn" (click)="deleteSensor(s)" matTooltip="Eliminar"><mat-icon>delete</mat-icon></button>
             </td>
           </ng-container>
