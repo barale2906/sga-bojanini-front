@@ -9,5 +9,5 @@
 .code-tag { background:#EDF2F7; color:#4a5568; padding:0.15rem 0.5rem; border-radius:4px; font-size:0.8rem; font-family:monospace; }
 .badge { display:inline-flex; padding:0.15rem 0.6rem; border-radius:9999px; font-size:0.75rem; font-weight:600; &--on { background:#c6f6d5; color:#276749; } &--off { background:#fed7d7; color:#c53030; } }
 .type-badge { display:inline-flex; padding:0.15rem 0.6rem; border-radius:9999px; font-size:0.75rem; font-weight:600; background:#EDF2F7; color:#4a5568; &--kit { background:#e9d8fd; color:#553c9a; } }
-.act { width:120px; text-align:right; }
+.act { /* global col-actions en styles.scss */ }
 .no-data { text-align:center; padding:2.5rem; color:#a0aec0; }

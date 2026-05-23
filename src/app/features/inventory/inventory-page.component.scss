@@ -21,5 +21,5 @@
   &--error { color: #c53030; }
 }
 .type-chip { display: flex; align-items: center; gap: 0.25rem; font-size: 0.8rem; mat-icon { font-size: 1rem; width: 1rem; height: 1rem; } }
-.act { width: 80px; text-align: right; }
+.act { /* global col-actions en styles.scss */ }
 .no-data { text-align: center; padding: 2.5rem; color: #a0aec0; }

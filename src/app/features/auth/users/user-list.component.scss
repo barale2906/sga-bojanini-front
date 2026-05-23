@@ -68,10 +68,7 @@
   }
 }
 
-.actions-col {
-  width: 100px;
-  text-align: right;
-}
+.actions-col { /* global col-actions en styles.scss */ }
 
 .no-data {
   text-align: center;

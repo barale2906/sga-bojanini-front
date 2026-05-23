@@ -48,22 +48,22 @@ export class CatalogPageComponent implements OnInit {
 
   // Categories
   categories = signal<Category[]>([]);
-  catCols = ['code', 'name', 'parent', 'actions'];
+  catCols = ['actions', 'code', 'name', 'parent'];
 
   // UoM
   units = signal<UnitOfMeasure[]>([]);
-  uomCols = ['name', 'abbreviation', 'actions'];
+  uomCols = ['actions', 'name', 'abbreviation'];
 
   // Products
   products = signal<Product[]>([]);
   productMeta = signal<PaginationMeta>({ current_page: 1, last_page: 1, per_page: 25, total: 0 });
-  productCols = ['code', 'name', 'type', 'category', 'uom', 'stock_levels', 'is_active', 'actions'];
+  productCols = ['actions', 'code', 'name', 'type', 'category', 'uom', 'stock_levels', 'is_active'];
   productFilters = this.fb.group({ search: [''], category_id: [''], product_type: [''], is_active: [''] });
 
   // Suppliers
   suppliers = signal<Supplier[]>([]);
   supplierMeta = signal<PaginationMeta>({ current_page: 1, last_page: 1, per_page: 25, total: 0 });
-  supplierCols = ['name', 'tax_id', 'contact_name', 'contact_phone', 'is_active', 'actions'];
+  supplierCols = ['actions', 'name', 'tax_id', 'contact_name', 'contact_phone', 'is_active'];
   supplierFilters = this.fb.group({ search: [''], is_active: [''] });
 
   loading = signal(false);

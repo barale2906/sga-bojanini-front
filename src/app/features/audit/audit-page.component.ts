@@ -52,7 +52,7 @@ export class AuditPageComponent implements OnInit {
   loading = signal(false);
   exporting = signal(false);
 
-  cols = ['user_name', 'action', 'auditable_type', 'auditable_id', 'ip_address', 'created_at', 'actions'];
+  cols = ['actions', 'user_name', 'action', 'auditable_type', 'auditable_id', 'ip_address', 'created_at'];
   filters = this.fb.group({ action: [''], auditable_type: [''], date_from: [''], date_to: [''] });
 
   ngOnInit(): void {

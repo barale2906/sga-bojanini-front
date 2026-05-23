@@ -38,7 +38,7 @@ export class RoleListComponent implements OnInit {
 
   roles = signal<Role[]>([]);
   loading = signal(false);
-  displayedColumns = ['name', 'permissions_count', 'users_count', 'actions'];
+  displayedColumns = ['actions', 'name', 'permissions_count', 'users_count'];
 
   ngOnInit(): void {
     this.loadRoles();

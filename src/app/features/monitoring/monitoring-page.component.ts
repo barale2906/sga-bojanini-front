@@ -48,7 +48,7 @@ export class MonitoringPageComponent implements OnInit {
   loading = signal(false);
   loadingStats = signal(false);
 
-  sensorCols = ['code', 'name', 'zone', 'type', 'is_active', 'actions'];
+  sensorCols = ['actions', 'code', 'name', 'zone', 'type', 'is_active'];
   sensorFilters = this.fb.group({ zone_id: [''], type: [''] });
 
   chartDateForm = this.fb.group({

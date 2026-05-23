@@ -55,9 +55,9 @@ export class IntegrationPageComponent implements OnInit {
   loading = signal(false);
   testResult = signal<string | null>(null);
 
-  intCols = ['name', 'type', 'base_url', 'is_active', 'actions'];
+  intCols = ['actions', 'name', 'type', 'base_url', 'is_active'];
   apptCols = ['appointment_id', 'patient_name', 'service_type', 'scheduled_at', 'status'];
-  consCols = ['appointment_id', 'service_type', 'warehouse', 'sync_status', 'created_at', 'actions'];
+  consCols = ['actions', 'appointment_id', 'service_type', 'warehouse', 'sync_status', 'created_at'];
 
   intForm = this.fb.group({
     name: ['', Validators.required], type: ['scheduling', Validators.required],

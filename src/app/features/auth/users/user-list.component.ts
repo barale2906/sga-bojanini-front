@@ -57,7 +57,7 @@ export class UserListComponent implements OnInit {
   meta = signal<PaginationMeta>({ current_page: 1, last_page: 1, per_page: 25, total: 0 });
   loading = signal(false);
 
-  displayedColumns = ['name', 'email', 'roles', 'is_active', 'created_at', 'actions'];
+  displayedColumns = ['actions', 'name', 'email', 'roles', 'is_active', 'created_at'];
 
   filters = this.fb.group({
     search: [''],

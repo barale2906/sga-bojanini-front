@@ -44,9 +44,9 @@ export class WarehousePageComponent implements OnInit {
   locations = signal<Location[]>([]);
   loading = signal(false);
 
-  whCols = ['code', 'name', 'address', 'is_active', 'actions'];
-  zoneCols = ['code', 'name', 'type', 'temp_range', 'is_active', 'actions'];
-  locCols = ['code', 'name', 'capacity', 'is_active', 'actions'];
+  whCols = ['actions', 'code', 'name', 'address', 'is_active'];
+  zoneCols = ['actions', 'code', 'name', 'type', 'temp_range', 'is_active'];
+  locCols = ['actions', 'code', 'name', 'capacity', 'is_active'];
 
   whFilters = this.fb.group({ search: [''], is_active: [''] });
   zoneFilters = this.fb.group({ warehouse_id: [''], type: [''], search: [''] });

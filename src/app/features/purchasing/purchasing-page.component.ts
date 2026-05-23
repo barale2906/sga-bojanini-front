@@ -48,7 +48,7 @@ export class PurchasingPageComponent implements OnInit {
   suggestions = signal<any[]>([]);
   loading = signal(false);
 
-  cols = ['code', 'supplier', 'warehouse', 'status', 'total', 'created_at', 'actions'];
+  cols = ['actions', 'code', 'supplier', 'warehouse', 'status', 'total', 'created_at'];
   suggCols = ['product', 'current_stock', 'reorder_point', 'suggested_qty', 'supplier'];
   filters = this.fb.group({ status: [''] });
 

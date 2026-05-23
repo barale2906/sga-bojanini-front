@@ -48,8 +48,8 @@ export class ProductDetailDialogComponent implements OnInit {
   get isKit() { return this.product.product_type === 'kit'; }
   get simpleProducts() { return this.data.products.filter(p => p.product_type === 'simple' && p.id !== this.product.id); }
 
-  presCols = ['code', 'name', 'factor_to_base', 'is_base_unit', 'actions'];
-  kitCols = ['component', 'quantity', 'actions'];
+  presCols = ['actions', 'code', 'name', 'factor_to_base', 'is_base_unit'];
+  kitCols = ['actions', 'component', 'quantity'];
 
   ngOnInit(): void { this.loadPresentations(); if (this.isKit) this.loadKitComponents(); }
 

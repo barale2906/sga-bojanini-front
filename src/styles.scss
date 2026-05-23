@@ -84,6 +84,20 @@ app-root {
 }
 
 // ============================================================
+// Columna de acciones en tablas Material
+// ============================================================
+// Clases .act y .actions-col usadas en th/td mat-cell de todos los listados.
+// width:1% hace que la columna se encoja al mínimo necesario;
+// white-space:nowrap garantiza que los botones queden siempre en una sola fila.
+th.act, td.act,
+th.actions-col, td.actions-col {
+  width: 1% !important;
+  white-space: nowrap;
+  padding-left: 0.5rem !important;
+  padding-right: 0.5rem !important;
+}
+
+// ============================================================
 // Utilidades
 // ============================================================
 .w-full  { width: 100% !important; }
