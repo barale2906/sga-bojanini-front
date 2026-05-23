@@ -31,19 +31,19 @@ export const routes: Routes = [
         path: 'users',
         loadComponent: () =>
           import('./features/auth/users/user-list.component').then((m) => m.UserListComponent),
-        data: { title: 'Usuarios', permission: 'users.view' },
+        data: { title: 'Usuarios', permission: 'usuarios.ver' },
       },
       {
         path: 'users/new',
         loadComponent: () =>
           import('./features/auth/users/user-form.component').then((m) => m.UserFormComponent),
-        data: { title: 'Nuevo Usuario', permission: 'users.create' },
+        data: { title: 'Nuevo Usuario', permission: 'usuarios.crear' },
       },
       {
         path: 'users/:id/edit',
         loadComponent: () =>
           import('./features/auth/users/user-form.component').then((m) => m.UserFormComponent),
-        data: { title: 'Editar Usuario', permission: 'users.update' },
+        data: { title: 'Editar Usuario', permission: 'usuarios.actualizar' },
       },
 
       // Roles
@@ -51,7 +51,7 @@ export const routes: Routes = [
         path: 'roles',
         loadComponent: () =>
           import('./features/auth/roles/role-list.component').then((m) => m.RoleListComponent),
-        data: { title: 'Roles', permission: 'roles.view' },
+        data: { title: 'Roles', permission: 'roles.ver' },
       },
 
       // Perfil y contraseña
@@ -71,7 +71,7 @@ export const routes: Routes = [
         path: 'warehouses',
         loadChildren: () =>
           import('./features/warehouse/warehouse.routes').then((m) => m.warehouseRoutes),
-        data: { permission: 'warehouses.view' },
+        data: { permission: 'almacenes.ver' },
       },
 
       // Catálogo (Fase 3)
@@ -79,7 +79,7 @@ export const routes: Routes = [
         path: 'catalog',
         loadChildren: () =>
           import('./features/catalog/catalog.routes').then((m) => m.catalogRoutes),
-        data: { permission: 'products.view' },
+        data: { permission: 'productos.ver' },
       },
 
       // Inventario (Fase 4)
@@ -87,7 +87,7 @@ export const routes: Routes = [
         path: 'inventory',
         loadChildren: () =>
           import('./features/inventory/inventory.routes').then((m) => m.inventoryRoutes),
-        data: { permission: 'stock.view' },
+        data: { permission: 'stock.ver' },
       },
 
       // Compras (Fase 5)
@@ -95,7 +95,7 @@ export const routes: Routes = [
         path: 'purchasing',
         loadChildren: () =>
           import('./features/purchasing/purchasing.routes').then((m) => m.purchasingRoutes),
-        data: { permission: 'purchase_orders.view' },
+        data: { permission: 'ordenes_compra.ver' },
       },
 
       // Monitoreo (Fase 6)
@@ -103,7 +103,7 @@ export const routes: Routes = [
         path: 'monitoring',
         loadChildren: () =>
           import('./features/monitoring/monitoring.routes').then((m) => m.monitoringRoutes),
-        data: { permission: 'sensors.view' },
+        data: { permission: 'sensores.ver' },
       },
 
       // Auditoría (Fase 7)
@@ -111,7 +111,7 @@ export const routes: Routes = [
         path: 'audit',
         loadComponent: () =>
           import('./features/audit/audit-page.component').then((m) => m.AuditPageComponent),
-        data: { permission: 'audit.view' },
+        data: { permission: 'auditoria.ver' },
       },
 
       // Integraciones (Fase 8)
@@ -119,7 +119,7 @@ export const routes: Routes = [
         path: 'integrations',
         loadChildren: () =>
           import('./features/integration/integration.routes').then((m) => m.integrationRoutes),
-        data: { permission: 'integrations.view' },
+        data: { permission: 'integraciones.ver' },
       },
 
       // Reportes (Fase 9)
@@ -127,7 +127,7 @@ export const routes: Routes = [
         path: 'reports',
         loadComponent: () =>
           import('./features/reports/reports-page.component').then((m) => m.ReportsPageComponent),
-        data: { permission: 'reports.view' },
+        data: { permission: 'reportes.ver' },
       },
 
       // Notificaciones (Fase 10)
@@ -137,7 +137,7 @@ export const routes: Routes = [
           import('./features/notifications/notification-list.component').then(
             (m) => m.NotificationListComponent
           ),
-        data: { permission: 'notifications.view' },
+        data: { permission: 'notificaciones.ver' },
       },
     ],
   },

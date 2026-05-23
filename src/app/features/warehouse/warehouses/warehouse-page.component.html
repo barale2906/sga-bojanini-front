@@ -20,7 +20,7 @@
             <mat-option value="false">Inactivos</mat-option>
           </mat-select>
         </mat-form-field>
-        <button *sgaPermission="'warehouses.create'" mat-raised-button color="primary" (click)="openWarehouseForm()">
+        <button *sgaPermission="'almacenes.crear'" mat-raised-button color="primary" (click)="openWarehouseForm()">
           <mat-icon>add</mat-icon> Nuevo Almacén
         </button>
       </div>
@@ -52,8 +52,8 @@
           <ng-container matColumnDef="actions">
             <th mat-header-cell *matHeaderCellDef class="act">Acciones</th>
             <td mat-cell *matCellDef="let w" class="act">
-              <button *sgaPermission="'warehouses.update'" mat-icon-button color="primary" (click)="openWarehouseForm(w)" matTooltip="Editar"><mat-icon>edit</mat-icon></button>
-              <button *sgaPermission="'warehouses.delete'" mat-icon-button color="warn" (click)="deleteWarehouse(w)" matTooltip="Eliminar"><mat-icon>delete</mat-icon></button>
+              <button *sgaPermission="'almacenes.actualizar'" mat-icon-button color="primary" (click)="openWarehouseForm(w)" matTooltip="Editar"><mat-icon>edit</mat-icon></button>
+              <button *sgaPermission="'almacenes.eliminar'" mat-icon-button color="warn" (click)="deleteWarehouse(w)" matTooltip="Eliminar"><mat-icon>delete</mat-icon></button>
             </td>
           </ng-container>
           <tr mat-header-row *matHeaderRowDef="whCols"></tr>
@@ -91,7 +91,7 @@
           <mat-icon matPrefix>search</mat-icon>
           <input matInput formControlName="search" />
         </mat-form-field>
-        <button *sgaPermission="'zones.create'" mat-raised-button color="primary" (click)="openZoneForm()">
+        <button *sgaPermission="'zonas.crear'" mat-raised-button color="primary" (click)="openZoneForm()">
           <mat-icon>add</mat-icon> Nueva Zona
         </button>
       </div>
@@ -105,8 +105,8 @@
           <ng-container matColumnDef="is_active"><th mat-header-cell *matHeaderCellDef>Estado</th><td mat-cell *matCellDef="let z"><span class="badge" [class.badge--on]="z.is_active" [class.badge--off]="!z.is_active">{{ z.is_active ? 'Activa' : 'Inactiva' }}</span></td></ng-container>
           <ng-container matColumnDef="actions"><th mat-header-cell *matHeaderCellDef class="act">Acciones</th>
             <td mat-cell *matCellDef="let z" class="act">
-              <button *sgaPermission="'zones.update'" mat-icon-button color="primary" (click)="openZoneForm(z)" matTooltip="Editar"><mat-icon>edit</mat-icon></button>
-              <button *sgaPermission="'zones.delete'" mat-icon-button color="warn" (click)="deleteZone(z)" matTooltip="Eliminar"><mat-icon>delete</mat-icon></button>
+              <button *sgaPermission="'zonas.actualizar'" mat-icon-button color="primary" (click)="openZoneForm(z)" matTooltip="Editar"><mat-icon>edit</mat-icon></button>
+              <button *sgaPermission="'zonas.eliminar'" mat-icon-button color="warn" (click)="deleteZone(z)" matTooltip="Eliminar"><mat-icon>delete</mat-icon></button>
             </td>
           </ng-container>
           <tr mat-header-row *matHeaderRowDef="zoneCols"></tr>
@@ -130,7 +130,7 @@
             }
           </mat-select>
         </mat-form-field>
-        <button *sgaPermission="'locations.create'" mat-raised-button color="primary" (click)="openLocationForm()">
+        <button *sgaPermission="'ubicaciones.crear'" mat-raised-button color="primary" (click)="openLocationForm()">
           <mat-icon>add</mat-icon> Nueva Ubicación
         </button>
       </div>
@@ -143,8 +143,8 @@
           <ng-container matColumnDef="is_active"><th mat-header-cell *matHeaderCellDef>Estado</th><td mat-cell *matCellDef="let l"><span class="badge" [class.badge--on]="l.is_active" [class.badge--off]="!l.is_active">{{ l.is_active ? 'Activa' : 'Inactiva' }}</span></td></ng-container>
           <ng-container matColumnDef="actions"><th mat-header-cell *matHeaderCellDef class="act">Acciones</th>
             <td mat-cell *matCellDef="let l" class="act">
-              <button *sgaPermission="'locations.update'" mat-icon-button color="primary" (click)="openLocationForm(l)" matTooltip="Editar"><mat-icon>edit</mat-icon></button>
-              <button *sgaPermission="'locations.delete'" mat-icon-button color="warn" (click)="deleteLocation(l)" matTooltip="Eliminar"><mat-icon>delete</mat-icon></button>
+              <button *sgaPermission="'ubicaciones.actualizar'" mat-icon-button color="primary" (click)="openLocationForm(l)" matTooltip="Editar"><mat-icon>edit</mat-icon></button>
+              <button *sgaPermission="'ubicaciones.eliminar'" mat-icon-button color="warn" (click)="deleteLocation(l)" matTooltip="Eliminar"><mat-icon>delete</mat-icon></button>
             </td>
           </ng-container>
           <tr mat-header-row *matHeaderRowDef="locCols"></tr>

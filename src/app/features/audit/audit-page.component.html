@@ -1,8 +1,8 @@
 <app-page-header title="Auditoría" subtitle="Registro de todas las acciones del sistema" icon="history">
-  <button *sgaPermission="'audit.export'" mat-stroked-button (click)="export('excel')" [disabled]="exporting()">
+  <button *sgaPermission="'auditoria.exportar'" mat-stroked-button (click)="export('excel')" [disabled]="exporting()">
     <mat-icon>table_chart</mat-icon> Exportar Excel
   </button>
-  <button *sgaPermission="'audit.export'" mat-stroked-button (click)="export('csv')" [disabled]="exporting()">
+  <button *sgaPermission="'auditoria.exportar'" mat-stroked-button (click)="export('csv')" [disabled]="exporting()">
     <mat-icon>file_download</mat-icon> Exportar CSV
   </button>
 </app-page-header>

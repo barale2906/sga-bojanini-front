@@ -7,7 +7,7 @@
   <mat-tab label="Categorías">
     <div class="tab-body">
       <div class="tab-toolbar">
-        <button *sgaPermission="'products.create'" mat-raised-button color="primary" (click)="openCategoryForm()">
+        <button *sgaPermission="'productos.crear'" mat-raised-button color="primary" (click)="openCategoryForm()">
           <mat-icon>add</mat-icon> Nueva Categoría
         </button>
       </div>
@@ -18,8 +18,8 @@
           <ng-container matColumnDef="parent"><th mat-header-cell *matHeaderCellDef>Categoría Padre</th><td mat-cell *matCellDef="let c">{{ getParentName(c) }}</td></ng-container>
           <ng-container matColumnDef="actions"><th mat-header-cell *matHeaderCellDef class="act">Acciones</th>
             <td mat-cell *matCellDef="let c" class="act">
-              <button *sgaPermission="'products.update'" mat-icon-button color="primary" (click)="openCategoryForm(c)" matTooltip="Editar"><mat-icon>edit</mat-icon></button>
-              <button *sgaPermission="'products.delete'" mat-icon-button color="warn" (click)="deleteCategory(c)" matTooltip="Eliminar"><mat-icon>delete</mat-icon></button>
+              <button *sgaPermission="'productos.actualizar'" mat-icon-button color="primary" (click)="openCategoryForm(c)" matTooltip="Editar"><mat-icon>edit</mat-icon></button>
+              <button *sgaPermission="'productos.eliminar'" mat-icon-button color="warn" (click)="deleteCategory(c)" matTooltip="Eliminar"><mat-icon>delete</mat-icon></button>
             </td>
           </ng-container>
           <tr mat-header-row *matHeaderRowDef="catCols"></tr>
@@ -34,7 +34,7 @@
   <mat-tab label="Unidades de Medida">
     <div class="tab-body">
       <div class="tab-toolbar">
-        <button *sgaPermission="'products.create'" mat-raised-button color="primary" (click)="openUomForm()">
+        <button *sgaPermission="'productos.crear'" mat-raised-button color="primary" (click)="openUomForm()">
           <mat-icon>add</mat-icon> Nueva Unidad
         </button>
       </div>
@@ -44,7 +44,7 @@
           <ng-container matColumnDef="abbreviation"><th mat-header-cell *matHeaderCellDef>Abreviatura</th><td mat-cell *matCellDef="let u"><code class="code-tag">{{ u.abbreviation }}</code></td></ng-container>
           <ng-container matColumnDef="actions"><th mat-header-cell *matHeaderCellDef class="act">Acciones</th>
             <td mat-cell *matCellDef="let u" class="act">
-              <button *sgaPermission="'products.update'" mat-icon-button color="primary" (click)="openUomForm(u)" matTooltip="Editar"><mat-icon>edit</mat-icon></button>
+              <button *sgaPermission="'productos.actualizar'" mat-icon-button color="primary" (click)="openUomForm(u)" matTooltip="Editar"><mat-icon>edit</mat-icon></button>
             </td>
           </ng-container>
           <tr mat-header-row *matHeaderRowDef="uomCols"></tr>
@@ -88,10 +88,10 @@
           </mat-select>
         </mat-form-field>
         <div class="toolbar-actions">
-          <button *sgaPermission="'products.create'" mat-raised-button color="primary" (click)="openProductForm()">
+          <button *sgaPermission="'productos.crear'" mat-raised-button color="primary" (click)="openProductForm()">
             <mat-icon>add</mat-icon> Nuevo Producto
           </button>
-          <button *sgaPermission="'products.import'" mat-stroked-button (click)="openImport('products')">
+          <button *sgaPermission="'productos.importar'" mat-stroked-button (click)="openImport('products')">
             <mat-icon>upload_file</mat-icon> Importar
           </button>
         </div>
@@ -119,8 +119,8 @@
           <ng-container matColumnDef="actions"><th mat-header-cell *matHeaderCellDef class="act">Acciones</th>
             <td mat-cell *matCellDef="let p" class="act">
               <button mat-icon-button color="accent" (click)="openProductDetail(p)" matTooltip="Detalle (presentaciones/kit)"><mat-icon>info</mat-icon></button>
-              <button *sgaPermission="'products.update'" mat-icon-button color="primary" (click)="openProductForm(p)" matTooltip="Editar"><mat-icon>edit</mat-icon></button>
-              <button *sgaPermission="'products.delete'" mat-icon-button color="warn" (click)="deleteProduct(p)" matTooltip="Eliminar"><mat-icon>delete</mat-icon></button>
+              <button *sgaPermission="'productos.actualizar'" mat-icon-button color="primary" (click)="openProductForm(p)" matTooltip="Editar"><mat-icon>edit</mat-icon></button>
+              <button *sgaPermission="'productos.eliminar'" mat-icon-button color="warn" (click)="deleteProduct(p)" matTooltip="Eliminar"><mat-icon>delete</mat-icon></button>
             </td>
           </ng-container>
           <tr mat-header-row *matHeaderRowDef="productCols"></tr>
@@ -150,10 +150,10 @@
           </mat-select>
         </mat-form-field>
         <div class="toolbar-actions">
-          <button *sgaPermission="'suppliers.create'" mat-raised-button color="primary" (click)="openSupplierForm()">
+          <button *sgaPermission="'proveedores.crear'" mat-raised-button color="primary" (click)="openSupplierForm()">
             <mat-icon>add</mat-icon> Nuevo Proveedor
           </button>
-          <button *sgaPermission="'suppliers.import'" mat-stroked-button (click)="openImport('suppliers')">
+          <button *sgaPermission="'proveedores.importar'" mat-stroked-button (click)="openImport('suppliers')">
             <mat-icon>upload_file</mat-icon> Importar
           </button>
         </div>
@@ -169,8 +169,8 @@
           </ng-container>
           <ng-container matColumnDef="actions"><th mat-header-cell *matHeaderCellDef class="act">Acciones</th>
             <td mat-cell *matCellDef="let s" class="act">
-              <button *sgaPermission="'suppliers.update'" mat-icon-button color="primary" (click)="openSupplierForm(s)" matTooltip="Editar"><mat-icon>edit</mat-icon></button>
-              <button *sgaPermission="'suppliers.delete'" mat-icon-button color="warn" (click)="deleteSupplier(s)" matTooltip="Eliminar"><mat-icon>delete</mat-icon></button>
+              <button *sgaPermission="'proveedores.actualizar'" mat-icon-button color="primary" (click)="openSupplierForm(s)" matTooltip="Editar"><mat-icon>edit</mat-icon></button>
+              <button *sgaPermission="'proveedores.eliminar'" mat-icon-button color="warn" (click)="deleteSupplier(s)" matTooltip="Eliminar"><mat-icon>delete</mat-icon></button>
             </td>
           </ng-container>
           <tr mat-header-row *matHeaderRowDef="supplierCols"></tr>

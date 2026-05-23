@@ -16,11 +16,11 @@
 }
 
 <div class="action-bar">
-  <button *sgaPermission="'movements.entry'" mat-raised-button color="primary" (click)="openMovement('entry')"><mat-icon>add_box</mat-icon> Entrada</button>
-  <button *sgaPermission="'movements.exit'" mat-stroked-button (click)="openMovement('exit')"><mat-icon>output</mat-icon> Salida</button>
-  <button *sgaPermission="'movements.transfer'" mat-stroked-button (click)="openMovement('transfer')"><mat-icon>swap_horiz</mat-icon> Transferencia</button>
-  <button *sgaPermission="'movements.adjustment'" mat-stroked-button (click)="openMovement('adjustment')"><mat-icon>tune</mat-icon> Ajuste</button>
-  <button *sgaPermission="'movements.return'" mat-stroked-button (click)="openMovement('return')"><mat-icon>undo</mat-icon> Devolución</button>
+  <button *sgaPermission="'movimientos.entrada'" mat-raised-button color="primary" (click)="openMovement('entry')"><mat-icon>add_box</mat-icon> Entrada</button>
+  <button *sgaPermission="'movimientos.salida'" mat-stroked-button (click)="openMovement('exit')"><mat-icon>output</mat-icon> Salida</button>
+  <button *sgaPermission="'movimientos.transferir'" mat-stroked-button (click)="openMovement('transfer')"><mat-icon>swap_horiz</mat-icon> Transferencia</button>
+  <button *sgaPermission="'movimientos.ajustar'" mat-stroked-button (click)="openMovement('adjustment')"><mat-icon>tune</mat-icon> Ajuste</button>
+  <button *sgaPermission="'movimientos.devolver'" mat-stroked-button (click)="openMovement('return')"><mat-icon>undo</mat-icon> Devolución</button>
 </div>
 
 <mat-tab-group color="primary" animationDuration="200ms">
@@ -99,7 +99,7 @@
           <ng-container matColumnDef="actions"><th mat-header-cell *matHeaderCellDef class="act">Acciones</th>
             <td mat-cell *matCellDef="let b" class="act">
               @if (b.status === 'expired' && b.quantity_available > 0) {
-                <button *sgaPermission="'movements.write_off'" mat-icon-button color="warn" (click)="writeOff(b)" matTooltip="Dar de baja por vencimiento"><mat-icon>delete_sweep</mat-icon></button>
+                <button *sgaPermission="'movimientos.baja'" mat-icon-button color="warn" (click)="writeOff(b)" matTooltip="Dar de baja por vencimiento"><mat-icon>delete_sweep</mat-icon></button>
               }
             </td>
           </ng-container>

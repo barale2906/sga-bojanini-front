@@ -44,14 +44,14 @@
         </mat-card-content>
         <mat-card-actions>
           <p class="format-label">Formato:</p>
-          <button *sgaPermission="'reports.export'" mat-raised-button color="primary" (click)="generate('pdf')" [disabled]="generating()">
+          <button *sgaPermission="'reportes.exportar'" mat-raised-button color="primary" (click)="generate('pdf')" [disabled]="generating()">
             @if (generating()) { <mat-spinner diameter="18"></mat-spinner> }
             <mat-icon>picture_as_pdf</mat-icon> PDF
           </button>
-          <button *sgaPermission="'reports.export'" mat-raised-button (click)="generate('excel')" [disabled]="generating()">
+          <button *sgaPermission="'reportes.exportar'" mat-raised-button (click)="generate('excel')" [disabled]="generating()">
             <mat-icon>table_chart</mat-icon> Excel
           </button>
-          <button *sgaPermission="'reports.export'" mat-stroked-button (click)="generate('csv')" [disabled]="generating()">
+          <button *sgaPermission="'reportes.exportar'" mat-stroked-button (click)="generate('csv')" [disabled]="generating()">
             <mat-icon>file_download</mat-icon> CSV
           </button>
         </mat-card-actions>

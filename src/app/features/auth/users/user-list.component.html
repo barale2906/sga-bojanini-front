@@ -1,6 +1,6 @@
 <app-page-header title="Usuarios" subtitle="Gestión de usuarios del sistema" icon="people">
   <button
-    *sgaPermission="'users.create'"
+    *sgaPermission="'usuarios.crear'"
     mat-raised-button
     color="primary"
     routerLink="/users/new"
@@ -80,7 +80,7 @@
       <th mat-header-cell *matHeaderCellDef class="actions-col">Acciones</th>
       <td mat-cell *matCellDef="let user" class="actions-col">
         <button
-          *sgaPermission="'users.update'"
+          *sgaPermission="'usuarios.actualizar'"
           mat-icon-button
           color="primary"
           [routerLink]="['/users', user.id, 'edit']"
@@ -89,7 +89,7 @@
           <mat-icon>edit</mat-icon>
         </button>
         <button
-          *sgaPermission="'users.delete'"
+          *sgaPermission="'usuarios.eliminar'"
           mat-icon-button
           color="warn"
           (click)="confirmDelete(user)"
