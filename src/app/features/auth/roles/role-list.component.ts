@@ -58,8 +58,8 @@ export class RoleListComponent implements OnInit {
   openForm(role?: Role): void {
     const ref = this.dialog.open(RoleFormDialogComponent, {
       data: role || null,
-      width: '960px',
-      maxWidth: '95vw',
+      width: '90vw',
+      maxWidth: '90vw',
       maxHeight: '90vh',
     });
 
