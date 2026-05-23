@@ -18,7 +18,7 @@
   border: 1px solid #cbd5e0;
   border-radius: 6px;
   font-size: 0.8rem;
-  overflow: hidden; /* sin scroll horizontal — las columnas se reparten el ancho */
+  /* overflow: hidden eliminado — bloqueaba position:sticky del header */
 }
 
 .matrix-row {
@@ -27,7 +27,10 @@
   /* Divisor horizontal visible entre módulos */
   border-bottom: 1px solid #b2bcc9;
 
-  &:last-child { border-bottom: none; }
+  &:last-child {
+    border-bottom: none;
+    border-radius: 0 0 6px 6px; /* esquinas inferiores del wrapper */
+  }
 
   &--header {
     background: #edf2f7;
@@ -35,6 +38,7 @@
     top: 0;
     z-index: 2;
     border-bottom: 2px solid #718096;
+    border-radius: 6px 6px 0 0; /* esquinas superiores del wrapper */
   }
 
   &--alt { background: #f7fafc; }
