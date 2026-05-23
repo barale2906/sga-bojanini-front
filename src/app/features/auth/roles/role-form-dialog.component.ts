@@ -1,4 +1,4 @@
-import { Component, inject, signal, OnInit } from '@angular/core';
+import { Component, inject, signal, computed, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { MatDialogModule, MAT_DIALOG_DATA, MatDialogRef } from '@angular/material/dialog';
@@ -9,6 +9,7 @@ import { MatCheckboxModule } from '@angular/material/checkbox';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatDividerModule } from '@angular/material/divider';
 import { MatIconModule } from '@angular/material/icon';
+import { MatTooltipModule } from '@angular/material/tooltip';
 import { RoleService, Role, Permission, PermissionsGrouped } from './role.service';
 import { FormErrorsComponent } from '../../../shared/components/form-errors/form-errors.component';
 
@@ -35,6 +36,31 @@ const MODULE_LABELS: Record<string, string> = {
   notificaciones: 'Notificaciones',
 };
 
+const ACTION_LABELS: Record<string, string> = {
+  ver: 'Ver',
+  crear: 'Crear',
+  editar: 'Editar',
+  eliminar: 'Eliminar',
+  importar: 'Importar',
+  exportar: 'Exportar',
+  entrada: 'Entrada',
+  salida: 'Salida',
+  transferir: 'Transferir',
+  ajuste: 'Ajuste',
+  devolucion: 'Devolución',
+  baja: 'Baja',
+  aprobar: 'Aprobar',
+  enviar: 'Enviar',
+  recibir: 'Recibir',
+  configurar: 'Configurar',
+};
+
+const ACTION_ORDER = [
+  'ver', 'crear', 'editar', 'eliminar', 'importar', 'exportar',
+  'entrada', 'salida', 'transferir', 'ajuste', 'devolucion', 'baja',
+  'aprobar', 'enviar', 'recibir', 'configurar',
+];
+
 @Component({
   selector: 'app-role-form-dialog',
   standalone: true,
@@ -49,6 +75,7 @@ const MODULE_LABELS: Record<string, string> = {
     MatProgressSpinnerModule,
     MatDividerModule,
     MatIconModule,
+    MatTooltipModule,
     FormErrorsComponent,
   ],
   templateUrl: './role-form-dialog.component.html',
@@ -67,6 +94,24 @@ export class RoleFormDialogComponent implements OnInit {
   selectedPermissions = signal<Set<number>>(new Set());
 
   moduleLabels = MODULE_LABELS;
+  actionLabels = ACTION_LABELS;
+
+  /** Mapa nombre→Permission para lookup O(1) en la plantilla */
+  permissionsMap = computed(() => {
+    const map = new Map<string, Permission>();
+    Object.values(this.permissionsGrouped()).flat().forEach(p => map.set(p.name, p));
+    return map;
+  });
+
+  /** Columnas de acciones ordenadas y deduplicadas */
+  allActions = computed(() => {
+    const found = new Set<string>();
+    Object.values(this.permissionsGrouped()).flat().forEach(p => {
+      const action = p.name.split('.').pop()!;
+      found.add(action);
+    });
+    return ACTION_ORDER.filter(a => found.has(a));
+  });
 
   form = this.fb.group({
     name: ['', [Validators.required, Validators.maxLength(255)]],
@@ -139,6 +184,11 @@ export class RoleFormDialogComponent implements OnInit {
   getPermissionLabel(name: string): string {
     const parts = name.split('.');
     return parts[parts.length - 1].replace(/_/g, ' ');
+  }
+
+  /** Devuelve el Permission para la celda [módulo × acción], o null si no existe */
+  getPermForCell(module: string, action: string): Permission | null {
+    return this.permissionsMap().get(`${module}.${action}`) ?? null;
   }
 
   onSubmit(): void {

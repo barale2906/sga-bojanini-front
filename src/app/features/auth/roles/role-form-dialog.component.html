@@ -25,35 +25,57 @@
     </div>
   }
 
-  <div class="permissions-grid">
-    @for (module of moduleNames; track module) {
-      <div class="permission-module">
-        <div class="permission-module__header">
-          <mat-checkbox
-            [checked]="isModuleSelected(module)"
-            [indeterminate]="isModuleIndeterminate(module)"
-            (change)="toggleModule(module)"
-            color="primary"
-          >
-            <span class="module-label">{{ moduleLabels[module] || module }}</span>
-          </mat-checkbox>
-        </div>
-        <div class="permission-module__items">
-          @for (perm of permissionsGrouped()[module]; track perm.id) {
-            <mat-checkbox
-              [checked]="selectedPermissions().has(perm.id)"
-              (change)="togglePermission(perm)"
-              color="primary"
-              class="perm-item"
-            >
-              {{ getPermissionLabel(perm.name) }}
-            </mat-checkbox>
-          }
-        </div>
+  @if (!loading() && moduleNames.length) {
+    <div class="matrix-wrap">
+
+      <!-- ── Cabecera ── -->
+      <div class="matrix-row matrix-row--header">
+        <div class="matrix-cell matrix-cell--module">Módulo</div>
+        @for (action of allActions(); track action) {
+          <div class="matrix-cell matrix-cell--action"
+               [matTooltip]="actionLabels[action] || action">
+            {{ actionLabels[action] || action }}
+          </div>
+        }
       </div>
-      <mat-divider></mat-divider>
-    }
-  </div>
+
+      <!-- ── Filas de módulos ── -->
+      @for (module of moduleNames; track module; let odd = $odd) {
+        <div class="matrix-row" [class.matrix-row--alt]="odd">
+
+          <!-- Nombre del módulo + seleccionar todo -->
+          <div class="matrix-cell matrix-cell--module">
+            <mat-checkbox
+              [checked]="isModuleSelected(module)"
+              [indeterminate]="isModuleIndeterminate(module)"
+              (change)="toggleModule(module)"
+              color="primary"
+            >
+              <span class="module-label">{{ moduleLabels[module] || module }}</span>
+            </mat-checkbox>
+          </div>
+
+          <!-- Una celda por acción -->
+          @for (action of allActions(); track action) {
+            @let perm = getPermForCell(module, action);
+            <div class="matrix-cell matrix-cell--check">
+              @if (perm) {
+                <mat-checkbox
+                  [checked]="selectedPermissions().has(perm.id)"
+                  (change)="togglePermission(perm)"
+                  color="primary"
+                ></mat-checkbox>
+              } @else {
+                <span class="no-perm">–</span>
+              }
+            </div>
+          }
+
+        </div>
+      }
+
+    </div>
+  }
 
 </mat-dialog-content>
 
