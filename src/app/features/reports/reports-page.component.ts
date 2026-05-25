@@ -13,7 +13,6 @@ import { MatSnackBar } from '@angular/material/snack-bar';
 import { environment } from '../../../environments/environment';
 import { PageHeaderComponent } from '../../shared/components/page-header/page-header.component';
 import { PermissionDirective } from '../../shared/directives/permission.directive';
-import { saveAs } from 'file-saver';
 
 interface ReportType {
   id: string; name: string; icon: string; description: string;
@@ -66,13 +65,11 @@ export class ReportsPageComponent {
       next: res => {
         this.generating.set(false);
         const filename = res.data?.filename || `${rt.id}_report.${format}`;
-        if (res.data?.path) {
-          this.http.get(`${this.api}/reports/download/${filename}`, { responseType: 'blob' }).subscribe({
-            next: blob => saveAs(blob, filename),
-            error: () => this.snack.open('Reporte generado. Descarga manual desde el servidor.', 'OK', { duration: 5000 }),
-          });
-        }
-        this.snack.open('Reporte generado: ' + filename, 'OK', { duration: 4000 });
+        this.snack.open(
+          `Reporte generado: ${filename}. El archivo quedó en el servidor (${res.data?.path ?? 'storage/app/exports'}).`,
+          'OK',
+          { duration: 6000 },
+        );
       },
       error: () => this.generating.set(false),
     });

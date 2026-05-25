@@ -85,12 +85,12 @@ export class MonitoringService {
     return this.http.post<ApiResponse<AlertRule>>(`${this.api}/sensors/${sensorId}/alert-rules`, payload);
   }
 
-  updateAlertRule(sensorId: number, ruleId: number, payload: Partial<AlertRule>): Observable<ApiResponse<AlertRule>> {
-    return this.http.put<ApiResponse<AlertRule>>(`${this.api}/sensors/${sensorId}/alert-rules/${ruleId}`, payload);
+  updateAlertRule(_sensorId: number, ruleId: number, payload: Partial<AlertRule>): Observable<ApiResponse<AlertRule>> {
+    return this.http.put<ApiResponse<AlertRule>>(`${this.api}/alert-rules/${ruleId}`, payload);
   }
 
-  deleteAlertRule(sensorId: number, ruleId: number): Observable<ApiResponse<null>> {
-    return this.http.delete<ApiResponse<null>>(`${this.api}/sensors/${sensorId}/alert-rules/${ruleId}`);
+  deleteAlertRule(_sensorId: number, ruleId: number): Observable<ApiResponse<null>> {
+    return this.http.delete<ApiResponse<null>>(`${this.api}/alert-rules/${ruleId}`);
   }
 
   generateReport(sensorId: number, dateFrom: string, dateTo: string): Observable<ApiResponse<{ path: string; filename: string }>> {

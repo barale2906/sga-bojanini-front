@@ -10,7 +10,8 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { InventoryService } from '../inventory.service';
 import { WarehouseService, Warehouse, Location } from '../../warehouse/warehouse.service';
-import { CatalogService, Product, ProductPresentation } from '../../catalog/catalog.service';
+// TODO: restaurar cuando se reconstruya catalog
+// import { CatalogService, Product, ProductPresentation } from '../../catalog/catalog.service';
 import { FormErrorsComponent } from '../../../shared/components/form-errors/form-errors.component';
 
 const TYPE_LABELS: Record<string, string> = {

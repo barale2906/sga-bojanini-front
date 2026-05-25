@@ -398,6 +398,7 @@ export const environment = {
 
 ## Integración con Backend
 
+- **Contrato OpenAPI:** `recursos/bojanini_endpoints.json` (fuente de verdad de rutas y schemas)
 - **Seguir contratos de API:** respetar el formato de respuesta del backend (`ApiResponse`)
 - **Manejo de errores:** procesar errores según formato del backend
 - **Autorización:** implementar guards que validen roles/permisos según backend

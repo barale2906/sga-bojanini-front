@@ -36,9 +36,13 @@ make npm -- run ng generate component mi-componente
 make build           # Build de producción (dist/)
 ```
 
-## Proxy API (desarrollo)
+## API (desarrollo)
 
-Las peticiones a `/api` se redirigen al backend configurado en `proxy.docker.conf.json` (por defecto `http://host.docker.internal:8000`). Ajusta el `target` según tu API.
+En desarrollo las peticiones van directamente al backend en **`http://localhost:8000/api/v1`** (ver `src/environments/environment.ts`). Asegúrate de tener el API levantado en el puerto 8000 y CORS habilitado para `http://localhost:4202`.
+
+**Contrato de endpoints (OpenAPI):** `recursos/bojanini_endpoints.json` — resumen en `recursos/API-ENDPOINTS.md`.
+
+El proxy de Docker (`proxy.docker.conf.json`) solo aplica si usas rutas relativas (`/api/v1`); no es necesario con la URL absoluta del entorno de desarrollo.
 
 ## Estructura Docker
 

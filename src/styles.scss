@@ -83,6 +83,26 @@ app-root {
   border-radius: 12px !important;
 }
 
+// Formularios reutilizables en diálogos (mismo patrón que /warehouses)
+.mat-mdc-dialog-content .dialog-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  padding: 0.5rem 0;
+  min-width: 100%;
+
+  mat-form-field,
+  .mat-mdc-form-field {
+    width: 100%;
+  }
+}
+
+.mat-mdc-dialog-content .dialog-form .two-col {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.5rem;
+}
+
 // ============================================================
 // Columna de acciones en tablas Material
 // ============================================================

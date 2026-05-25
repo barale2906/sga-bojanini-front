@@ -13,7 +13,8 @@ import { MatTooltipModule } from '@angular/material/tooltip';
 import { MatDialog } from '@angular/material/dialog';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { PurchasingService, PurchaseOrder } from './purchasing.service';
-import { CatalogService } from '../catalog/catalog.service';
+// TODO: restaurar cuando se reconstruya catalog
+// import { CatalogService } from '../catalog/catalog.service';
 import { WarehouseService } from '../warehouse/warehouse.service';
 import { PaginationMeta } from '../../core/models/api-response.model';
 import { PageHeaderComponent } from '../../shared/components/page-header/page-header.component';

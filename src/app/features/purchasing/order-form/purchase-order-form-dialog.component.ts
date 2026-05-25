@@ -10,7 +10,8 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatTableModule } from '@angular/material/table';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { PurchasingService } from '../purchasing.service';
-import { CatalogService, ProductPresentation } from '../../catalog/catalog.service';
+// TODO: restaurar cuando se reconstruya catalog
+// import { CatalogService, ProductPresentation } from '../../catalog/catalog.service';
 import { FormErrorsComponent } from '../../../shared/components/form-errors/form-errors.component';
 
 @Component({

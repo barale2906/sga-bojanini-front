@@ -82,7 +82,7 @@ export class DashboardComponent implements OnInit {
         error: () => this.checkDone(--pending),
       });
 
-      this.http.get<ApiResponse<DashboardConditions>>(`${this.api}/dashboard/conditions`).subscribe({
+      this.http.get<ApiResponse<DashboardConditions>>(`${this.api}/dashboard/monitoring`).subscribe({
         next: (res) => { this.conditions.set(res.data); this.checkDone(--pending); },
         error: () => this.checkDone(--pending),
       });

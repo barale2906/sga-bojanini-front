@@ -16,7 +16,8 @@ import { MatSnackBar } from '@angular/material/snack-bar';
 import { debounceTime, distinctUntilChanged } from 'rxjs';
 import { InventoryService, Batch, StockItem, Movement } from './inventory.service';
 import { WarehouseService, Warehouse, Location } from '../warehouse/warehouse.service';
-import { CatalogService, Product } from '../catalog/catalog.service';
+// TODO: restaurar cuando se reconstruya catalog
+// import { CatalogService, Product } from '../catalog/catalog.service';
 import { PaginationMeta } from '../../core/models/api-response.model';
 import { PageHeaderComponent } from '../../shared/components/page-header/page-header.component';
 import { LoadingSpinnerComponent } from '../../shared/components/loading-spinner/loading-spinner.component';
