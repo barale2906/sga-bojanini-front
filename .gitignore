@@ -49,3 +49,9 @@ Thumbs.db
 # Claude Code
 .claudecontext
 .claude/
+recursos/*
+
+# Branding
+recursos/identidad.pdf
+recursos/sga-frontend-angular-premisas.mdc
+recursos/sga-frontend-angular-calidad.mdc
