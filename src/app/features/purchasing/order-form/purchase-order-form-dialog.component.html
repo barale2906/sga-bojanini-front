@@ -20,22 +20,78 @@
     <h3>Ítems de la Orden</h3>
     <div formArrayName="items">
       @for (item of items.controls; track $index) {
-        <div [formGroupName]="$index" class="item-row">
-          <mat-form-field appearance="outline" class="item-product">
-            <mat-label>Producto *</mat-label>
-            <mat-select formControlName="product_id" (selectionChange)="onProductChange($index, $event.value)">
-              @for (p of data.products; track p.id) { <mat-option [value]="p.id">{{ p.code }} — {{ p.name }}</mat-option> }
-            </mat-select>
-          </mat-form-field>
-          <mat-form-field appearance="outline" class="item-pres">
-            <mat-label>Presentación *</mat-label>
-            <mat-select formControlName="product_presentation_id">
-              @for (pr of getItemPresentations($index); track pr.id) { <mat-option [value]="pr.id">{{ pr.name }} (× {{ pr.factor_to_base }})</mat-option> }
-            </mat-select>
-          </mat-form-field>
-          <mat-form-field appearance="outline" class="item-qty"><mat-label>Cant. *</mat-label><input matInput type="number" formControlName="quantity" min="1" /></mat-form-field>
-          <mat-form-field appearance="outline" class="item-price"><mat-label>Precio unit. *</mat-label><input matInput type="number" formControlName="unit_price" min="0" /></mat-form-field>
-          <button mat-icon-button color="warn" type="button" (click)="removeItem($index)" [disabled]="items.length === 1"><mat-icon>remove_circle</mat-icon></button>
+        <div [formGroupName]="$index" class="item-block">
+          <div class="item-row">
+            <!-- Producto -->
+            <mat-form-field appearance="outline" class="item-product">
+              <mat-label>Producto *</mat-label>
+              <mat-select formControlName="product_id" (selectionChange)="onProductChange($index, $event.value)">
+                @for (p of data.products; track p.id) {
+                  <mat-option [value]="p.id">{{ p.code }} — {{ p.name }}</mat-option>
+                }
+              </mat-select>
+            </mat-form-field>
+
+            <!-- Presentación (empaque de compra) -->
+            <mat-form-field appearance="outline" class="item-pres">
+              <mat-label>Presentación / empaque *</mat-label>
+              <mat-select formControlName="product_presentation_id">
+                @if (getItemPresentations($index).length === 0 && $any(item).get('product_id')?.value) {
+                  <mat-option disabled>Sin presentaciones configuradas</mat-option>
+                }
+                @for (pr of getItemPresentations($index); track pr.id) {
+                  <mat-option [value]="pr.id">
+                    {{ pr.name }}
+                    <span style="color:#718096;font-size:0.83em"> · ×{{ pr.factor_to_base }}</span>
+                    @if (pr.is_purchase_default) { <span style="color:#d69e2e"> ★</span> }
+                  </mat-option>
+                }
+              </mat-select>
+              @if ($any(item).get('product_id')?.value && getItemPresentations($index).length === 0) {
+                <mat-hint style="color:#c05621">Configure presentaciones en Catálogo</mat-hint>
+              }
+            </mat-form-field>
+
+            <!-- Cantidad -->
+            <mat-form-field appearance="outline" class="item-qty">
+              <mat-label>Cant. *</mat-label>
+              <input matInput type="number" formControlName="quantity" min="1" />
+              @if (getItemPresName($index)) {
+                <mat-hint>{{ getItemPresName($index) }}</mat-hint>
+              }
+            </mat-form-field>
+
+            <!-- Precio unitario -->
+            <mat-form-field appearance="outline" class="item-price">
+              <mat-label>Precio unit. *</mat-label>
+              <input matInput type="number" formControlName="unit_price" min="0" />
+            </mat-form-field>
+
+            <!-- Eliminar ítem -->
+            <button mat-icon-button color="warn" type="button" (click)="removeItem($index)"
+                    [disabled]="items.length === 1" matTooltip="Eliminar ítem">
+              <mat-icon>remove_circle</mat-icon>
+            </button>
+          </div>
+
+          <!-- Preview de equivalencia en unidades base -->
+          @if (getItemBasePreview($index); as preview) {
+            <div class="base-preview">
+              <mat-icon>calculate</mat-icon>
+              {{ $any(item).get('quantity')?.value }} {{ getItemPresName($index) }}
+              =
+              <strong>{{ preview.value | number }}</strong> {{ preview.unit }} en inventario al recepcionar
+            </div>
+          }
+
+          <!-- Aviso sin presentaciones -->
+          @if ($any(item).get('product_id')?.value && getItemPresentations($index).length === 0) {
+            <div class="no-pres-alert">
+              <mat-icon>warning</mat-icon>
+              Este producto no tiene presentaciones de empaque. Configúralas en
+              <strong>Catálogo → Detalle del producto → Presentaciones</strong>.
+            </div>
+          }
         </div>
       }
     </div>

@@ -35,22 +35,81 @@
         </mat-select>
       </mat-form-field>
 
+      <!-- Selector de modo de ingreso -->
       <div class="span2 mode-toggle">
         <label>Modo de ingreso:</label>
-        <button mat-stroked-button type="button" [class.active]="!usePresentationMode()" (click)="usePresentationMode.set(false)">Unidad base</button>
-        <button mat-stroked-button type="button" [class.active]="usePresentationMode()" (click)="usePresentationMode.set(true)">Por presentación</button>
+        <button mat-stroked-button type="button" [class.active]="!usePresentationMode()" (click)="usePresentationMode.set(false)">
+          Unidad base directa
+        </button>
+        <button mat-stroked-button type="button" [class.active]="usePresentationMode()" (click)="usePresentationMode.set(true)"
+                [disabled]="presentations().length === 0"
+                [matTooltip]="presentations().length === 0 ? 'Este producto no tiene presentaciones configuradas. Configúralas en Catálogo → producto → Presentaciones.' : 'Ingresar por empaque (caja, paquete, etc.)'">
+          Por empaque / presentación
+        </button>
       </div>
 
-      @if (!usePresentationMode()) {
-        <mat-form-field appearance="outline" class="span2"><mat-label>Cantidad en unidad base *</mat-label><input matInput type="number" formControlName="quantity_base" min="1" /></mat-form-field>
-      } @else {
-        <mat-form-field appearance="outline"><mat-label>Presentación</mat-label>
-          <mat-select formControlName="product_presentation_id">
-            @for (pr of presentations(); track pr.id) { <mat-option [value]="pr.id">{{ pr.name }} (× {{ pr.factor_to_base }})</mat-option> }
-          </mat-select>
-        </mat-form-field>
-        <mat-form-field appearance="outline"><mat-label>Cantidad en presentación *</mat-label><input matInput type="number" formControlName="quantity_in_presentation" min="1" /></mat-form-field>
+      <!-- Aviso cuando no hay presentaciones -->
+      @if (usePresentationMode() && presentations().length === 0 && form.get('product_id')?.value) {
+        <div class="span2 no-pres-warn">
+          <mat-icon>info</mat-icon>
+          Este producto no tiene presentaciones de empaque configuradas.
+          Dirígete al <strong>Catálogo → Detalle del producto → Presentaciones de empaque</strong>
+          para definir cajas, paquetes y sus factores de conversión.
+        </div>
       }
+
+      <!-- Modo: unidad base directa -->
+      @if (!usePresentationMode()) {
+        <mat-form-field appearance="outline" class="span2">
+          <mat-label>Cantidad en {{ selectedProduct?.base_unit?.abbreviation || 'unidad base' }} *</mat-label>
+          <input matInput type="number" formControlName="quantity_base" min="1" />
+          <mat-hint>Ingresa directamente el número de {{ selectedProduct?.base_unit?.name || 'unidades base' }}</mat-hint>
+        </mat-form-field>
+      }
+
+      <!-- Modo: por presentación/empaque -->
+      @if (usePresentationMode()) {
+        <mat-form-field appearance="outline">
+          <mat-label>Presentación / empaque *</mat-label>
+          <mat-select formControlName="product_presentation_id">
+            @for (pr of presentations(); track pr.id) {
+              <mat-option [value]="pr.id">
+                {{ pr.name }}
+                <span style="color:#718096;font-size:0.85em"> — 1 und = {{ pr.factor_to_base }} {{ selectedProduct?.base_unit?.abbreviation || 'base' }}</span>
+              </mat-option>
+            }
+          </mat-select>
+          @if (selectedPresentation) {
+            <mat-hint>
+              Factor: 1 {{ selectedPresentation.name }} = <strong>{{ selectedPresentation.factor_to_base }}</strong>
+              {{ selectedProduct?.base_unit?.abbreviation || 'uds.' }} en inventario
+            </mat-hint>
+          }
+        </mat-form-field>
+
+        <mat-form-field appearance="outline">
+          <mat-label>Cantidad de empaques *</mat-label>
+          <input matInput type="number" formControlName="quantity_in_presentation" min="1" />
+          @if (selectedPresentation) {
+            <mat-hint>{{ selectedPresentation.name }}{{ (form.get('quantity_in_presentation')?.value || 0) > 1 ? 's' : '' }}</mat-hint>
+          }
+        </mat-form-field>
+
+        <!-- Preview de conversión -->
+        @if (previewBaseUnits !== null) {
+          <div class="span2 conversion-preview">
+            <mat-icon>calculate</mat-icon>
+            <span>
+              <strong>{{ form.get('quantity_in_presentation')?.value }}</strong>
+              {{ selectedPresentation?.name }}
+              =
+              <strong class="base-qty">{{ previewBaseUnits }}</strong>
+              {{ selectedProduct?.base_unit?.abbreviation || 'unidades base' }} ingresarán al inventario
+            </span>
+          </div>
+        }
+      }
+
       <mat-form-field appearance="outline" class="span2"><mat-label>Notas</mat-label><textarea matInput formControlName="notes" rows="2"></textarea></mat-form-field>
     }
 

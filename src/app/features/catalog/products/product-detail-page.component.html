@@ -1,0 +1,241 @@
+<app-page-header
+  [title]="product()?.name || 'Producto'"
+  [subtitle]="product()?.code || ''"
+  icon="inventory_2">
+</app-page-header>
+
+<app-loading-spinner [loading]="loading()" [inline]="true"></app-loading-spinner>
+
+@if (product(); as p) {
+
+  <!-- Cabecera de info -->
+  <div class="product-meta">
+    <span class="badge" [class.badge--kit]="p.product_type === 'kit'" [class.badge--simple]="p.product_type === 'simple'">
+      {{ getProductTypeBadge(p.product_type) }}
+    </span>
+    @if (p.requires_cold_chain) { <span class="chip-cold">❄️ Cadena de frío</span> }
+    @if (!p.is_active) { <span class="badge badge--off">Inactivo</span> }
+    <span class="cat-label">{{ p.category?.name }}</span>
+    <span class="unit-label">Unidad base: <strong>{{ p.base_unit?.abbreviation }}</strong></span>
+    <button mat-icon-button (click)="back()" matTooltip="Volver al catálogo" style="margin-left:auto">
+      <mat-icon>arrow_back</mat-icon>
+    </button>
+  </div>
+
+  <mat-tab-group color="primary" animationDuration="200ms">
+
+    <!-- ── TAB: Info general ── -->
+    <mat-tab label="Información">
+      <div class="tab-body">
+        <div class="info-grid">
+          <div class="info-item"><span class="label">Nombre</span><span class="val">{{ p.name }}</span></div>
+          <div class="info-item"><span class="label">Código</span><span class="val"><code class="code-tag">{{ p.code }}</code></span></div>
+          <div class="info-item"><span class="label">SKU</span><span class="val">{{ p.sku || '—' }}</span></div>
+          <div class="info-item"><span class="label">Categoría</span><span class="val">{{ p.category?.name || '—' }}</span></div>
+          <div class="info-item"><span class="label">Unidad base</span><span class="val">{{ p.base_unit?.name }} ({{ p.base_unit?.abbreviation }})</span></div>
+          @if (p.product_type === 'simple') {
+            <div class="info-item"><span class="label">Punto reorden</span><span class="val">{{ p.reorder_point }}</span></div>
+            <div class="info-item"><span class="label">Cant. reorden</span><span class="val">{{ p.reorder_quantity }}</span></div>
+            <div class="info-item"><span class="label">Stock mín.</span><span class="val">{{ p.min_stock }}</span></div>
+            <div class="info-item"><span class="label">Stock máx.</span><span class="val">{{ p.max_stock }}</span></div>
+          }
+          @if (p.description) {
+            <div class="info-item info-item--full"><span class="label">Descripción</span><span class="val">{{ p.description }}</span></div>
+          }
+        </div>
+      </div>
+    </mat-tab>
+
+    <!-- ── TAB: Presentaciones (solo simple) ── -->
+    @if (p.product_type === 'simple') {
+      <mat-tab label="Presentaciones de empaque">
+        <div class="tab-body">
+
+          <!-- Guía de conversión -->
+          <div class="conv-guide">
+            <mat-icon class="conv-icon">layers</mat-icon>
+            <div>
+              <strong>¿Para qué sirven las presentaciones?</strong>
+              Definen cómo se recibe o compra el producto en distintos empaques
+              (cajas, paquetes, unidades) y el factor de conversión a
+              <strong>{{ p.base_unit?.name || 'unidad base' }} ({{ p.base_unit?.abbreviation || 'base' }})</strong>.
+              <br>
+              <span class="conv-formula">
+                Recibir <em>N</em> unidades de una presentación →
+                ingresa <em>N × factor_to_base</em> {{ p.base_unit?.abbreviation || 'uds.' }} al inventario.
+              </span>
+            </div>
+          </div>
+
+          <div class="tab-toolbar">
+            <span class="toolbar-hint">
+              Los empaques se gestionan globalmente en <strong>Catálogo → Empaques / Presentaciones</strong>.
+              @if (presentations().length === 0) {
+                <strong style="color:#c05621"> · Sin presentaciones configuradas — las entradas solo aceptarán unidad base.</strong>
+              }
+            </span>
+            <button mat-stroked-button color="accent" (click)="goToGlobalPresentations()" matTooltip="Ir al tab de empaques globales">
+              <mat-icon>open_in_new</mat-icon> Gestionar empaques
+            </button>
+          </div>
+
+          <div class="table-wrap mat-elevation-z1">
+            <table mat-table [dataSource]="sortedPresentations">
+
+              <!-- Jerarquía / nombre -->
+              <ng-container matColumnDef="hierarchy">
+                <th mat-header-cell *matHeaderCellDef>Empaque (nivel)</th>
+                <td mat-cell *matCellDef="let pr" class="hierarchy-cell">
+                  <span class="level-prefix" [style.padding-left.px]="(pr.level - 1) * 16">
+                    @if (pr.level > 1) { <span class="tree-branch">└─</span> }
+                    <span class="level-badge" [attr.data-level]="pr.level">L{{ pr.level }}</span>
+                  </span>
+                  <span class="pres-name">{{ pr.name }}</span>
+                  <code class="code-tag" style="margin-left:0.4rem">{{ pr.code }}</code>
+                </td>
+              </ng-container>
+
+              <!-- Tipo de empaque (unidad de medida) -->
+              <ng-container matColumnDef="unit_abbr">
+                <th mat-header-cell *matHeaderCellDef>Tipo</th>
+                <td mat-cell *matCellDef="let pr">
+                  <code class="code-tag">{{ getUnitAbbr(pr.units_of_measure_id) }}</code>
+                </td>
+              </ng-container>
+
+              <!-- Factor a base (conversión clave) -->
+              <ng-container matColumnDef="factor_to_base">
+                <th mat-header-cell *matHeaderCellDef>
+                  Factor a base
+                  <mat-icon style="font-size:0.9rem;height:0.9rem;width:0.9rem;vertical-align:middle;color:#718096"
+                            matTooltip="Cuántas unidades base ({{ p.base_unit?.abbreviation }}) trae 1 unidad de este empaque">
+                    help_outline
+                  </mat-icon>
+                </th>
+                <td mat-cell *matCellDef="let pr" class="factor-cell">
+                  <strong class="factor-val">× {{ pr.factor_to_base }}</strong>
+                  <span class="factor-hint">{{ p.base_unit?.abbreviation || 'base' }}/und</span>
+                </td>
+              </ng-container>
+
+              <!-- Cantidad por padre -->
+              <ng-container matColumnDef="quantity_per_parent">
+                <th mat-header-cell *matHeaderCellDef>
+                  Cant./padre
+                  <mat-icon style="font-size:0.9rem;height:0.9rem;width:0.9rem;vertical-align:middle;color:#718096"
+                            matTooltip="Cuántas unidades de este empaque caben en 1 del padre">
+                    help_outline
+                  </mat-icon>
+                </th>
+                <td mat-cell *matCellDef="let pr">
+                  @if (pr.quantity_per_parent) {
+                    {{ pr.quantity_per_parent }} en 1 {{ getParentPresName(pr.parent_id) | slice:0:12 }}
+                  } @else {
+                    <span style="color:#a0aec0">—</span>
+                  }
+                </td>
+              </ng-container>
+
+              <!-- Compra por defecto -->
+              <ng-container matColumnDef="is_purchase_default">
+                <th mat-header-cell *matHeaderCellDef>Compra</th>
+                <td mat-cell *matCellDef="let pr">
+                  @if (pr.is_purchase_default) {
+                    <span class="default-badge" matTooltip="Presentación por defecto en órdenes de compra">
+                      <mat-icon style="font-size:0.9rem;height:0.9rem;width:0.9rem">star</mat-icon> defecto
+                    </span>
+                  }
+                </td>
+              </ng-container>
+
+              <!-- Estado -->
+              <ng-container matColumnDef="is_active">
+                <th mat-header-cell *matHeaderCellDef>Estado</th>
+                <td mat-cell *matCellDef="let pr">
+                  <span class="badge" [class.badge--on]="pr.is_active" [class.badge--off]="!pr.is_active">
+                    {{ pr.is_active ? 'Activa' : 'Inactiva' }}
+                  </span>
+                </td>
+              </ng-container>
+
+              <tr mat-header-row *matHeaderRowDef="presCols"></tr>
+              <tr mat-row *matRowDef="let row; columns: presCols;"></tr>
+              <tr class="mat-row" *matNoDataRow>
+                <td class="no-data" [attr.colspan]="presCols.length">
+                  <mat-icon style="font-size:2rem;height:2rem;width:2rem;display:block;margin:0 auto 0.5rem">layers</mat-icon>
+                  Sin presentaciones configuradas.<br>
+                  <small>Agrega al menos una para poder registrar entradas por empaque.</small>
+                </td>
+              </tr>
+            </table>
+          </div>
+
+          <!-- Tabla de conversiones rápida (si hay presentaciones) -->
+          @if (presentations().length > 0) {
+            <div class="conv-summary">
+              <p class="conv-summary-title">📋 Resumen de conversiones (recibir → inventario)</p>
+              @for (pr of sortedPresentations; track pr.id) {
+                <div class="conv-row">
+                  <span class="conv-label">1 {{ pr.name }}</span>
+                  <span class="conv-arrow">→</span>
+                  <span class="conv-result">
+                    <strong>{{ pr.factor_to_base }}</strong> {{ p.base_unit?.abbreviation || 'uds.' }} en inventario
+                  </span>
+                </div>
+              }
+            </div>
+          }
+
+        </div>
+      </mat-tab>
+    }
+
+    <!-- ── TAB: BOM / Componentes (solo kit) ── -->
+    @if (p.product_type === 'kit') {
+      <mat-tab label="Receta (BOM)">
+        <div class="tab-body">
+          <p class="section-hint">Sincroniza la receta completa del kit. Los cambios reemplazan todos los componentes actuales.</p>
+          <form [formGroup]="bomForm">
+            <div formArrayName="components">
+              @for (ctrl of bomArray.controls; track $index) {
+                <div class="bom-row" [formGroupName]="$index">
+                  <mat-form-field appearance="outline" class="bom-product">
+                    <mat-label>Componente *</mat-label>
+                    <mat-select formControlName="component_product_id">
+                      @for (sp of simpleProducts(); track sp.id) {
+                        <mat-option [value]="sp.id">{{ sp.name }} ({{ sp.code }})</mat-option>
+                      }
+                    </mat-select>
+                  </mat-form-field>
+                  <mat-form-field appearance="outline" class="bom-qty">
+                    <mat-label>Cant./kit *</mat-label>
+                    <input matInput type="number" min="1" formControlName="quantity_per_kit" />
+                  </mat-form-field>
+                  <mat-form-field appearance="outline" class="bom-order">
+                    <mat-label>Orden</mat-label>
+                    <input matInput type="number" min="0" formControlName="sort_order" />
+                  </mat-form-field>
+                  <button mat-icon-button color="warn" type="button" (click)="removeBomRow($index)" matTooltip="Eliminar fila">
+                    <mat-icon>remove_circle_outline</mat-icon>
+                  </button>
+                </div>
+              }
+            </div>
+
+            <div class="bom-actions">
+              <button mat-stroked-button type="button" (click)="addBomRow()">
+                <mat-icon>add</mat-icon> Agregar componente
+              </button>
+              <button *sgaPermission="'productos.editar'" mat-raised-button color="primary" type="button"
+                      (click)="saveBom()" [disabled]="bomForm.invalid || savingBom()">
+                @if (savingBom()) { <mat-spinner diameter="18" style="display:inline-block;margin-right:6px"></mat-spinner> }
+                Guardar receta
+              </button>
+            </div>
+          </form>
+        </div>
+      </mat-tab>
+    }
+
+  </mat-tab-group>
+}

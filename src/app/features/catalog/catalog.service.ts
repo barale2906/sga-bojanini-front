@@ -1,0 +1,286 @@
+import { Injectable, inject } from '@angular/core';
+import { HttpClient, HttpParams } from '@angular/common/http';
+import { Observable } from 'rxjs';
+import { environment } from '../../../environments/environment';
+import { ApiResponse } from '../../core/models/api-response.model';
+
+// ── Interfaces ──────────────────────────────────────────────────
+
+export interface Category {
+  id: number;
+  parent_id: number | null;
+  name: string;
+  code: string;
+  description: string | null;
+  is_active: boolean;
+  children?: Category[];
+}
+
+export interface UnitOfMeasure {
+  id: number;
+  name: string;
+  abbreviation: string;
+  is_base: boolean;
+  is_active: boolean;
+}
+
+export interface Product {
+  id: number;
+  category_id: number;
+  base_unit_id: number;
+  product_type: 'simple' | 'kit';
+  name: string;
+  code: string;
+  sku: string | null;
+  description: string | null;
+  requires_cold_chain: boolean;
+  reorder_point: number;
+  reorder_quantity: number;
+  min_stock: number;
+  max_stock: number;
+  is_active: boolean;
+  category?: Pick<Category, 'id' | 'name' | 'code'>;
+  base_unit?: Pick<UnitOfMeasure, 'id' | 'name' | 'abbreviation'>;
+  components?: KitComponent[];
+  created_at?: string;
+}
+
+export interface KitComponent {
+  id: number;
+  kit_product_id?: number;
+  component_product_id: number;
+  quantity_per_kit: number;
+  sort_order: number;
+  notes?: string | null;
+  is_active?: boolean;
+  component?: Pick<Product, 'id' | 'name' | 'code'>;
+}
+
+export interface ProductPresentation {
+  id: number;
+  product_id: number;
+  parent_id: number | null;
+  name: string;
+  code: string;
+  units_of_measure_id: number;
+  quantity_per_parent: number | null;
+  factor_to_base: number;
+  level: number;
+  is_purchase_default: boolean;
+  is_active: boolean;
+  sort_order: number;
+  children?: ProductPresentation[];
+}
+
+export interface Supplier {
+  id: number;
+  name: string;
+  tax_id: string | null;
+  contact_name: string | null;
+  phone: string | null;
+  email: string | null;
+  address: string | null;
+  notes: string | null;
+  is_active: boolean;
+}
+
+export interface ImportResult {
+  total: number;
+  success: number;
+  failed: number;
+  errors: { row: number; errors: Record<string, string[]> }[];
+}
+
+export interface KitAvailability {
+  kit_product_id: number;
+  warehouse_id: number;
+  available_kits: number;
+}
+
+export interface KitExplosionLine {
+  component_product_id: number;
+  component_code: string;
+  component_name: string;
+  quantity_base: number;
+}
+
+// ── Service ──────────────────────────────────────────────────────
+
+@Injectable({ providedIn: 'root' })
+export class CatalogService {
+  private http = inject(HttpClient);
+  private api = environment.apiUrl;
+
+  // ── Categorías ──────────────────────────────────────────────
+
+  getCategories(filters: { search?: string; is_active?: string; parent_id?: number } = {}): Observable<ApiResponse<Category[]>> {
+    let params = new HttpParams();
+    if (filters.search) params = params.set('search', filters.search);
+    if (filters.is_active !== undefined && filters.is_active !== '') params = params.set('is_active', filters.is_active);
+    if (filters.parent_id !== undefined) params = params.set('parent_id', String(filters.parent_id));
+    return this.http.get<ApiResponse<Category[]>>(`${this.api}/categories`, { params });
+  }
+
+  getCategoriesTree(): Observable<ApiResponse<Category[]>> {
+    return this.http.get<ApiResponse<Category[]>>(`${this.api}/categories-tree`);
+  }
+
+  getCategory(id: number): Observable<ApiResponse<Category>> {
+    return this.http.get<ApiResponse<Category>>(`${this.api}/categories/${id}`);
+  }
+
+  createCategory(payload: Partial<Category>): Observable<ApiResponse<Category>> {
+    return this.http.post<ApiResponse<Category>>(`${this.api}/categories`, payload);
+  }
+
+  updateCategory(id: number, payload: Partial<Category>): Observable<ApiResponse<Category>> {
+    return this.http.put<ApiResponse<Category>>(`${this.api}/categories/${id}`, payload);
+  }
+
+  deleteCategory(id: number): Observable<ApiResponse<null>> {
+    return this.http.delete<ApiResponse<null>>(`${this.api}/categories/${id}`);
+  }
+
+  // ── Unidades de medida ───────────────────────────────────────
+
+  getUnits(filters: { search?: string; is_active?: string; is_base?: string } = {}): Observable<ApiResponse<UnitOfMeasure[]>> {
+    let params = new HttpParams();
+    if (filters.search) params = params.set('search', filters.search);
+    if (filters.is_active !== undefined && filters.is_active !== '') params = params.set('is_active', filters.is_active);
+    if (filters.is_base !== undefined && filters.is_base !== '') params = params.set('is_base', filters.is_base);
+    return this.http.get<ApiResponse<UnitOfMeasure[]>>(`${this.api}/units-of-measure`, { params });
+  }
+
+  getUnit(id: number): Observable<ApiResponse<UnitOfMeasure>> {
+    return this.http.get<ApiResponse<UnitOfMeasure>>(`${this.api}/units-of-measure/${id}`);
+  }
+
+  createUnit(payload: Partial<UnitOfMeasure>): Observable<ApiResponse<UnitOfMeasure>> {
+    return this.http.post<ApiResponse<UnitOfMeasure>>(`${this.api}/units-of-measure`, payload);
+  }
+
+  updateUnit(id: number, payload: Partial<UnitOfMeasure>): Observable<ApiResponse<UnitOfMeasure>> {
+    return this.http.put<ApiResponse<UnitOfMeasure>>(`${this.api}/units-of-measure/${id}`, payload);
+  }
+
+  deleteUnit(id: number): Observable<ApiResponse<null>> {
+    return this.http.delete<ApiResponse<null>>(`${this.api}/units-of-measure/${id}`);
+  }
+
+  // ── Productos ────────────────────────────────────────────────
+
+  getProducts(filters: { search?: string; category_id?: number; product_type?: string; is_active?: string; per_page?: number } = {}): Observable<ApiResponse<Product[]>> {
+    let params = new HttpParams();
+    if (filters.search) params = params.set('search', filters.search);
+    if (filters.category_id) params = params.set('category_id', String(filters.category_id));
+    if (filters.product_type) params = params.set('product_type', filters.product_type);
+    if (filters.is_active !== undefined && filters.is_active !== '') params = params.set('is_active', filters.is_active);
+    if (filters.per_page) params = params.set('per_page', String(filters.per_page));
+    return this.http.get<ApiResponse<Product[]>>(`${this.api}/products`, { params });
+  }
+
+  getProduct(id: number): Observable<ApiResponse<Product>> {
+    return this.http.get<ApiResponse<Product>>(`${this.api}/products/${id}`);
+  }
+
+  createProduct(payload: any): Observable<ApiResponse<Product>> {
+    return this.http.post<ApiResponse<Product>>(`${this.api}/products`, payload);
+  }
+
+  updateProduct(id: number, payload: any): Observable<ApiResponse<Product>> {
+    return this.http.put<ApiResponse<Product>>(`${this.api}/products/${id}`, payload);
+  }
+
+  deleteProduct(id: number): Observable<ApiResponse<null>> {
+    return this.http.delete<ApiResponse<null>>(`${this.api}/products/${id}`);
+  }
+
+  // ── Presentaciones ───────────────────────────────────────────
+
+  getPresentations(productId: number): Observable<ApiResponse<ProductPresentation[]>> {
+    return this.http.get<ApiResponse<ProductPresentation[]>>(`${this.api}/products/${productId}/presentations`);
+  }
+
+  getPresentationsTree(productId: number): Observable<ApiResponse<ProductPresentation[]>> {
+    return this.http.get<ApiResponse<ProductPresentation[]>>(`${this.api}/products/${productId}/presentations/tree`);
+  }
+
+  createPresentation(productId: number, payload: Partial<ProductPresentation>): Observable<ApiResponse<ProductPresentation>> {
+    return this.http.post<ApiResponse<ProductPresentation>>(`${this.api}/products/${productId}/presentations`, payload);
+  }
+
+  updatePresentation(id: number, payload: Partial<ProductPresentation>): Observable<ApiResponse<ProductPresentation>> {
+    return this.http.put<ApiResponse<ProductPresentation>>(`${this.api}/presentations/${id}`, payload);
+  }
+
+  deletePresentation(id: number): Observable<ApiResponse<null>> {
+    return this.http.delete<ApiResponse<null>>(`${this.api}/presentations/${id}`);
+  }
+
+  convertToBase(presentationId: number, quantity: number): Observable<ApiResponse<{ quantity_base: number }>> {
+    return this.http.post<ApiResponse<{ quantity_base: number }>>(`${this.api}/presentations/convert-to-base`, { presentation_id: presentationId, quantity });
+  }
+
+  // ── Kit / BOM ────────────────────────────────────────────────
+
+  getKitComponents(productId: number): Observable<ApiResponse<KitComponent[]>> {
+    return this.http.get<ApiResponse<KitComponent[]>>(`${this.api}/products/${productId}/kit-components`);
+  }
+
+  syncKitComponents(productId: number, components: Partial<KitComponent>[]): Observable<ApiResponse<KitComponent[]>> {
+    return this.http.put<ApiResponse<KitComponent[]>>(`${this.api}/products/${productId}/kit-components`, { components });
+  }
+
+  explodeKit(productId: number, quantityKits: number): Observable<ApiResponse<KitExplosionLine[]>> {
+    return this.http.post<ApiResponse<KitExplosionLine[]>>(`${this.api}/products/${productId}/kit-components/explode`, { quantity_kits: quantityKits });
+  }
+
+  getKitAvailability(productId: number, warehouseId: number): Observable<ApiResponse<KitAvailability>> {
+    let params = new HttpParams().set('warehouse_id', String(warehouseId));
+    return this.http.get<ApiResponse<KitAvailability>>(`${this.api}/products/${productId}/kit-availability`, { params });
+  }
+
+  // ── Proveedores ──────────────────────────────────────────────
+
+  getSuppliers(filters: { search?: string; is_active?: string; per_page?: number } = {}): Observable<ApiResponse<Supplier[]>> {
+    let params = new HttpParams();
+    if (filters.search) params = params.set('search', filters.search);
+    if (filters.is_active !== undefined && filters.is_active !== '') params = params.set('is_active', filters.is_active);
+    if (filters.per_page) params = params.set('per_page', String(filters.per_page));
+    return this.http.get<ApiResponse<Supplier[]>>(`${this.api}/suppliers`, { params });
+  }
+
+  getSupplier(id: number): Observable<ApiResponse<Supplier>> {
+    return this.http.get<ApiResponse<Supplier>>(`${this.api}/suppliers/${id}`);
+  }
+
+  createSupplier(payload: Partial<Supplier>): Observable<ApiResponse<Supplier>> {
+    return this.http.post<ApiResponse<Supplier>>(`${this.api}/suppliers`, payload);
+  }
+
+  updateSupplier(id: number, payload: Partial<Supplier>): Observable<ApiResponse<Supplier>> {
+    return this.http.put<ApiResponse<Supplier>>(`${this.api}/suppliers/${id}`, payload);
+  }
+
+  deleteSupplier(id: number): Observable<ApiResponse<null>> {
+    return this.http.delete<ApiResponse<null>>(`${this.api}/suppliers/${id}`);
+  }
+
+  // ── Importación masiva ───────────────────────────────────────
+
+  importProducts(file: File): Observable<ApiResponse<ImportResult>> {
+    const fd = new FormData();
+    fd.append('file', file);
+    return this.http.post<ApiResponse<ImportResult>>(`${this.api}/import/products`, fd);
+  }
+
+  importSuppliers(file: File): Observable<ApiResponse<ImportResult>> {
+    const fd = new FormData();
+    fd.append('file', file);
+    return this.http.post<ApiResponse<ImportResult>>(`${this.api}/import/suppliers`, fd);
+  }
+
+  downloadTemplate(entity: 'products' | 'suppliers'): Observable<Blob> {
+    return this.http.get(`${this.api}/import/templates/${entity}`, { responseType: 'blob' });
+  }
+}

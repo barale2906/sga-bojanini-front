@@ -1,4 +1,4 @@
-import { Component, inject, signal, OnInit, computed } from '@angular/core';
+import { Component, inject, signal, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { MatDialogModule, MAT_DIALOG_DATA, MatDialogRef } from '@angular/material/dialog';
@@ -8,10 +8,10 @@ import { MatSelectModule } from '@angular/material/select';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
+import { MatTooltipModule } from '@angular/material/tooltip';
 import { InventoryService } from '../inventory.service';
 import { WarehouseService, Warehouse, Location } from '../../warehouse/warehouse.service';
-// TODO: restaurar cuando se reconstruya catalog
-// import { CatalogService, Product, ProductPresentation } from '../../catalog/catalog.service';
+import { CatalogService, Product, ProductPresentation } from '../../catalog/catalog.service';
 import { FormErrorsComponent } from '../../../shared/components/form-errors/form-errors.component';
 
 const TYPE_LABELS: Record<string, string> = {
@@ -22,7 +22,7 @@ const TYPE_LABELS: Record<string, string> = {
 @Component({
   selector: 'app-movement-form-dialog',
   standalone: true,
-  imports: [CommonModule, ReactiveFormsModule, MatDialogModule, MatFormFieldModule, MatInputModule, MatSelectModule, MatButtonModule, MatIconModule, MatProgressSpinnerModule, FormErrorsComponent],
+  imports: [CommonModule, ReactiveFormsModule, MatDialogModule, MatFormFieldModule, MatInputModule, MatSelectModule, MatButtonModule, MatIconModule, MatProgressSpinnerModule, MatTooltipModule, FormErrorsComponent],
   templateUrl: './movement-form-dialog.component.html',
   styleUrl: './movement-form-dialog.component.scss',
 })
@@ -38,6 +38,27 @@ export class MovementFormDialogComponent implements OnInit {
   locations = signal<Location[]>([]);
   presentations = signal<ProductPresentation[]>([]);
   usePresentationMode = signal(false);
+
+  /** Producto actualmente seleccionado */
+  get selectedProduct(): Product | null {
+    const id = this.form.get('product_id')?.value;
+    return this.data.products.find((p: Product) => p.id === id) ?? null;
+  }
+
+  /** Presentación actualmente seleccionada */
+  get selectedPresentation(): ProductPresentation | null {
+    const id = this.form.get('product_presentation_id')?.value;
+    return this.presentations().find(pr => pr.id === id) ?? null;
+  }
+
+  /** Preview de unidades base: qty_in_presentation × factor_to_base */
+  get previewBaseUnits(): number | null {
+    if (!this.usePresentationMode()) return null;
+    const pres = this.selectedPresentation;
+    const qty = this.form.get('quantity_in_presentation')?.value;
+    if (!pres || !qty || qty < 1) return null;
+    return qty * pres.factor_to_base;
+  }
 
   get typeLabel() { return TYPE_LABELS[this.data.type] || this.data.type; }
   get isEntry() { return this.data.type === 'entry'; }

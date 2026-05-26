@@ -9,15 +9,15 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatTableModule } from '@angular/material/table';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
+import { MatTooltipModule } from '@angular/material/tooltip';
 import { PurchasingService } from '../purchasing.service';
-// TODO: restaurar cuando se reconstruya catalog
-// import { CatalogService, ProductPresentation } from '../../catalog/catalog.service';
+import { CatalogService, ProductPresentation } from '../../catalog/catalog.service';
 import { FormErrorsComponent } from '../../../shared/components/form-errors/form-errors.component';
 
 @Component({
   selector: 'app-purchase-order-form-dialog',
   standalone: true,
-  imports: [CommonModule, ReactiveFormsModule, MatDialogModule, MatFormFieldModule, MatInputModule, MatSelectModule, MatButtonModule, MatIconModule, MatTableModule, MatProgressSpinnerModule, FormErrorsComponent],
+  imports: [CommonModule, ReactiveFormsModule, MatDialogModule, MatFormFieldModule, MatInputModule, MatSelectModule, MatButtonModule, MatIconModule, MatTableModule, MatProgressSpinnerModule, MatTooltipModule, FormErrorsComponent],
   templateUrl: './purchase-order-form-dialog.component.html',
   styleUrl: './purchase-order-form-dialog.component.scss',
 })
@@ -63,6 +63,29 @@ export class PurchaseOrderFormDialogComponent implements OnInit {
 
   getItemPresentations(i: number): ProductPresentation[] {
     return this.presentationsMap()[i] || [];
+  }
+
+  /** Devuelve cuántas unidades base equivalen qty × factor_to_base para el ítem i */
+  getItemBasePreview(i: number): { value: number; unit: string } | null {
+    const presentations = this.presentationsMap()[i] || [];
+    const item = this.items.at(i);
+    const presId = item.get('product_presentation_id')?.value;
+    const qty = item.get('quantity')?.value;
+    if (!presId || !qty || qty < 1) return null;
+    const pres = presentations.find(p => p.id === presId);
+    if (!pres) return null;
+    // Buscar unidad base del producto seleccionado
+    const productId = item.get('product_id')?.value;
+    const product = (this.data.products as any[]).find((p: any) => p.id === productId);
+    const unit = product?.base_unit?.abbreviation || 'uds. base';
+    return { value: qty * pres.factor_to_base, unit };
+  }
+
+  /** Nombre abreviado de la presentación seleccionada para el ítem i */
+  getItemPresName(i: number): string {
+    const presentations = this.presentationsMap()[i] || [];
+    const presId = this.items.at(i).get('product_presentation_id')?.value;
+    return presentations.find(p => p.id === presId)?.name || '';
   }
 
   calcTotal(): number {

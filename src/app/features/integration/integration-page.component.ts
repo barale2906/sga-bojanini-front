@@ -22,8 +22,7 @@ import { PermissionDirective } from '../../shared/directives/permission.directiv
 import { DateFormatPipe } from '../../shared/pipes/date-format.pipe';
 import { ConfirmDialogComponent } from '../../shared/components/confirm-dialog/confirm-dialog.component';
 import { WarehouseService } from '../warehouse/warehouse.service';
-// TODO: restaurar cuando se reconstruya catalog
-// import { CatalogService } from '../catalog/catalog.service';
+import { CatalogService } from '../catalog/catalog.service';
 
 @Component({
   selector: 'app-integration-page',

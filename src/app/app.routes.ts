@@ -74,7 +74,13 @@ export const routes: Routes = [
         data: { permission: 'almacenes.ver' },
       },
 
-      // Catálogo (Fase 3) — módulo eliminado, pendiente de reconstrucción
+      // Catálogo (Fase 3)
+      {
+        path: 'catalog',
+        loadChildren: () =>
+          import('./features/catalog/catalog.routes').then((m) => m.catalogRoutes),
+        data: { permission: 'productos.ver' },
+      },
 
       // Inventario (Fase 4)
       {
