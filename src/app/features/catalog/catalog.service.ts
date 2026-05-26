@@ -58,7 +58,8 @@ export interface KitComponent {
 
 export interface ProductPresentation {
   id: number;
-  product_id: number;
+  /** @deprecated product_id ya no existe en presentaciones (modelo M:N) */
+  product_id?: number;
   parent_id: number | null;
   name: string;
   code: string;
@@ -66,10 +67,17 @@ export interface ProductPresentation {
   quantity_per_parent: number | null;
   factor_to_base: number;
   level: number;
-  is_purchase_default: boolean;
+  /** Campo de la tabla pivot — presente solo en respuestas por-producto */
+  is_purchase_default?: boolean;
   is_active: boolean;
   sort_order: number;
   children?: ProductPresentation[];
+}
+
+/** Payload para asignar / actualizar la vinculación presentación ↔ producto */
+export interface PresentationAttachPayload {
+  is_purchase_default?: boolean;
+  sort_order?: number;
 }
 
 export interface Supplier {
@@ -195,26 +203,97 @@ export class CatalogService {
     return this.http.delete<ApiResponse<null>>(`${this.api}/products/${id}`);
   }
 
-  // ── Presentaciones ───────────────────────────────────────────
+  // ── Presentaciones (catálogo global) ────────────────────────
 
-  getPresentations(productId: number): Observable<ApiResponse<ProductPresentation[]>> {
-    return this.http.get<ApiResponse<ProductPresentation[]>>(`${this.api}/products/${productId}/presentations`);
+  /**
+   * Lista todas las presentaciones del catálogo global.
+   * GET /api/v1/presentations
+   */
+  getCatalogPresentations(filters: { search?: string; is_active?: string } = {}): Observable<ApiResponse<ProductPresentation[]>> {
+    let params = new HttpParams();
+    if (filters.search) params = params.set('search', filters.search);
+    if (filters.is_active !== undefined && filters.is_active !== '') params = params.set('is_active', filters.is_active);
+    return this.http.get<ApiResponse<ProductPresentation[]>>(`${this.api}/presentations`, { params });
   }
 
-  getPresentationsTree(productId: number): Observable<ApiResponse<ProductPresentation[]>> {
-    return this.http.get<ApiResponse<ProductPresentation[]>>(`${this.api}/products/${productId}/presentations/tree`);
+  /**
+   * Árbol global de presentaciones.
+   * GET /api/v1/presentations/tree
+   */
+  getPresentationsTree(): Observable<ApiResponse<ProductPresentation[]>> {
+    return this.http.get<ApiResponse<ProductPresentation[]>>(`${this.api}/presentations/tree`);
   }
 
-  createPresentation(productId: number, payload: Partial<ProductPresentation>): Observable<ApiResponse<ProductPresentation>> {
-    return this.http.post<ApiResponse<ProductPresentation>>(`${this.api}/products/${productId}/presentations`, payload);
+  /**
+   * Crea una presentación en el catálogo global (sin vincular a ningún producto).
+   * POST /api/v1/presentations
+   */
+  createPresentation(payload: Partial<ProductPresentation>): Observable<ApiResponse<ProductPresentation>> {
+    return this.http.post<ApiResponse<ProductPresentation>>(`${this.api}/presentations`, payload);
   }
 
+  /**
+   * Actualiza campos globales de una presentación del catálogo.
+   * PUT /api/v1/presentations/{id}
+   */
   updatePresentation(id: number, payload: Partial<ProductPresentation>): Observable<ApiResponse<ProductPresentation>> {
     return this.http.put<ApiResponse<ProductPresentation>>(`${this.api}/presentations/${id}`, payload);
   }
 
+  /**
+   * Elimina una presentación del catálogo global (la desvincula de TODOS los productos).
+   * DELETE /api/v1/presentations/{id}
+   */
   deletePresentation(id: number): Observable<ApiResponse<null>> {
     return this.http.delete<ApiResponse<null>>(`${this.api}/presentations/${id}`);
+  }
+
+  // ── Presentaciones por producto ──────────────────────────────
+
+  /**
+   * Lista las presentaciones asignadas a un producto específico.
+   * GET /api/v1/products/{productId}/presentations
+   */
+  getPresentations(productId: number): Observable<ApiResponse<ProductPresentation[]>> {
+    return this.http.get<ApiResponse<ProductPresentation[]>>(`${this.api}/products/${productId}/presentations`);
+  }
+
+  /**
+   * Asigna (o actualiza la vinculación de) una presentación a un producto.
+   * POST /api/v1/products/{productId}/presentations/{presentationId}
+   */
+  attachPresentation(
+    productId: number,
+    presentationId: number,
+    payload: PresentationAttachPayload = {},
+  ): Observable<ApiResponse<null>> {
+    return this.http.post<ApiResponse<null>>(
+      `${this.api}/products/${productId}/presentations/${presentationId}`,
+      payload,
+    );
+  }
+
+  /**
+   * Desvincula una presentación de un producto (no la elimina del catálogo global).
+   * DELETE /api/v1/products/{productId}/presentations/{presentationId}
+   */
+  detachPresentation(productId: number, presentationId: number): Observable<ApiResponse<null>> {
+    return this.http.delete<ApiResponse<null>>(
+      `${this.api}/products/${productId}/presentations/${presentationId}`,
+    );
+  }
+
+  /**
+   * Valida la coherencia de jerarquía antes de crear/editar una presentación.
+   * POST /api/v1/presentations/validate-hierarchy
+   */
+  validatePresentationHierarchy(payload: {
+    parent_id?: number | null;
+    factor_to_base: number;
+    quantity_per_parent?: number | null;
+    level: number;
+  }): Observable<{ valid: boolean }> {
+    return this.http.post<{ valid: boolean }>(`${this.api}/presentations/validate-hierarchy`, payload);
   }
 
   convertToBase(presentationId: number, quantity: number): Observable<ApiResponse<{ quantity_base: number }>> {
@@ -229,6 +308,10 @@ export class CatalogService {
 
   syncKitComponents(productId: number, components: Partial<KitComponent>[]): Observable<ApiResponse<KitComponent[]>> {
     return this.http.put<ApiResponse<KitComponent[]>>(`${this.api}/products/${productId}/kit-components`, { components });
+  }
+
+  deleteKitComponent(productId: number, componentId: number): Observable<ApiResponse<null>> {
+    return this.http.delete<ApiResponse<null>>(`${this.api}/products/${productId}/kit-components/${componentId}`);
   }
 
   explodeKit(productId: number, quantityKits: number): Observable<ApiResponse<KitExplosionLine[]>> {

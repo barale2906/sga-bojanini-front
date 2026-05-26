@@ -2,6 +2,7 @@ import { Component, inject, OnInit, signal, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormBuilder, ReactiveFormsModule, Validators, FormArray, FormGroup } from '@angular/forms';
 import { MatDialogModule, MAT_DIALOG_DATA, MatDialogRef } from '@angular/material/dialog';
+import { MatStepperModule } from '@angular/material/stepper';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatSelectModule } from '@angular/material/select';
@@ -9,17 +10,20 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
-import { MatDividerModule } from '@angular/material/divider';
 import { MatTooltipModule } from '@angular/material/tooltip';
-import { switchMap, map, of } from 'rxjs';
-import { CatalogService, Product, Category, UnitOfMeasure } from '../catalog.service';
+import { MatChipsModule } from '@angular/material/chips';
+import { switchMap, map, of, forkJoin } from 'rxjs';
+import { CatalogService, Product, Category, UnitOfMeasure, ProductPresentation } from '../catalog.service';
 import { FormErrorsComponent } from '../../../shared/components/form-errors/form-errors.component';
 
 export interface ProductDialogData {
   product: Product | null;
   categories: Category[];
   units: UnitOfMeasure[];
-  simpleProducts: Product[]; // productos simples activos para elegir componentes de kit
+  /** Productos simples activos para elegir componentes de kit */
+  simpleProducts: Product[];
+  /** Empaques del catálogo global para seleccionar en el paso de presentaciones */
+  catalogPresentations: ProductPresentation[];
 }
 
 @Component({
@@ -27,118 +31,175 @@ export interface ProductDialogData {
   standalone: true,
   imports: [
     CommonModule, ReactiveFormsModule, MatDialogModule,
+    MatStepperModule,
     MatFormFieldModule, MatInputModule, MatSelectModule,
     MatButtonModule, MatIconModule, MatSlideToggleModule,
-    MatProgressSpinnerModule, MatDividerModule, MatTooltipModule,
+    MatProgressSpinnerModule, MatTooltipModule, MatChipsModule,
     FormErrorsComponent,
   ],
   templateUrl: './product-form-dialog.component.html',
   styles: [`
-    .dialog-form { display:flex; flex-direction:column; gap:0.25rem; padding:0.5rem 0; }
-    .w-full { width:100%; }
-    .row-2 { display:grid; grid-template-columns:1fr 1fr; gap:0.75rem; }
-    .section-title { font-size:0.85rem; font-weight:600; color:#4a5568; margin:0.5rem 0 0; text-transform:uppercase; letter-spacing:.05em; }
-    .section-hint { font-size:0.8rem; color:#718096; margin:0 0 0.5rem; }
-    .kit-row { display:grid; grid-template-columns:1fr 110px 36px; gap:0.5rem; align-items:flex-start; }
-    .kit-row-num { font-size:0.78rem; color:#a0aec0; min-width:1.2rem; padding-top:1rem; text-align:right; }
-    .kit-search { margin-bottom:0.25rem; }
-    .bom-empty { text-align:center; color:#a0aec0; font-size:0.85rem; padding:0.75rem 0; }
-    .bom-counter { font-size:0.78rem; color:#718096; margin-bottom:0.25rem; }
-    .loading-wrap { display:flex; align-items:center; gap:0.5rem; color:#718096; font-size:0.85rem; padding:0.5rem 0; }
-    mat-divider { margin:0.75rem 0; }
-    .component-name { font-weight:500; }
-    .component-code { font-size:0.78rem; color:#718096; margin-left:0.25rem; }
-    .pkg-section-header {
+    .step-body { display:flex; flex-direction:column; gap:0.6rem; padding:0.75rem 0 0.5rem; }
+    .w-full  { width:100%; }
+    .row-2   { display:grid; grid-template-columns:1fr 1fr; gap:0.75rem; }
+    .step-nav {
       display:flex; justify-content:space-between; align-items:center;
-      padding:0.5rem 0.75rem; border-radius:8px; cursor:pointer;
-      background:#EBF8FF; border:1px solid #BEE3F8; margin:0.25rem 0;
-      &:hover { background:#dbeafe; }
+      margin-top:0.75rem; padding-top:0.5rem; border-top:1px solid #e2e8f0;
     }
-    .pkg-body {
-      padding:0.75rem; background:#F7FAFC; border:1px solid #E2E8F0;
-      border-radius:0 0 8px 8px; border-top:none; display:flex;
-      flex-direction:column; gap:0.25rem;
+    .step-hint { font-size:0.8rem; color:#718096; margin:0 0 0.25rem; }
+    .small-hint { font-size:0.72rem !important; }
+    .section-label {
+      font-size:0.78rem; font-weight:700; color:#4a5568;
+      text-transform:uppercase; letter-spacing:0.04em; margin:0.25rem 0 0;
     }
-    .pkg-preview {
-      display:flex; align-items:center; gap:0.4rem;
-      background:#F0FFF4; border:1px solid #9AE6B4; border-radius:6px;
-      padding:0.4rem 0.75rem; font-size:0.82rem; color:#276749; margin-top:0.25rem;
+
+    /* Tipo de producto cards */
+    .type-cards { display:grid; grid-template-columns:1fr 1fr; gap:0.75rem; }
+    .type-card {
+      border:2px solid #e2e8f0; border-radius:10px; padding:0.9rem 1rem;
+      cursor:pointer; transition:all .15s; background:#fafafa;
+      &:hover { border-color:#90cdf4; background:#EBF8FF; }
+      &.selected { border-color:#3182ce; background:#EBF8FF; }
     }
+    .type-card-title { font-weight:700; font-size:0.9rem; }
+    .type-card-desc  { font-size:0.78rem; color:#718096; margin-top:0.2rem; }
+
+    /* BOM */
+    .kit-row { display:grid; grid-template-columns:1fr 110px 36px; gap:0.5rem; align-items:flex-start; }
+    .bom-empty { text-align:center; color:#a0aec0; font-size:0.85rem; padding:0.75rem 0; }
+
+    /* Presentations checklist */
+    .pres-search { margin-bottom:0.5rem; }
+    .pres-list { display:flex; flex-direction:column; gap:0.35rem; max-height:280px; overflow-y:auto; padding-right:2px; }
+    .pres-item {
+      display:flex; align-items:center; gap:0.6rem;
+      padding:0.45rem 0.75rem; border-radius:8px;
+      border:2px solid #e2e8f0; background:#fafafa;
+      cursor:pointer; transition:all .12s; user-select:none;
+      &:hover { border-color:#90cdf4; background:#EBF8FF; }
+      &.pres-item--selected { border-color:#3182ce; background:#EBF8FF; }
+    }
+    .pres-check {
+      width:18px; height:18px; border-radius:4px; border:2px solid #cbd5e0;
+      display:flex; align-items:center; justify-content:center; flex-shrink:0;
+      background:#fff; transition:all .12s;
+      mat-icon { font-size:0.85rem; height:0.85rem; width:0.85rem; color:#fff; }
+      .pres-item--selected & { background:#3182ce; border-color:#3182ce; }
+    }
+    .lvl-chip {
+      display:inline-flex; align-items:center; justify-content:center;
+      padding:0.05rem 0.35rem; border-radius:3px; font-size:0.7rem; font-weight:700; flex-shrink:0;
+      &--1 { background:#e9d8fd; color:#553c9a; }
+      &--2 { background:#bee3f8; color:#2c5282; }
+      &--3 { background:#c6f6d5; color:#276749; }
+    }
+    .pres-name  { font-weight:500; font-size:0.85rem; }
+    .pres-code  { font-size:0.75rem; font-family:monospace; background:#e2e8f0; padding:0.1rem 0.3rem; border-radius:3px; }
+    .pres-factor { font-size:0.78rem; color:#276749; font-weight:600; margin-left:auto; flex-shrink:0; }
+    .pres-empty { text-align:center; color:#a0aec0; font-size:0.85rem; padding:1rem 0; }
+
+    /* Summary box */
+    .summary-box {
+      background:#f7fafc; border:1px solid #e2e8f0; border-radius:8px;
+      padding:0.75rem 0.9rem; display:flex; flex-direction:column; gap:0.3rem;
+    }
+    .summary-row { display:flex; align-items:baseline; gap:0.5rem; font-size:0.83rem; }
+    .slabel { color:#718096; min-width:120px; font-size:0.78rem; flex-shrink:0; }
+    .code-tag { background:#e2e8f0; padding:0.1rem 0.4rem; border-radius:4px; font-size:0.78rem; font-family:monospace; }
   `],
 })
 export class ProductFormDialogComponent implements OnInit {
   data: ProductDialogData = inject(MAT_DIALOG_DATA);
-  private ref = inject(MatDialogRef<ProductFormDialogComponent>);
-  private svc = inject(CatalogService);
-  private fb = inject(FormBuilder);
+  private ref  = inject(MatDialogRef<ProductFormDialogComponent>);
+  private svc  = inject(CatalogService);
+  private fb   = inject(FormBuilder);
 
-  saving = signal(false);
-  loadingComponents = signal(false);
-  errors = signal<string[]>([]);
-  fe = signal<Record<string, string[]>>({});
+  saving               = signal(false);
+  loadingComponents    = signal(false);
+  loadingAssignedPres  = signal(false);
+  errors               = signal<string[]>([]);
+  fe                   = signal<Record<string, string[]>>({});
 
-  /** Controla si se muestra la sección de empaque principal al crear un producto simple */
-  pkgVisible = signal(false);
+  // ── Señales reactivas ──────────────────────────────────────
+  _typeSig     = signal<string>('simple');
+  _baseUnitSig = signal<number | null>(null);
 
-  /** Señal con todos los simples disponibles como componentes */
-  simpleProducts = signal<Product[]>([]);
+  isKit = computed(() => this._typeSig() === 'kit');
 
-  /** Texto de búsqueda para filtrar opciones en los selectores de componente */
-  componentSearch = signal('');
+  // ── Presentaciones ─────────────────────────────────────────
+  selectedPresentationIds  = signal<Set<number>>(new Set());
+  _originalPresIds         = signal<Set<number>>(new Set());
+  defaultPresentationId    = signal<number | null>(null);
+  presentationSearch       = signal('');
 
-  /** Lista filtrada según búsqueda; siempre incluye el producto ya seleccionado en cada fila */
-  filteredProducts = computed(() => {
-    const q = this.componentSearch().toLowerCase().trim();
-    const all = this.simpleProducts();
+  filteredPresentations = computed(() => {
+    const q   = this.presentationSearch().toLowerCase().trim();
+    const all = this.data.catalogPresentations ?? [];
     if (!q) return all;
     return all.filter(p =>
-      p.name.toLowerCase().includes(q) ||
-      p.code.toLowerCase().includes(q)
+      p.name.toLowerCase().includes(q) || p.code.toLowerCase().includes(q)
     );
   });
 
-  /** Signal reactiva del tipo de producto (evita problema de computed sobre form.value no-reactivo) */
-  private _productType = signal<string>('simple');
-  isKit = computed(() => this._productType() === 'kit');
+  selectedPresentationsList = computed(() => {
+    const ids = this.selectedPresentationIds();
+    return (this.data.catalogPresentations ?? []).filter(p => ids.has(p.id));
+  });
 
-  form = this.fb.group({
-    category_id: [null as number | null, Validators.required],
-    base_unit_id: [null as number | null, Validators.required],
+  // ── BOM (components) ──────────────────────────────────────
+  simpleProducts   = signal<Product[]>([]);
+  componentSearch  = signal('');
+
+  filteredSimpleProducts = computed(() => {
+    const q = this.componentSearch().toLowerCase().trim();
+    return q
+      ? this.simpleProducts().filter(p => p.name.toLowerCase().includes(q) || p.code.toLowerCase().includes(q))
+      : this.simpleProducts();
+  });
+
+  // ── Unidad base seleccionada ───────────────────────────────
+  selectedBaseUnitAbbr = computed(() => {
+    const id = this._baseUnitSig();
+    return id ? (this.data.units.find(u => u.id === id)?.abbreviation ?? 'uds.') : 'uds.';
+  });
+
+  // ── FormGroups por paso ────────────────────────────────────
+  stepTipo = this.fb.group({
     product_type: ['simple', Validators.required],
-    name: ['', [Validators.required, Validators.maxLength(255)]],
-    code: ['', [Validators.required, Validators.maxLength(50)]],
-    sku: [null as string | null],
+  });
+
+  stepIdent = this.fb.group({
+    name:        ['', [Validators.required, Validators.maxLength(255)]],
+    code:        ['', [Validators.required, Validators.maxLength(50)]],
+    sku:         [null as string | null],
+    category_id: [null as number | null, Validators.required],
     description: [''],
+  });
+
+  stepInv = this.fb.group({
+    base_unit_id:      [null as number | null, Validators.required],
     requires_cold_chain: [false],
-    reorder_point: [0, [Validators.min(0)]],
-    reorder_quantity: [0, [Validators.min(0)]],
-    min_stock: [0, [Validators.min(0)]],
-    max_stock: [0, [Validators.min(0)]],
+    reorder_point:     [0, Validators.min(0)],
+    reorder_quantity:  [0, Validators.min(0)],
+    min_stock:         [0, Validators.min(0)],
+    max_stock:         [0, Validators.min(0)],
+    components:        this.fb.array([]),
+  });
+
+  stepFinal = this.fb.group({
     is_active: [true],
-    components: this.fb.array([]),
-    // ── Empaque principal (opcional, solo al crear un producto simple) ──
-    pkg_name:    [''],
-    pkg_code:    [''],
-    pkg_unit_id: [null as number | null],
-    pkg_factor:  [null as number | null, [Validators.min(1)]],
   });
 
   get componentsArray(): FormArray {
-    return this.form.get('components') as FormArray;
+    return this.stepInv.get('components') as FormArray;
   }
 
-  /** Obtiene las opciones para una fila concreta:
-   *  incluye SIEMPRE el producto ya seleccionado (para que mat-select muestre la etiqueta) */
   getRowOptions(rowIndex: number): Product[] {
-    const filtered = this.filteredProducts();
-    const selectedId = (this.componentsArray.at(rowIndex) as FormGroup)
-      .get('component_product_id')?.value as number | null;
-    if (!selectedId) return filtered;
-    // Si el producto seleccionado ya está en la lista filtrada, devolver tal cual
-    if (filtered.some(p => p.id === selectedId)) return filtered;
-    // Incluirlo al inicio para que mat-select pueda mostrar su etiqueta
-    const selectedProduct = this.simpleProducts().find(p => p.id === selectedId);
-    return selectedProduct ? [selectedProduct, ...filtered] : filtered;
+    const filtered   = this.filteredSimpleProducts();
+    const selectedId = (this.componentsArray.at(rowIndex) as FormGroup).get('component_product_id')?.value as number | null;
+    if (!selectedId || filtered.some(p => p.id === selectedId)) return filtered;
+    const selected = this.simpleProducts().find(p => p.id === selectedId);
+    return selected ? [selected, ...filtered] : filtered;
   }
 
   getProductLabel(id: number | null): string {
@@ -147,50 +208,89 @@ export class ProductFormDialogComponent implements OnInit {
     return p ? `${p.name} (${p.code})` : String(id);
   }
 
-  /** Abreviatura de la unidad base actualmente seleccionada */
-  get selectedBaseUnitAbbr(): string {
-    const id = this.form.get('base_unit_id')?.value;
-    if (!id) return 'uds.';
-    return this.data.units.find(u => u.id === id)?.abbreviation ?? 'uds.';
+  // ── Presentaciones — métodos ──────────────────────────────
+  isSelected(id: number): boolean {
+    return this.selectedPresentationIds().has(id);
   }
 
+  togglePresentation(id: number): void {
+    const s = new Set(this.selectedPresentationIds());
+    if (s.has(id)) {
+      s.delete(id);
+      if (this.defaultPresentationId() === id) this.defaultPresentationId.set(null);
+    } else {
+      s.add(id);
+      if (s.size === 1) this.defaultPresentationId.set(id); // auto-default al primero
+    }
+    this.selectedPresentationIds.set(s);
+  }
+
+  setDefault(id: number): void {
+    this.defaultPresentationId.set(id);
+  }
+
+  isDefault(id: number): boolean {
+    return this.defaultPresentationId() === id;
+  }
+
+  // ── Helpers ───────────────────────────────────────────────
+  getCategoryName(id: number | null | undefined): string {
+    if (!id) return '—';
+    return this.data.categories.find(c => c.id === id)?.name ?? '—';
+  }
+
+  // ── BOM — métodos ─────────────────────────────────────────
+  addComponentRow(): void {
+    this.componentsArray.push(this.fb.group({
+      component_product_id: [null as number | null, Validators.required],
+      quantity_per_kit:     [1, [Validators.required, Validators.min(1)]],
+    }));
+  }
+
+  removeComponentRow(i: number): void {
+    this.componentsArray.removeAt(i);
+  }
+
+  // ── Lifecycle ─────────────────────────────────────────────
   ngOnInit(): void {
-    // Inicializar simpleProducts desde los datos pre-cargados
     this.simpleProducts.set(this.data.simpleProducts);
 
-    // Mantener la señal _productType sincronizada con el form
-    this.form.get('product_type')!.valueChanges.subscribe(v => {
-      this._productType.set(v || 'simple');
+    // Sincronizar señal _typeSig
+    this.stepTipo.get('product_type')!.valueChanges.subscribe(v => {
+      this._typeSig.set(v || 'simple');
+    });
+
+    // Sincronizar señal _baseUnitSig
+    this.stepInv.get('base_unit_id')!.valueChanges.subscribe(v => {
+      this._baseUnitSig.set(v);
     });
 
     if (this.data.product) {
       const p = this.data.product;
-      this._productType.set(p.product_type);
-      this.form.patchValue({
-        category_id: p.category_id,
+      this._typeSig.set(p.product_type);
+      this._baseUnitSig.set(p.base_unit_id);
+
+      this.stepTipo.patchValue({ product_type: p.product_type });
+      this.stepIdent.patchValue({ name: p.name, code: p.code, sku: p.sku, category_id: p.category_id, description: p.description ?? '' });
+      this.stepInv.patchValue({
         base_unit_id: p.base_unit_id,
-        product_type: p.product_type,
-        name: p.name,
-        code: p.code,
-        sku: p.sku,
-        description: p.description ?? '',
         requires_cold_chain: p.requires_cold_chain,
         reorder_point: p.reorder_point,
         reorder_quantity: p.reorder_quantity,
         min_stock: p.min_stock,
         max_stock: p.max_stock,
-        is_active: p.is_active,
       });
+      this.stepFinal.patchValue({ is_active: p.is_active });
 
-      // Al editar un kit, cargar sus componentes actuales
       if (p.product_type === 'kit') {
-        this.loadExistingComponents(p.id);
+        this._loadExistingComponents(p.id);
+      } else {
+        this._loadAssignedPresentations(p.id);
       }
     }
   }
 
-  /** Carga los componentes actuales del kit desde la API y puebla el FormArray */
-  private loadExistingComponents(productId: number): void {
+  private _loadExistingComponents(productId: number): void {
     this.loadingComponents.set(true);
     this.svc.getKitComponents(productId).subscribe({
       next: r => {
@@ -199,7 +299,7 @@ export class ProductFormDialogComponent implements OnInit {
         r.data.forEach(c => {
           this.componentsArray.push(this.fb.group({
             component_product_id: [c.component_product_id, Validators.required],
-            quantity_per_kit: [c.quantity_per_kit, [Validators.required, Validators.min(1)]],
+            quantity_per_kit:     [c.quantity_per_kit, [Validators.required, Validators.min(1)]],
           }));
         });
       },
@@ -210,110 +310,123 @@ export class ProductFormDialogComponent implements OnInit {
     });
   }
 
-  addComponentRow(): void {
-    this.componentsArray.push(this.fb.group({
-      component_product_id: [null as number | null, Validators.required],
-      quantity_per_kit: [1, [Validators.required, Validators.min(1)]],
-    }));
+  private _loadAssignedPresentations(productId: number): void {
+    this.loadingAssignedPres.set(true);
+    this.svc.getPresentations(productId).subscribe({
+      next: r => {
+        const ids = new Set(r.data.map((pr: ProductPresentation) => pr.id));
+        this.selectedPresentationIds.set(ids);
+        this._originalPresIds.set(new Set(ids));
+        const def = r.data.find((pr: ProductPresentation) => pr.is_purchase_default);
+        if (def) this.defaultPresentationId.set(def.id);
+        else if (ids.size > 0) this.defaultPresentationId.set([...ids][0]);
+        this.loadingAssignedPres.set(false);
+      },
+      error: () => this.loadingAssignedPres.set(false),
+    });
   }
 
-  removeComponentRow(i: number): void {
-    this.componentsArray.removeAt(i);
-  }
-
-  clearComponentSearch(): void {
-    this.componentSearch.set('');
-  }
-
+  // ── Guardar ───────────────────────────────────────────────
   save(): void {
-    if (this.form.invalid || this.saving()) return;
+    if (this.saving()) return;
     if (this.isKit() && this.componentsArray.length === 0) {
-      this.errors.set(['Un kit debe tener al menos un componente.']);
-      return;
+      this.errors.set(['Un kit debe tener al menos un componente.']); return;
     }
-    this.errors.set([]);
-    this.fe.set({});
-    this.saving.set(true);
+    this.errors.set([]); this.fe.set({}); this.saving.set(true);
 
-    const raw = this.form.value;
+    const ti = this.stepTipo.value;
+    const si = this.stepIdent.value;
+    const iv = this.stepInv.value;
+    const sf = this.stepFinal.value;
+
     const basePayload: any = {
-      category_id: raw.category_id,
-      base_unit_id: raw.base_unit_id,
-      product_type: raw.product_type,
-      name: raw.name,
-      code: raw.code,
-      sku: raw.sku || null,
-      description: raw.description || null,
-      requires_cold_chain: raw.requires_cold_chain,
-      reorder_point: raw.reorder_point ?? 0,
-      reorder_quantity: raw.reorder_quantity ?? 0,
-      min_stock: raw.min_stock ?? 0,
-      max_stock: raw.max_stock ?? 0,
-      is_active: raw.is_active,
+      product_type:        ti.product_type,
+      name:                si.name,
+      code:                si.code,
+      sku:                 si.sku || null,
+      category_id:         si.category_id,
+      description:         si.description || null,
+      base_unit_id:        iv.base_unit_id,
+      requires_cold_chain: iv.requires_cold_chain,
+      reorder_point:       iv.reorder_point ?? 0,
+      reorder_quantity:    iv.reorder_quantity ?? 0,
+      min_stock:           iv.min_stock ?? 0,
+      max_stock:           iv.max_stock ?? 0,
+      is_active:           sf.is_active ?? true,
     };
 
-    const kitComponents = (raw.components as any[]).map(c => ({
+    const kitComponents = (iv.components as any[]).map(c => ({
       component_product_id: c.component_product_id,
-      quantity_per_kit: c.quantity_per_kit,
+      quantity_per_kit:     c.quantity_per_kit,
     }));
 
+    const defaultId = this.defaultPresentationId();
+
     if (!this.data.product) {
-      // ── CREAR ──────────────────────────────────────────────────
+      // ── CREAR ────────────────────────────────────────────────
       if (this.isKit()) {
         basePayload.components = kitComponents;
       }
 
-      // Determinar si hay que crear un empaque principal después de crear el producto
-      const hasPkg = !this.isKit() && this.pkgVisible()
-        && raw.pkg_name && raw.pkg_code && raw.pkg_unit_id && (raw.pkg_factor ?? 0) >= 1;
-
       this.svc.createProduct(basePayload).pipe(
-        switchMap(productRes => {
-          if (hasPkg) {
-            return this.svc.createPresentation(productRes.data.id, {
-              parent_id: null,
-              name: raw.pkg_name!,
-              code: raw.pkg_code!,
-              units_of_measure_id: raw.pkg_unit_id!,
-              factor_to_base: raw.pkg_factor!,
-              quantity_per_parent: null,
-              level: 1,
-              sort_order: 1,
-              is_purchase_default: true,
-            }).pipe(map(() => productRes));
+        switchMap(res => {
+          if (!this.isKit()) {
+            const toAttach = [...this.selectedPresentationIds()];
+            if (toAttach.length === 0) return of(res);
+            const ops = toAttach.map(id =>
+              this.svc.attachPresentation(res.data.id, id, { is_purchase_default: id === defaultId })
+            );
+            return forkJoin(ops).pipe(map(() => res));
           }
-          return of(productRes);
+          return of(res);
         })
       ).subscribe({
         next: res => { this.saving.set(false); this.ref.close(res.data); },
-        error: err => this.handleError(err),
+        error: err => this._handleError(err),
       });
 
     } else {
-      // ── EDITAR ─────────────────────────────────────────────────
+      // ── EDITAR ───────────────────────────────────────────────
+      const productId = this.data.product.id;
+
       if (this.isKit()) {
-        // 1) Actualizar cabecera del producto
-        // 2) Sincronizar BOM (reemplaza todos los componentes)
-        this.svc.updateProduct(this.data.product.id, basePayload).pipe(
-          switchMap(productRes =>
-            this.svc.syncKitComponents(this.data.product!.id, kitComponents).pipe(
-              map(() => productRes)
-            )
+        this.svc.updateProduct(productId, basePayload).pipe(
+          switchMap(res =>
+            this.svc.syncKitComponents(productId, kitComponents).pipe(map(() => res))
           )
         ).subscribe({
           next: res => { this.saving.set(false); this.ref.close(res.data); },
-          error: err => this.handleError(err),
+          error: err => this._handleError(err),
         });
+
       } else {
-        this.svc.updateProduct(this.data.product.id, basePayload).subscribe({
+        // Calcular delta de presentaciones
+        const original = this._originalPresIds();
+        const current  = this.selectedPresentationIds();
+        const toUpsert = [...current]; // re-attach todos los seleccionados (actualiza pivot)
+        const toDetach = [...original].filter(id => !current.has(id));
+
+        this.svc.updateProduct(productId, basePayload).pipe(
+          switchMap(res => {
+            const ops = [
+              ...toUpsert.map(id =>
+                this.svc.attachPresentation(productId, id, { is_purchase_default: id === defaultId })
+              ),
+              ...toDetach.map(id => this.svc.detachPresentation(productId, id)),
+            ];
+            return ops.length > 0
+              ? forkJoin(ops).pipe(map(() => res))
+              : of(res);
+          })
+        ).subscribe({
           next: res => { this.saving.set(false); this.ref.close(res.data); },
-          error: err => this.handleError(err),
+          error: err => this._handleError(err),
         });
       }
     }
   }
 
-  private handleError(err: any): void {
+  private _handleError(err: any): void {
     this.saving.set(false);
     if (err.status === 422 || err.status === 409) {
       this.fe.set(err.error?.errors || {});

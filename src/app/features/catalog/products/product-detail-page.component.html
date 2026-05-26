@@ -69,13 +69,15 @@
 
           <div class="tab-toolbar">
             <span class="toolbar-hint">
-              Los empaques se gestionan globalmente en <strong>Catálogo → Empaques / Presentaciones</strong>.
               @if (presentations().length === 0) {
-                <strong style="color:#c05621"> · Sin presentaciones configuradas — las entradas solo aceptarán unidad base.</strong>
+                <strong style="color:#c05621">Sin presentaciones configuradas — las entradas solo aceptarán unidad base.</strong>
+              } @else {
+                <span>{{ presentations().length }} presentación(es) configurada(s)</span>
               }
             </span>
-            <button mat-stroked-button color="accent" (click)="goToGlobalPresentations()" matTooltip="Ir al tab de empaques globales">
-              <mat-icon>open_in_new</mat-icon> Gestionar empaques
+            <button *sgaPermission="'productos.editar'" mat-raised-button color="primary"
+                    (click)="openPresentationForm()">
+              <mat-icon>add</mat-icon> Nuevo Empaque
             </button>
           </div>
 
@@ -158,6 +160,21 @@
                 </td>
               </ng-container>
 
+              <!-- Acciones por fila -->
+              <ng-container matColumnDef="actions">
+                <th mat-header-cell *matHeaderCellDef class="act">Acciones</th>
+                <td mat-cell *matCellDef="let pr" class="act">
+                  <button *sgaPermission="'productos.editar'" mat-icon-button color="primary"
+                          (click)="openPresentationForm(pr)" matTooltip="Editar empaque">
+                    <mat-icon>edit</mat-icon>
+                  </button>
+                  <button *sgaPermission="'productos.editar'" mat-icon-button color="warn"
+                          (click)="deletePresentation(pr)" matTooltip="Desvincular empaque del producto">
+                    <mat-icon>link_off</mat-icon>
+                  </button>
+                </td>
+              </ng-container>
+
               <tr mat-header-row *matHeaderRowDef="presCols"></tr>
               <tr mat-row *matRowDef="let row; columns: presCols;"></tr>
               <tr class="mat-row" *matNoDataRow>
@@ -202,7 +219,7 @@
                   <mat-form-field appearance="outline" class="bom-product">
                     <mat-label>Componente *</mat-label>
                     <mat-select formControlName="component_product_id">
-                      @for (sp of simpleProducts(); track sp.id) {
+                      @for (sp of availableComponents(); track sp.id) {
                         <mat-option [value]="sp.id">{{ sp.name }} ({{ sp.code }})</mat-option>
                       }
                     </mat-select>
@@ -215,7 +232,8 @@
                     <mat-label>Orden</mat-label>
                     <input matInput type="number" min="0" formControlName="sort_order" />
                   </mat-form-field>
-                  <button mat-icon-button color="warn" type="button" (click)="removeBomRow($index)" matTooltip="Eliminar fila">
+                  <button *sgaPermission="'productos.editar'" mat-icon-button color="warn" type="button"
+                          (click)="deleteKitComponent($index)" matTooltip="Eliminar componente">
                     <mat-icon>remove_circle_outline</mat-icon>
                   </button>
                 </div>

@@ -1,4 +1,4 @@
-import { Component, inject, signal, OnInit } from '@angular/core';
+import { Component, inject, signal, computed, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Router, ActivatedRoute } from '@angular/router';
 import { FormBuilder, ReactiveFormsModule } from '@angular/forms';
@@ -24,11 +24,7 @@ import { ProductFormDialogComponent, ProductDialogData } from './products/produc
 import { SupplierFormDialogComponent } from './suppliers/supplier-form-dialog.component';
 import { ImportDialogComponent, ImportEntity } from './import/import-dialog.component';
 import { PresentationFormDialogComponent, PresentationDialogData } from './products/presentation-form-dialog.component';
-
-/** Presentación con la info del producto al que pertenece */
-export interface PresentationRow extends ProductPresentation {
-  product: Product;
-}
+import { PresProductsDialogComponent, PresProductsDialogData } from './products/pres-products-dialog.component';
 
 @Component({
   selector: 'app-catalog-page',
@@ -60,39 +56,50 @@ export class CatalogPageComponent implements OnInit {
   /** Tab inicial (se puede forzar con ?tab=N en la URL) */
   initialTabIndex = signal(0);
 
-  // ── Presentaciones (tab global) ────────────────────────────
-  allPresentations = signal<PresentationRow[]>([]);
-  filteredPresentations = signal<PresentationRow[]>([]);
-  allSimpleProducts = signal<Product[]>([]);
+  // ── Presentaciones (catálogo global M:N) ───────────────────
+  /** Todas las presentaciones del catálogo global */
+  catalogPresentations = signal<ProductPresentation[]>([]);
+  /** Presentaciones filtradas por búsqueda */
+  filteredCatalogPresentations = signal<ProductPresentation[]>([]);
   loadingPresentations = signal(false);
   presTabLoaded = signal(false);
-  presProductFilter = this.fb.control<number | ''>('' as const);
+  presSearch = this.fb.control('');
+
+  /**
+   * Mapa presentationId → productos que la usan.
+   * Se carga en background al abrir el tab.
+   */
+  presProductsMap = signal<Map<number, Product[]>>(new Map());
+  presProductsMapLoaded = signal(false);
 
   // ── Column defs ────────────────────────────────────────────
-  catCols = ['actions', 'code', 'name', 'parent', 'is_active'];
-  uomCols = ['actions', 'abbreviation', 'name', 'is_base', 'is_active'];
+  catCols  = ['actions', 'code', 'name', 'parent', 'is_active'];
+  uomCols  = ['actions', 'abbreviation', 'name', 'is_base', 'is_active'];
   prodCols = ['actions', 'code', 'name', 'product_type', 'category', 'base_unit', 'is_active'];
   suppCols = ['actions', 'name', 'tax_id', 'contact_name', 'phone', 'is_active'];
-  globalPresCols = ['product', 'pres_name', 'unit_type', 'factor', 'is_purchase_default', 'is_active', 'pres_actions'];
+  /** Columnas del tab global de empaques: acciones al inicio, sin columna producto */
+  globalPresCols = ['pres_actions', 'pres_name', 'unit_type', 'factor', 'level_col', 'is_active'];
 
   // ── Filters ────────────────────────────────────────────────
-  catFilters = this.fb.group({ search: [''], is_active: [''] });
-  uomFilters = this.fb.group({ search: [''], is_active: [''], is_base: [''] });
+  catFilters  = this.fb.group({ search: [''], is_active: [''] });
+  uomFilters  = this.fb.group({ search: [''], is_active: [''], is_base: [''] });
   prodFilters = this.fb.group({ search: [''], category_id: [''], product_type: [''], is_active: [''] });
   suppFilters = this.fb.group({ search: [''], is_active: [''] });
 
   ngOnInit(): void {
-    // Si la URL tiene ?tab=N, abre ese tab directamente (ej: desde detalle de producto)
     const tabParam = this.route.snapshot.queryParamMap.get('tab');
     if (tabParam !== null) {
       const idx = Number(tabParam);
       this.initialTabIndex.set(idx);
-      if (idx === 4) this.loadAllPresentations(); // pre-carga el tab de empaques
+      if (idx === 3) this.loadCatalogPresentations();
     }
 
     this.loadAll();
     this.setupFilterSubscriptions();
-    this.presProductFilter.valueChanges.subscribe(() => this.filterPresentations());
+
+    // Filtro de búsqueda en empaques
+    this.presSearch.valueChanges.pipe(debounceTime(300), distinctUntilChanged())
+      .subscribe(() => this.filterCatalogPresentations());
   }
 
   private loadAll(): void {
@@ -105,14 +112,11 @@ export class CatalogPageComponent implements OnInit {
   private setupFilterSubscriptions(): void {
     this.catFilters.get('search')!.valueChanges.pipe(debounceTime(400), distinctUntilChanged()).subscribe(() => this.loadCategories());
     this.catFilters.get('is_active')!.valueChanges.subscribe(() => this.loadCategories());
-
     this.uomFilters.valueChanges.pipe(debounceTime(300), distinctUntilChanged()).subscribe(() => this.loadUnits());
-
     this.prodFilters.get('search')!.valueChanges.pipe(debounceTime(400), distinctUntilChanged()).subscribe(() => this.loadProducts());
     this.prodFilters.get('category_id')!.valueChanges.subscribe(() => this.loadProducts());
     this.prodFilters.get('product_type')!.valueChanges.subscribe(() => this.loadProducts());
     this.prodFilters.get('is_active')!.valueChanges.subscribe(() => this.loadProducts());
-
     this.suppFilters.get('search')!.valueChanges.pipe(debounceTime(400), distinctUntilChanged()).subscribe(() => this.loadSuppliers());
     this.suppFilters.get('is_active')!.valueChanges.subscribe(() => this.loadSuppliers());
   }
@@ -206,40 +210,29 @@ export class CatalogPageComponent implements OnInit {
   // ── Productos ───────────────────────────────────────────────
 
   openProductForm(prod?: Product): void {
-    // Cargamos TODOS los simples activos (sin filtros de tabla) para el selector de componentes del kit
-    this.svc.getProducts({ product_type: 'simple', is_active: 'true' }).subscribe({
-      next: r => {
-        const simples = r.data.filter(p => p.id !== prod?.id);
-        const data: ProductDialogData = {
-          product: prod ?? null,
-          categories: this.categories(),
-          units: this.units(),
-          simpleProducts: simples,
-        };
-        this.dialog.open(ProductFormDialogComponent, { data, width: '720px', maxHeight: '92vh' })
-          .afterClosed().subscribe(saved => {
-            if (saved) {
-              this.snack.open(prod ? 'Producto actualizado' : 'Producto creado', 'OK', { duration: 3000 });
-              this.loadProducts();
-            }
-          });
-      },
-      error: () => {
-        // Si falla la carga de simples, abrimos igual con lista vacía
-        const data: ProductDialogData = {
-          product: prod ?? null,
-          categories: this.categories(),
-          units: this.units(),
-          simpleProducts: [],
-        };
-        this.dialog.open(ProductFormDialogComponent, { data, width: '720px', maxHeight: '92vh' })
-          .afterClosed().subscribe(saved => {
-            if (saved) {
-              this.snack.open(prod ? 'Producto actualizado' : 'Producto creado', 'OK', { duration: 3000 });
-              this.loadProducts();
-            }
-          });
-      },
+    const open = (simples: Product[], pres: ProductPresentation[]) => {
+      const data: ProductDialogData = {
+        product:              prod ?? null,
+        categories:           this.categories(),
+        units:                this.units(),
+        simpleProducts:       simples.filter(p => p.id !== prod?.id),
+        catalogPresentations: pres,
+      };
+      this.dialog.open(ProductFormDialogComponent, { data, width: '720px', maxHeight: '92vh' })
+        .afterClosed().subscribe(saved => {
+          if (saved) {
+            this.snack.open(prod ? 'Producto actualizado' : 'Producto creado', 'OK', { duration: 3000 });
+            this.loadProducts();
+          }
+        });
+    };
+
+    forkJoin({
+      simples: this.svc.getProducts({ product_type: 'simple', is_active: '1' }),
+      pres:    this.svc.getCatalogPresentations(),
+    }).subscribe({
+      next:  ({ simples, pres })  => open(simples.data, pres.data),
+      error: ()                   => open([], []),
     });
   }
 
@@ -290,106 +283,129 @@ export class CatalogPageComponent implements OnInit {
       });
   }
 
-  // ── Tab Empaques / Presentaciones ───────────────────────────
+  // ── Tab Empaques / Presentaciones (catálogo global) ─────────
 
-  /** Lazy-load la primera vez que el usuario abre el tab de Empaques (índice 4) */
+  /** Lazy-load la primera vez que el usuario abre el tab de Empaques (índice 3) */
   onTabIndexChange(index: number): void {
-    if (index === 4 && !this.presTabLoaded()) {
-      this.loadAllPresentations();
+    if (index === 3 && !this.presTabLoaded()) {
+      this.loadCatalogPresentations();
     }
   }
 
-  /** Carga todos los productos simples y sus presentaciones en paralelo (forkJoin) */
-  loadAllPresentations(): void {
+  /**
+   * Carga el catálogo global de presentaciones.
+   * GET /api/v1/presentations
+   * En paralelo carga los productos para el mapa "qué productos usan cada empaque".
+   */
+  loadCatalogPresentations(): void {
     this.loadingPresentations.set(true);
-    this.svc.getProducts({ product_type: 'simple', is_active: 'true' }).subscribe({
+
+    // 1) Catálogo global (fuente principal de la tabla)
+    this.svc.getCatalogPresentations().subscribe({
       next: r => {
-        const simples = r.data;
-        this.allSimpleProducts.set(simples);
-
-        if (simples.length === 0) {
-          this.allPresentations.set([]);
-          this.filteredPresentations.set([]);
-          this.loadingPresentations.set(false);
-          this.presTabLoaded.set(true);
-          return;
-        }
-
-        forkJoin(
-          simples.map(p =>
-            this.svc.getPresentations(p.id).pipe(
-              map(res => res.data.map(pr => ({ ...pr, product: p }) as PresentationRow)),
-              catchError(() => of([] as PresentationRow[]))
-            )
-          )
-        ).subscribe(results => {
-          const rows = (results as PresentationRow[][]).flat()
-            .sort((a, b) => a.product.name.localeCompare(b.product.name) || a.level - b.level || a.sort_order - b.sort_order);
-          this.allPresentations.set(rows);
-          this.filterPresentations();
-          this.loadingPresentations.set(false);
-          this.presTabLoaded.set(true);
-        });
+        this.catalogPresentations.set(r.data);
+        this.filterCatalogPresentations();
+        this.loadingPresentations.set(false);
+        this.presTabLoaded.set(true);
       },
       error: () => {
         this.loadingPresentations.set(false);
         this.presTabLoaded.set(true);
       },
     });
+
+    // 2) En segundo plano, construye el mapa presentationId → productos
+    this._loadPresProductsMap();
   }
 
-  filterPresentations(): void {
-    const productId = this.presProductFilter.value;
-    if (!productId) {
-      this.filteredPresentations.set(this.allPresentations());
+  /**
+   * Carga en background el mapa presentationId → productos que lo usan.
+   * Se hace con forkJoin sobre todos los productos simples.
+   */
+  private _loadPresProductsMap(): void {
+    this.svc.getProducts({ product_type: 'simple', is_active: '1', per_page: 9999 }).subscribe({
+      next: r => {
+        const simples = r.data;
+        if (simples.length === 0) { this.presProductsMapLoaded.set(true); return; }
+
+        forkJoin(
+          simples.map(p =>
+            this.svc.getPresentations(p.id).pipe(
+              map(res => ({ product: p, presIds: res.data.map((pr: ProductPresentation) => pr.id) })),
+              catchError(() => of({ product: p, presIds: [] as number[] }))
+            )
+          )
+        ).subscribe(results => {
+          const map = new Map<number, Product[]>();
+          for (const { product, presIds } of results) {
+            for (const presId of presIds) {
+              if (!map.has(presId)) map.set(presId, []);
+              map.get(presId)!.push(product);
+            }
+          }
+          this.presProductsMap.set(map);
+          this.presProductsMapLoaded.set(true);
+        });
+      },
+      error: () => this.presProductsMapLoaded.set(true),
+    });
+  }
+
+  filterCatalogPresentations(): void {
+    const q = (this.presSearch.value ?? '').toLowerCase().trim();
+    if (!q) {
+      this.filteredCatalogPresentations.set(this.catalogPresentations());
     } else {
-      this.filteredPresentations.set(this.allPresentations().filter(r => r.product_id === Number(productId)));
+      this.filteredCatalogPresentations.set(
+        this.catalogPresentations().filter(p =>
+          p.name.toLowerCase().includes(q) || p.code.toLowerCase().includes(q)
+        )
+      );
     }
   }
 
-  /** Devuelve la abreviatura del tipo de empaque (unidad de medida) de una presentación */
-  getPresUnitAbbr(pres: PresentationRow): string {
+  /** Devuelve la abreviatura de unidad de una presentación global */
+  getPresUnitAbbr(pres: ProductPresentation): string {
     return this.units().find(u => u.id === pres.units_of_measure_id)?.abbreviation ?? '—';
   }
 
-  openGlobalPresForm(pres?: PresentationRow): void {
-    const openDialog = (simpleProds: Product[]) => {
-      const productId = pres?.product_id ?? 0;
-      const data: PresentationDialogData = {
-        presentation: pres ?? null,
-        productId,
-        units: this.units(),
-        existingPresentations: pres
-          ? this.allPresentations().filter(r => r.product_id === productId)
-          : [],
-        products: simpleProds,
-      };
-      this.dialog.open(PresentationFormDialogComponent, { data, width: '580px' })
-        .afterClosed().subscribe(saved => {
-          if (saved) {
-            this.snack.open(pres ? 'Empaque actualizado' : 'Empaque creado', 'OK', { duration: 3000 });
-            this.presTabLoaded.set(false);
-            this.loadAllPresentations();
-          }
-        });
+  /** Muestra los productos que usan una presentación */
+  showPresentationProducts(pres: ProductPresentation): void {
+    const products = this.presProductsMap().get(pres.id) ?? [];
+    const data: PresProductsDialogData = {
+      presentation: pres,
+      products,
+      loading: !this.presProductsMapLoaded(),
     };
-
-    // Asegurarse de que tengamos el listado de productos simples
-    if (this.allSimpleProducts().length > 0) {
-      openDialog(this.allSimpleProducts());
-    } else {
-      this.svc.getProducts({ product_type: 'simple', is_active: 'true' }).subscribe({
-        next: r => { this.allSimpleProducts.set(r.data); openDialog(r.data); },
-        error: () => openDialog([]),
-      });
-    }
+    this.dialog.open(PresProductsDialogComponent, { data, width: '480px' });
   }
 
-  deleteGlobalPresentation(pres: PresentationRow): void {
+  /** Abre el wizard de crear/editar presentación del catálogo global */
+  openGlobalPresForm(pres?: ProductPresentation): void {
+    const data: PresentationDialogData = {
+      presentation: pres ?? null,
+      units: this.units(),
+      catalogPresentations: pres
+        ? this.catalogPresentations().filter(p => p.id !== pres.id)
+        : this.catalogPresentations(),
+      // No productId: creación en catálogo global sin vincular a ningún producto
+    };
+    this.dialog.open(PresentationFormDialogComponent, { data, width: '640px', maxHeight: '92vh' })
+      .afterClosed().subscribe(saved => {
+        if (saved) {
+          this.snack.open(pres ? 'Empaque actualizado' : 'Empaque creado', 'OK', { duration: 3000 });
+          this.presTabLoaded.set(false);
+          this.loadCatalogPresentations();
+        }
+      });
+  }
+
+  /** Elimina una presentación del catálogo global (la desvincula de todos los productos) */
+  deleteGlobalPresentation(pres: ProductPresentation): void {
     this.dialog.open(ConfirmDialogComponent, {
       data: {
         title: 'Eliminar empaque',
-        message: `¿Eliminar "${pres.name}" del producto ${pres.product.name}?`,
+        message: `¿Eliminar "${pres.name}" del catálogo?\nSe desvinculará de todos los productos que lo usan.`,
         confirmColor: 'warn',
       },
       width: '420px',
@@ -397,11 +413,10 @@ export class CatalogPageComponent implements OnInit {
       if (ok) {
         this.svc.deletePresentation(pres.id).subscribe({
           next: () => {
-            this.snack.open('Empaque eliminado', 'OK', { duration: 3000 });
-            // Actualización local sin recargar todo
-            const updated = this.allPresentations().filter(r => r.id !== pres.id);
-            this.allPresentations.set(updated);
-            this.filterPresentations();
+            this.snack.open('Empaque eliminado del catálogo', 'OK', { duration: 3000 });
+            const updated = this.catalogPresentations().filter(p => p.id !== pres.id);
+            this.catalogPresentations.set(updated);
+            this.filterCatalogPresentations();
           },
           error: err => this.snack.open(err.error?.message || 'Error al eliminar', 'OK', { duration: 4000 }),
         });

@@ -1,326 +1,484 @@
 <h2 mat-dialog-title>
   {{ data.product ? 'Editar Producto' : 'Nuevo Producto' }}
-  @if (data.product?.product_type === 'kit') {
-    <span style="font-size:0.8rem;font-weight:400;color:#718096;margin-left:0.5rem">🧩 Kit</span>
-  }
 </h2>
 
-<mat-dialog-content style="min-width:580px; max-width:720px">
+<mat-dialog-content style="padding:0 0 0.25rem">
   <app-form-errors [errors]="errors()"></app-form-errors>
 
-  <form [formGroup]="form" class="dialog-form">
+  <mat-stepper #stepper linear>
 
-    <!-- ── Tipo de producto ───────────────────────────────── -->
-    <mat-form-field appearance="outline" class="w-full">
-      <mat-label>Tipo de producto *</mat-label>
-      <mat-select formControlName="product_type">
-        <mat-option value="simple">📦 Simple (insumo individual)</mat-option>
-        <mat-option value="kit">🧩 Kit / Producto compuesto</mat-option>
-      </mat-select>
-    </mat-form-field>
+    <!-- ═══════════════════════════════════════════════════════
+         PASO 1 · Tipo de producto
+    ════════════════════════════════════════════════════════ -->
+    <mat-step [stepControl]="stepTipo" label="Tipo">
+      <form [formGroup]="stepTipo" class="step-body">
 
-    <mat-divider></mat-divider>
-    <p class="section-title">Identificación</p>
+        <p class="step-hint">¿Qué tipo de producto vas a registrar?</p>
 
-    <!-- Nombre + Código -->
-    <div class="row-2">
-      <mat-form-field appearance="outline" class="w-full">
-        <mat-label>Nombre *</mat-label>
-        <input matInput formControlName="name" placeholder="Ej. Paquete cirugía básica" />
-        @if (form.get('name')?.hasError('required') && form.get('name')?.touched) {
-          <mat-error>El nombre es requerido</mat-error>
-        }
-      </mat-form-field>
-
-      <mat-form-field appearance="outline" class="w-full">
-        <mat-label>Código *</mat-label>
-        <input matInput formControlName="code" placeholder="Ej. KIT-CIR-BAS" style="text-transform:uppercase" />
-        @if (form.get('code')?.hasError('required') && form.get('code')?.touched) {
-          <mat-error>El código es requerido</mat-error>
-        }
-        @if (fe()['code']) { <mat-error>{{ fe()['code'][0] }}</mat-error> }
-      </mat-form-field>
-    </div>
-
-    <!-- SKU -->
-    <mat-form-field appearance="outline" class="w-full">
-      <mat-label>SKU</mat-label>
-      <input matInput formControlName="sku" placeholder="Opcional, único en el sistema" />
-      @if (fe()['sku']) { <mat-error>{{ fe()['sku'][0] }}</mat-error> }
-    </mat-form-field>
-
-    <!-- Categoría + Unidad base -->
-    <div class="row-2">
-      <mat-form-field appearance="outline" class="w-full">
-        <mat-label>Categoría *</mat-label>
-        <mat-select formControlName="category_id">
-          @for (cat of data.categories; track cat.id) {
-            <mat-option [value]="cat.id">{{ cat.name }}</mat-option>
-          }
-        </mat-select>
-        @if (form.get('category_id')?.hasError('required') && form.get('category_id')?.touched) {
-          <mat-error>Selecciona una categoría</mat-error>
-        }
-      </mat-form-field>
-
-      <mat-form-field appearance="outline" class="w-full">
-        <mat-label>Unidad base *</mat-label>
-        <mat-select formControlName="base_unit_id">
-          @for (u of data.units; track u.id) {
-            <mat-option [value]="u.id">{{ u.name }} ({{ u.abbreviation }})</mat-option>
-          }
-        </mat-select>
-        @if (form.get('base_unit_id')?.hasError('required') && form.get('base_unit_id')?.touched) {
-          <mat-error>Selecciona la unidad base</mat-error>
-        }
-      </mat-form-field>
-    </div>
-
-    <!-- Descripción -->
-    <mat-form-field appearance="outline" class="w-full">
-      <mat-label>Descripción</mat-label>
-      <textarea matInput formControlName="description" rows="2" placeholder="Descripción opcional..."></textarea>
-    </mat-form-field>
-
-    <!-- Requiere cadena de frío -->
-    <mat-slide-toggle formControlName="requires_cold_chain" color="accent">
-      Requiere cadena de frío ❄️
-    </mat-slide-toggle>
-
-    <!-- ── Umbrales de stock (solo simples) ───────────────── -->
-    @if (!isKit()) {
-      <mat-divider></mat-divider>
-      <p class="section-title">Umbrales de stock</p>
-      <div class="row-2">
-        <mat-form-field appearance="outline" class="w-full">
-          <mat-label>Punto de reorden</mat-label>
-          <input matInput type="number" min="0" formControlName="reorder_point" />
-        </mat-form-field>
-        <mat-form-field appearance="outline" class="w-full">
-          <mat-label>Cantidad de reorden</mat-label>
-          <input matInput type="number" min="0" formControlName="reorder_quantity" />
-        </mat-form-field>
-      </div>
-      <div class="row-2">
-        <mat-form-field appearance="outline" class="w-full">
-          <mat-label>Stock mínimo</mat-label>
-          <input matInput type="number" min="0" formControlName="min_stock" />
-        </mat-form-field>
-        <mat-form-field appearance="outline" class="w-full">
-          <mat-label>Stock máximo</mat-label>
-          <input matInput type="number" min="0" formControlName="max_stock" />
-        </mat-form-field>
-      </div>
-    }
-
-    <!-- ── Componentes del kit (BOM) ─────────────────────── -->
-    @if (isKit()) {
-      <mat-divider></mat-divider>
-
-      <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:0.25rem">
-        <p class="section-title" style="margin:0">Componentes del kit (BOM)</p>
-        @if (componentsArray.length > 0) {
-          <span class="bom-counter">{{ componentsArray.length }} componente{{ componentsArray.length !== 1 ? 's' : '' }}</span>
-        }
-      </div>
-      <p class="section-hint">
-        Cada componente debe ser un producto <strong>simple</strong> activo.
-        @if (data.product) {
-          La receta completa se reemplazará al guardar los cambios.
-        }
-      </p>
-
-      <!-- Spinner mientras carga componentes al editar -->
-      @if (loadingComponents()) {
-        <div class="loading-wrap">
-          <mat-spinner diameter="20"></mat-spinner>
-          <span>Cargando componentes actuales...</span>
+        <div class="type-cards">
+          <div class="type-card" [class.selected]="_typeSig() === 'simple'"
+               (click)="stepTipo.get('product_type')!.setValue('simple')">
+            <div class="type-card-title">📦 Simple</div>
+            <div class="type-card-desc">
+              Insumo individual almacenable con stock, umbrales de reorden
+              y empaques de compra.
+            </div>
+          </div>
+          <div class="type-card" [class.selected]="_typeSig() === 'kit'"
+               (click)="stepTipo.get('product_type')!.setValue('kit')">
+            <div class="type-card-title">🧩 Kit / Compuesto</div>
+            <div class="type-card-desc">
+              Conjunto de productos simples. Su stock se calcula
+              a partir de los componentes.
+            </div>
+          </div>
         </div>
-      }
 
-      @if (!loadingComponents()) {
+        <div class="step-nav">
+          <span></span>
+          <button mat-raised-button color="primary" matStepperNext type="button">
+            Siguiente <mat-icon>arrow_forward</mat-icon>
+          </button>
+        </div>
+      </form>
+    </mat-step>
 
-        <!-- Buscador de productos (filtra las opciones en TODOS los selectores) -->
-        @if (simpleProducts().length > 0) {
-          <mat-form-field appearance="outline" class="w-full kit-search">
-            <mat-label>Filtrar productos disponibles</mat-label>
+    <!-- ═══════════════════════════════════════════════════════
+         PASO 2 · Identificación
+    ════════════════════════════════════════════════════════ -->
+    <mat-step [stepControl]="stepIdent" label="Identificación">
+      <form [formGroup]="stepIdent" class="step-body">
+
+        <div class="row-2">
+          <mat-form-field appearance="outline" class="w-full">
+            <mat-label>Nombre *</mat-label>
+            <input matInput formControlName="name" placeholder="Ej. Guante nitrilo talla S" />
+            @if (stepIdent.get('name')?.hasError('required') && stepIdent.get('name')?.touched) {
+              <mat-error>El nombre es requerido</mat-error>
+            }
+            @if (fe()['name']) { <mat-error>{{ fe()['name'][0] }}</mat-error> }
+          </mat-form-field>
+
+          <mat-form-field appearance="outline" class="w-full">
+            <mat-label>Código *</mat-label>
+            <input matInput formControlName="code" placeholder="Ej. GUA-NIT-S"
+                   style="text-transform:uppercase" />
+            @if (stepIdent.get('code')?.hasError('required') && stepIdent.get('code')?.touched) {
+              <mat-error>El código es requerido</mat-error>
+            }
+            @if (fe()['code']) { <mat-error>{{ fe()['code'][0] }}</mat-error> }
+          </mat-form-field>
+        </div>
+
+        <mat-form-field appearance="outline" class="w-full">
+          <mat-label>SKU</mat-label>
+          <input matInput formControlName="sku" placeholder="Código SKU opcional (único en el sistema)" />
+          @if (fe()['sku']) { <mat-error>{{ fe()['sku'][0] }}</mat-error> }
+        </mat-form-field>
+
+        <mat-form-field appearance="outline" class="w-full">
+          <mat-label>Categoría *</mat-label>
+          <mat-select formControlName="category_id">
+            @for (cat of data.categories; track cat.id) {
+              <mat-option [value]="cat.id">{{ cat.name }}</mat-option>
+            }
+          </mat-select>
+          @if (stepIdent.get('category_id')?.hasError('required') && stepIdent.get('category_id')?.touched) {
+            <mat-error>Selecciona una categoría</mat-error>
+          }
+        </mat-form-field>
+
+        <mat-form-field appearance="outline" class="w-full">
+          <mat-label>Descripción</mat-label>
+          <textarea matInput formControlName="description" rows="2"
+                    placeholder="Descripción opcional..."></textarea>
+        </mat-form-field>
+
+        <div class="step-nav">
+          <button mat-stroked-button matStepperPrevious type="button">
+            <mat-icon>arrow_back</mat-icon> Atrás
+          </button>
+          <button mat-raised-button color="primary" matStepperNext type="button">
+            Siguiente <mat-icon>arrow_forward</mat-icon>
+          </button>
+        </div>
+      </form>
+    </mat-step>
+
+    <!-- ═══════════════════════════════════════════════════════
+         PASO 3 · Inventario (simple) / Receta BOM (kit)
+    ════════════════════════════════════════════════════════ -->
+    <mat-step [stepControl]="stepInv" [label]="isKit() ? 'Receta' : 'Inventario'">
+      <form [formGroup]="stepInv" class="step-body">
+
+        <!-- Unidad base (aplica a simple y kit) -->
+        <mat-form-field appearance="outline" class="w-full">
+          <mat-label>Unidad base *</mat-label>
+          <mat-select formControlName="base_unit_id">
+            @for (u of data.units; track u.id) {
+              <mat-option [value]="u.id">{{ u.name }} ({{ u.abbreviation }})</mat-option>
+            }
+          </mat-select>
+          <mat-hint class="small-hint">
+            Unidad en la que se registra el stock (ej. Unidades, Gramos, ml…)
+          </mat-hint>
+          @if (stepInv.get('base_unit_id')?.hasError('required') && stepInv.get('base_unit_id')?.touched) {
+            <mat-error>Selecciona la unidad base</mat-error>
+          }
+        </mat-form-field>
+
+        <!-- ── Solo simple: cadena de frío + umbrales ──────────── -->
+        @if (!isKit()) {
+          <mat-slide-toggle formControlName="requires_cold_chain" color="accent">
+            Requiere cadena de frío ❄️
+          </mat-slide-toggle>
+
+          <p class="section-label">Umbrales de stock</p>
+
+          <div class="row-2">
+            <mat-form-field appearance="outline" class="w-full">
+              <mat-label>Punto de reorden</mat-label>
+              <input matInput type="number" min="0" formControlName="reorder_point" />
+              <mat-hint class="small-hint">Nivel mínimo antes de generar OC</mat-hint>
+            </mat-form-field>
+            <mat-form-field appearance="outline" class="w-full">
+              <mat-label>Cantidad de reorden</mat-label>
+              <input matInput type="number" min="0" formControlName="reorder_quantity" />
+              <mat-hint class="small-hint">Cantidad a pedir al llegar al punto de reorden</mat-hint>
+            </mat-form-field>
+          </div>
+
+          <div class="row-2">
+            <mat-form-field appearance="outline" class="w-full">
+              <mat-label>Stock mínimo</mat-label>
+              <input matInput type="number" min="0" formControlName="min_stock" />
+            </mat-form-field>
+            <mat-form-field appearance="outline" class="w-full">
+              <mat-label>Stock máximo</mat-label>
+              <input matInput type="number" min="0" formControlName="max_stock" />
+            </mat-form-field>
+          </div>
+        }
+
+        <!-- ── Solo kit: BOM ────────────────────────────────────── -->
+        @if (isKit()) {
+          <p class="section-label">Componentes del kit (BOM)</p>
+          <p class="step-hint">
+            Cada componente debe ser un producto <strong>simple</strong> activo.
+            @if (data.product) { La receta completa se reemplazará al guardar. }
+          </p>
+
+          @if (loadingComponents()) {
+            <div style="display:flex;align-items:center;gap:0.5rem;padding:0.5rem 0">
+              <mat-spinner diameter="20"></mat-spinner>
+              <span class="step-hint">Cargando componentes actuales…</span>
+            </div>
+          }
+
+          @if (!loadingComponents()) {
+            <!-- Buscador de componentes -->
+            <mat-form-field appearance="outline" class="w-full">
+              <mat-label>Filtrar productos disponibles</mat-label>
+              <mat-icon matPrefix>search</mat-icon>
+              <input matInput
+                     [value]="componentSearch()"
+                     (input)="componentSearch.set($any($event.target).value)"
+                     placeholder="Nombre o código…" />
+              @if (componentSearch()) {
+                <button matSuffix mat-icon-button type="button"
+                        (click)="componentSearch.set('')"
+                        matTooltip="Limpiar filtro">
+                  <mat-icon style="font-size:1rem;height:1rem;width:1rem">close</mat-icon>
+                </button>
+              }
+              <mat-hint class="small-hint">
+                {{ filteredSimpleProducts().length }}&nbsp;de&nbsp;{{ simpleProducts().length }}&nbsp;
+                producto{{ simpleProducts().length !== 1 ? 's' : '' }} disponible{{ simpleProducts().length !== 1 ? 's' : '' }}
+              </mat-hint>
+            </mat-form-field>
+
+            <!-- Filas BOM -->
+            <div formArrayName="components">
+              @for (ctrl of componentsArray.controls; track $index) {
+                <div class="kit-row" [formGroupName]="$index">
+
+                  <mat-form-field appearance="outline" class="w-full">
+                    <mat-label>Producto *</mat-label>
+                    <mat-select formControlName="component_product_id">
+                      @for (p of getRowOptions($index); track p.id) {
+                        <mat-option [value]="p.id">{{ p.name }} ({{ p.code }})</mat-option>
+                      }
+                      @if (getRowOptions($index).length === 0) {
+                        <mat-option disabled>Sin resultados para "{{ componentSearch() }}"</mat-option>
+                      }
+                    </mat-select>
+                    @if ($any(ctrl).get('component_product_id')?.hasError('required') && $any(ctrl).get('component_product_id')?.touched) {
+                      <mat-error>Selecciona un producto</mat-error>
+                    }
+                    @if ($any(ctrl).get('component_product_id')?.value && componentSearch()) {
+                      <mat-hint>{{ getProductLabel($any(ctrl).get('component_product_id')?.value) }}</mat-hint>
+                    }
+                  </mat-form-field>
+
+                  <mat-form-field appearance="outline" class="w-full">
+                    <mat-label>Cant./kit *</mat-label>
+                    <input matInput type="number" min="1" formControlName="quantity_per_kit" />
+                    @if ($any(ctrl).get('quantity_per_kit')?.hasError('min') && $any(ctrl).get('quantity_per_kit')?.touched) {
+                      <mat-error>Mín. 1</mat-error>
+                    }
+                  </mat-form-field>
+
+                  <button mat-icon-button color="warn" type="button"
+                          (click)="removeComponentRow($index)"
+                          matTooltip="Eliminar componente"
+                          style="margin-top:0.5rem">
+                    <mat-icon>remove_circle_outline</mat-icon>
+                  </button>
+
+                </div>
+              }
+            </div>
+
+            @if (componentsArray.length === 0) {
+              <div class="bom-empty">
+                <mat-icon style="font-size:2rem;height:2rem;width:2rem;color:#cbd5e0">category</mat-icon>
+                <p style="margin:0.25rem 0 0">Sin componentes. Agrega al menos uno.</p>
+              </div>
+            }
+
+            <button mat-stroked-button type="button" (click)="addComponentRow()"
+                    style="margin-top:0.5rem">
+              <mat-icon>add</mat-icon> Agregar componente
+            </button>
+          }
+        }
+
+        <div class="step-nav">
+          <button mat-stroked-button matStepperPrevious type="button">
+            <mat-icon>arrow_back</mat-icon> Atrás
+          </button>
+          <button mat-raised-button color="primary" matStepperNext type="button">
+            Siguiente <mat-icon>arrow_forward</mat-icon>
+          </button>
+        </div>
+      </form>
+    </mat-step>
+
+    <!-- ═══════════════════════════════════════════════════════
+         PASO 4 · Empaques / Presentaciones
+    ════════════════════════════════════════════════════════ -->
+    <mat-step label="Empaques">
+      <div class="step-body">
+
+        <!-- Kits: no aplica -->
+        @if (isKit()) {
+          <div style="text-align:center;padding:1.5rem;color:#a0aec0">
+            <mat-icon style="font-size:2.5rem;height:2.5rem;width:2.5rem;display:block;margin:0 auto">
+              inventory_2
+            </mat-icon>
+            <p style="margin:0.5rem 0 0">
+              Los kits no tienen empaques de compra directos.<br>
+              Los empaques se configuran en cada componente simple.
+            </p>
+          </div>
+        }
+
+        <!-- Simples: checklist de empaques -->
+        @if (!isKit()) {
+          <p class="step-hint">
+            Selecciona los empaques en los que se compra o recibe este producto.
+            Cada empaque define la equivalencia a unidades de inventario.
+          </p>
+
+          @if (loadingAssignedPres()) {
+            <div style="display:flex;align-items:center;gap:0.5rem;padding:0.5rem 0">
+              <mat-spinner diameter="20"></mat-spinner>
+              <span class="step-hint">Cargando empaques asignados…</span>
+            </div>
+          }
+
+          <!-- Buscador -->
+          <mat-form-field appearance="outline" class="w-full pres-search">
+            <mat-label>Buscar empaques</mat-label>
             <mat-icon matPrefix>search</mat-icon>
             <input matInput
-                   [value]="componentSearch()"
-                   (input)="componentSearch.set($any($event.target).value)"
-                   placeholder="Nombre o código del producto..." />
-            @if (componentSearch()) {
-              <button matSuffix mat-icon-button (click)="clearComponentSearch()" matTooltip="Limpiar filtro" type="button">
+                   [value]="presentationSearch()"
+                   (input)="presentationSearch.set($any($event.target).value)"
+                   placeholder="Nombre o código del empaque…" />
+            @if (presentationSearch()) {
+              <button matSuffix mat-icon-button type="button"
+                      (click)="presentationSearch.set('')"
+                      matTooltip="Limpiar">
                 <mat-icon style="font-size:1rem;height:1rem;width:1rem">close</mat-icon>
               </button>
             }
-            <mat-hint>
-              {{ filteredProducts().length }} de {{ simpleProducts().length }} producto{{ simpleProducts().length !== 1 ? 's' : '' }} disponible{{ simpleProducts().length !== 1 ? 's' : '' }}
-            </mat-hint>
           </mat-form-field>
-        }
 
-        <!-- Filas de componentes -->
-        <div formArrayName="components">
-          @for (ctrl of componentsArray.controls; track $index) {
-            <div class="kit-row" [formGroupName]="$index">
+          <!-- Lista de empaques del catálogo -->
+          @if ((data.catalogPresentations ?? []).length === 0) {
+            <p class="pres-empty">No hay empaques disponibles en el catálogo global.</p>
+          } @else if (filteredPresentations().length === 0) {
+            <p class="pres-empty">Sin resultados para "{{ presentationSearch() }}"</p>
+          } @else {
+            <div class="pres-list">
+              @for (pres of filteredPresentations(); track pres.id) {
+                <div class="pres-item" [class.pres-item--selected]="isSelected(pres.id)"
+                     (click)="togglePresentation(pres.id)">
 
-              <!-- Selector del producto componente -->
-              <mat-form-field appearance="outline" class="w-full">
-                <mat-label>Producto *</mat-label>
-                <mat-select formControlName="component_product_id">
-                  @for (p of getRowOptions($index); track p.id) {
-                    <mat-option [value]="p.id">
-                      <span class="component-name">{{ p.name }}</span>
-                      <span class="component-code">({{ p.code }})</span>
-                    </mat-option>
+                  <!-- Checkbox visual -->
+                  <div class="pres-check">
+                    @if (isSelected(pres.id)) {
+                      <mat-icon>check</mat-icon>
+                    }
+                  </div>
+
+                  <!-- Nivel -->
+                  <span class="lvl-chip lvl-chip--{{ pres.level <= 3 ? pres.level : 3 }}">
+                    L{{ pres.level }}
+                  </span>
+
+                  <!-- Nombre + código -->
+                  <span class="pres-name">{{ pres.name }}</span>
+                  <span class="pres-code">{{ pres.code }}</span>
+
+                  <!-- Factor de conversión -->
+                  <span class="pres-factor">× {{ pres.factor_to_base }}</span>
+
+                  <!-- Marcar como defecto (solo si está seleccionado) -->
+                  @if (isSelected(pres.id)) {
+                    <button mat-icon-button type="button"
+                            (click)="setDefault(pres.id); $event.stopPropagation()"
+                            [matTooltip]="isDefault(pres.id) ? 'Empaque de compra por defecto' : 'Marcar como defecto'"
+                            [style.color]="isDefault(pres.id) ? '#e6a817' : '#a0aec0'"
+                            style="width:28px;height:28px;line-height:28px;flex-shrink:0">
+                      <mat-icon style="font-size:1.1rem;height:1.1rem;width:1.1rem">
+                        {{ isDefault(pres.id) ? 'star' : 'star_border' }}
+                      </mat-icon>
+                    </button>
                   }
-                  @if (getRowOptions($index).length === 0) {
-                    <mat-option disabled>Sin resultados para "{{ componentSearch() }}"</mat-option>
-                  }
-                </mat-select>
-                @if ($any(ctrl).get('component_product_id')?.hasError('required') && $any(ctrl).get('component_product_id')?.touched) {
-                  <mat-error>Selecciona un producto</mat-error>
-                }
-                <!-- Muestra el producto seleccionado fuera de la lista filtrada -->
-                @if ($any(ctrl).get('component_product_id')?.value && componentSearch()) {
-                  <mat-hint>{{ getProductLabel($any(ctrl).get('component_product_id')?.value) }}</mat-hint>
-                }
-              </mat-form-field>
 
-              <!-- Cantidad por kit -->
-              <mat-form-field appearance="outline" class="w-full">
-                <mat-label>Cant./kit *</mat-label>
-                <input matInput type="number" min="1" formControlName="quantity_per_kit" />
-                @if ($any(ctrl).get('quantity_per_kit')?.hasError('min') && $any(ctrl).get('quantity_per_kit')?.touched) {
-                  <mat-error>Mín. 1</mat-error>
-                }
-              </mat-form-field>
-
-              <!-- Botón eliminar fila -->
-              <button mat-icon-button color="warn" type="button"
-                      (click)="removeComponentRow($index)"
-                      matTooltip="Eliminar componente"
-                      style="margin-top:0.5rem">
-                <mat-icon>remove_circle_outline</mat-icon>
-              </button>
-
-            </div>
-          }
-        </div>
-
-        <!-- Estado vacío -->
-        @if (componentsArray.length === 0) {
-          <div class="bom-empty">
-            <mat-icon style="font-size:2rem;height:2rem;width:2rem;color:#cbd5e0">category</mat-icon>
-            <p style="margin:0.25rem 0 0">Sin componentes. Agrega al menos uno.</p>
-          </div>
-        }
-
-        <!-- Agregar fila -->
-        <button mat-stroked-button type="button" (click)="addComponentRow()" style="margin-top:0.5rem">
-          <mat-icon>add</mat-icon> Agregar componente
-        </button>
-
-      } <!-- /!loadingComponents -->
-    }
-
-    <!-- ── Empaque principal (solo al crear un producto simple) ──────── -->
-    @if (!data.product && !isKit()) {
-      <mat-divider></mat-divider>
-
-      <div class="pkg-section-header" (click)="pkgVisible.set(!pkgVisible())">
-        <div style="display:flex;align-items:center;gap:0.5rem">
-          <mat-icon style="color:#3182ce">inventory_2</mat-icon>
-          <span class="section-title" style="margin:0">Empaque de compra principal</span>
-          <span class="section-hint" style="margin:0">(opcional)</span>
-        </div>
-        <mat-icon style="color:#718096;transition:transform .2s" [style.transform]="pkgVisible() ? 'rotate(180deg)' : 'none'">
-          expand_more
-        </mat-icon>
-      </div>
-
-      @if (pkgVisible()) {
-        <div class="pkg-body">
-          <p class="section-hint" style="margin:0 0 0.5rem">
-            Define el empaque con el que recibirás / comprarás este producto y su equivalencia en unidades base de inventario.
-            Se creará automáticamente como presentación de nivel 1 al guardar.
-          </p>
-
-          <!-- Nombre + Código del empaque -->
-          <div class="row-2">
-            <mat-form-field appearance="outline" class="w-full">
-              <mat-label>Nombre del empaque</mat-label>
-              <input matInput formControlName="pkg_name" placeholder="Ej. Caja x500, Paquete x100" />
-              <mat-hint>Nombre visible en órdenes de compra y entradas</mat-hint>
-            </mat-form-field>
-            <mat-form-field appearance="outline" class="w-full">
-              <mat-label>Código del empaque</mat-label>
-              <input matInput formControlName="pkg_code" placeholder="Ej. CJ-500, PQ-100" style="text-transform:uppercase" />
-              <mat-hint>Debe ser único para el producto</mat-hint>
-            </mat-form-field>
-          </div>
-
-          <!-- Tipo de empaque + Factor -->
-          <div class="row-2">
-            <mat-form-field appearance="outline" class="w-full">
-              <mat-label>Tipo de empaque</mat-label>
-              <mat-select formControlName="pkg_unit_id">
-                <mat-option [value]="null">— Seleccionar —</mat-option>
-                @for (u of data.units; track u.id) {
-                  <mat-option [value]="u.id">{{ u.name }} ({{ u.abbreviation }})</mat-option>
-                }
-              </mat-select>
-              <mat-hint>Categoría: Caja (CJ), Paquete (PQ), Unidad (UND)…</mat-hint>
-            </mat-form-field>
-            <mat-form-field appearance="outline" class="w-full">
-              <mat-label>Factor a unidad base</mat-label>
-              <input matInput type="number" min="1" formControlName="pkg_factor" placeholder="Ej. 500" />
-              <mat-hint>
-                @if ((form.get('pkg_factor')?.value ?? 0) >= 1) {
-                  1 empaque = {{ form.get('pkg_factor')?.value }} uds. en inventario
-                } @else {
-                  Cuántas unidades base trae 1 unidad de este empaque
-                }
-              </mat-hint>
-              @if (form.get('pkg_factor')?.hasError('min')) {
-                <mat-error>Mínimo 1</mat-error>
+                </div>
               }
-            </mat-form-field>
-          </div>
+            </div>
+          }
 
-          <!-- Preview -->
-          @if ((form.get('pkg_factor')?.value ?? 0) >= 1 && form.get('pkg_name')?.value) {
-            <div class="pkg-preview">
-              <mat-icon style="font-size:1rem;height:1rem;width:1rem;color:#38a169">calculate</mat-icon>
-              Al recibir <strong>1 "{{ form.get('pkg_name')?.value }}"</strong>
-              → ingresarán <strong>{{ form.get('pkg_factor')?.value }}</strong>
-              {{ selectedBaseUnitAbbr }} al inventario
+          <!-- Chips de empaques seleccionados -->
+          @if (selectedPresentationIds().size > 0) {
+            <div style="margin-top:0.75rem">
+              <p class="section-label">Seleccionados ({{ selectedPresentationIds().size }})</p>
+              <mat-chip-set>
+                @for (pres of selectedPresentationsList(); track pres.id) {
+                  <mat-chip
+                    [style.background]="isDefault(pres.id) ? '#fef3c7' : '#e2e8f0'"
+                    [style.color]="isDefault(pres.id) ? '#92400e' : '#4a5568'"
+                    (removed)="togglePresentation(pres.id)">
+                    @if (isDefault(pres.id)) { ⭐ }
+                    {{ pres.name }}
+                    <button matChipRemove aria-label="Quitar empaque">
+                      <mat-icon>cancel</mat-icon>
+                    </button>
+                  </mat-chip>
+                }
+              </mat-chip-set>
+            </div>
+          }
+        }
+
+        <div class="step-nav">
+          <button mat-stroked-button matStepperPrevious type="button">
+            <mat-icon>arrow_back</mat-icon> Atrás
+          </button>
+          <button mat-raised-button color="primary" matStepperNext type="button">
+            Siguiente <mat-icon>arrow_forward</mat-icon>
+          </button>
+        </div>
+      </div>
+    </mat-step>
+
+    <!-- ═══════════════════════════════════════════════════════
+         PASO 5 · Confirmar y guardar
+    ════════════════════════════════════════════════════════ -->
+    <mat-step label="Confirmar">
+      <div class="step-body">
+        <p class="step-hint">Revisa el resumen antes de guardar.</p>
+
+        <div class="summary-box">
+          <div class="summary-row">
+            <span class="slabel">Tipo</span>
+            <strong>{{ isKit() ? '🧩 Kit / Compuesto' : '📦 Simple' }}</strong>
+          </div>
+          <div class="summary-row">
+            <span class="slabel">Nombre</span>
+            <span>{{ stepIdent.get('name')?.value || '—' }}</span>
+          </div>
+          <div class="summary-row">
+            <span class="slabel">Código</span>
+            <span class="code-tag">{{ stepIdent.get('code')?.value || '—' }}</span>
+          </div>
+          @if (stepIdent.get('sku')?.value) {
+            <div class="summary-row">
+              <span class="slabel">SKU</span>
+              <span class="code-tag">{{ stepIdent.get('sku')?.value }}</span>
+            </div>
+          }
+          <div class="summary-row">
+            <span class="slabel">Categoría</span>
+            <span>{{ getCategoryName(stepIdent.get('category_id')?.value) }}</span>
+          </div>
+          <div class="summary-row">
+            <span class="slabel">Unidad base</span>
+            <span>{{ selectedBaseUnitAbbr() }}</span>
+          </div>
+          @if (!isKit()) {
+            <div class="summary-row">
+              <span class="slabel">Empaques</span>
+              @if (selectedPresentationIds().size > 0) {
+                <span>
+                  {{ selectedPresentationIds().size }}
+                  empaque{{ selectedPresentationIds().size !== 1 ? 's' : '' }} seleccionado{{ selectedPresentationIds().size !== 1 ? 's' : '' }}
+                </span>
+              } @else {
+                <span style="color:#a0aec0">Sin empaques asignados</span>
+              }
+            </div>
+          }
+          @if (isKit()) {
+            <div class="summary-row">
+              <span class="slabel">Componentes</span>
+              <span>
+                {{ componentsArray.length }}
+                componente{{ componentsArray.length !== 1 ? 's' : '' }}
+              </span>
             </div>
           }
         </div>
-      }
-    }
 
-    <!-- ── Estado (solo edición) ─────────────────────────── -->
-    @if (data.product) {
-      <mat-divider></mat-divider>
-      <mat-slide-toggle formControlName="is_active" color="primary">
-        {{ form.get('is_active')?.value ? 'Activo' : 'Inactivo' }}
-      </mat-slide-toggle>
-    }
+        <!-- Estado activo/inactivo -->
+        <div [formGroup]="stepFinal" style="margin-top:0.5rem">
+          <mat-slide-toggle formControlName="is_active" color="primary">
+            {{ stepFinal.get('is_active')?.value ? '✅ Activo' : '⛔ Inactivo' }}
+          </mat-slide-toggle>
+        </div>
 
-  </form>
+        <div class="step-nav">
+          <button mat-stroked-button matStepperPrevious type="button">
+            <mat-icon>arrow_back</mat-icon> Atrás
+          </button>
+          <button mat-raised-button color="primary"
+                  (click)="save()"
+                  [disabled]="saving() || loadingComponents()">
+            @if (saving()) {
+              <mat-spinner diameter="18" style="display:inline-block;margin-right:6px"></mat-spinner>
+            }
+            {{ data.product ? 'Guardar cambios' : 'Crear producto' }}
+          </button>
+        </div>
+      </div>
+    </mat-step>
+
+  </mat-stepper>
 </mat-dialog-content>
 
 <mat-dialog-actions align="end">
   <button mat-button [mat-dialog-close]="false">Cancelar</button>
-  <button mat-raised-button color="primary"
-          (click)="save()"
-          [disabled]="form.invalid || saving() || loadingComponents()">
-    @if (saving()) {
-      <mat-spinner diameter="18" style="display:inline-block;margin-right:6px"></mat-spinner>
-    }
-    {{ data.product ? 'Guardar cambios' : 'Crear producto' }}
-  </button>
 </mat-dialog-actions>

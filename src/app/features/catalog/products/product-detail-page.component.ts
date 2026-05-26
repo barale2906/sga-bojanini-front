@@ -1,7 +1,8 @@
-import { Component, inject, signal, OnInit } from '@angular/core';
+import { Component, inject, signal, computed, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ActivatedRoute, Router } from '@angular/router';
 import { FormBuilder, ReactiveFormsModule, Validators, FormArray } from '@angular/forms';
+import { forkJoin } from 'rxjs';
 import { MatTabsModule } from '@angular/material/tabs';
 import { MatTableModule } from '@angular/material/table';
 import { MatButtonModule } from '@angular/material/button';
@@ -14,10 +15,13 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { MatChipsModule } from '@angular/material/chips';
+import { MatDialog } from '@angular/material/dialog';
 import { CatalogService, Product, ProductPresentation, KitComponent, UnitOfMeasure } from '../catalog.service';
 import { PageHeaderComponent } from '../../../shared/components/page-header/page-header.component';
 import { LoadingSpinnerComponent } from '../../../shared/components/loading-spinner/loading-spinner.component';
 import { PermissionDirective } from '../../../shared/directives/permission.directive';
+import { ConfirmDialogComponent } from '../../../shared/components/confirm-dialog/confirm-dialog.component';
+import { PresentationFormDialogComponent, PresentationDialogData } from './presentation-form-dialog.component';
 
 @Component({
   selector: 'app-product-detail-page',
@@ -28,6 +32,7 @@ import { PermissionDirective } from '../../../shared/directives/permission.direc
     MatSelectModule, MatSlideToggleModule, MatProgressSpinnerModule,
     MatTooltipModule, MatChipsModule,
     PageHeaderComponent, LoadingSpinnerComponent, PermissionDirective,
+    ConfirmDialogComponent, PresentationFormDialogComponent,
   ],
   templateUrl: './product-detail-page.component.html',
   styleUrl: './product-detail-page.component.scss',
@@ -37,19 +42,32 @@ export class ProductDetailPageComponent implements OnInit {
   private router = inject(Router);
   private svc = inject(CatalogService);
   private snack = inject(MatSnackBar);
+  private dialog = inject(MatDialog);
   private fb = inject(FormBuilder);
 
-  product = signal<Product | null>(null);
-  presentations = signal<ProductPresentation[]>([]);
-  components = signal<KitComponent[]>([]);
-  units = signal<UnitOfMeasure[]>([]);
-  simpleProducts = signal<Product[]>([]);
-  loading = signal(true);
-  savingBom = signal(false);
+  product        = signal<Product | null>(null);
+  presentations  = signal<ProductPresentation[]>([]);
+  components     = signal<KitComponent[]>([]);
+  units          = signal<UnitOfMeasure[]>([]);
+  /** Todas las presentaciones del catálogo global (para el selector de padre en el dialog) */
+  catalogPresentations = signal<ProductPresentation[]>([]);
+  allActiveProducts = signal<Product[]>([]);
+  loading        = signal(true);
+  savingBom      = signal(false);
 
-  // 'actions' y 'name' eliminados: gestión de empaques movida al tab global de Catálogo
-  presCols = ['hierarchy', 'unit_abbr', 'factor_to_base', 'quantity_per_parent', 'is_purchase_default', 'is_active'];
-  bomCols = ['sort_order', 'component_code', 'component_name', 'quantity_per_kit', 'actions'];
+  /**
+   * Signal computado: productos disponibles como componentes del kit.
+   * Excluye el producto actual para evitar referencias circulares.
+   * Al ser computed(), Angular re-evalúa automáticamente cuando
+   * allActiveProducts o product cambian.
+   */
+  availableComponents = computed(() => {
+    const currentId = this.product()?.id;
+    return this.allActiveProducts().filter(p => p.id !== currentId);
+  });
+
+  presCols = ['actions', 'hierarchy', 'unit_abbr', 'factor_to_base', 'quantity_per_parent', 'is_purchase_default', 'is_active'];
+  bomCols  = ['sort_order', 'component_code', 'component_name', 'quantity_per_kit', 'actions'];
 
   // BOM form
   bomForm = this.fb.group({ components: this.fb.array([]) });
@@ -57,8 +75,9 @@ export class ProductDetailPageComponent implements OnInit {
 
   ngOnInit(): void {
     const id = Number(this.route.snapshot.paramMap.get('id'));
+    // Datos maestros para el diálogo de presentaciones
     this.svc.getUnits().subscribe({ next: r => this.units.set(r.data) });
-    this.svc.getProducts({ product_type: 'simple', is_active: 'true' }).subscribe({ next: r => this.simpleProducts.set(r.data) });
+    this.svc.getCatalogPresentations().subscribe({ next: r => this.catalogPresentations.set(r.data) });
     this.loadProduct(id);
   }
 
@@ -68,8 +87,11 @@ export class ProductDetailPageComponent implements OnInit {
       next: r => {
         this.product.set(r.data);
         this.loading.set(false);
-        if (r.data.product_type === 'simple') this.loadPresentations(id);
-        else this.loadComponents(id);
+        if (r.data.product_type === 'simple') {
+          this.loadPresentations(id);
+        } else {
+          this.loadComponents(id);
+        }
       },
       error: () => { this.loading.set(false); this.router.navigate(['/catalog']); },
     });
@@ -79,11 +101,26 @@ export class ProductDetailPageComponent implements OnInit {
     this.svc.getPresentations(productId).subscribe({ next: r => this.presentations.set(r.data) });
   }
 
+  /**
+   * Carga los componentes del kit y el catálogo de productos activos en paralelo
+   * con forkJoin. De esta forma, cuando rebuildBomForm establece los valores del
+   * formulario, las mat-option ya están disponibles y los selects muestran
+   * correctamente los componentes guardados.
+   *
+   * GET /api/v1/products/{productId}/kit-components
+   */
   loadComponents(productId: number): void {
-    this.svc.getKitComponents(productId).subscribe({
-      next: r => {
-        this.components.set(r.data);
-        this.rebuildBomForm(r.data);
+    forkJoin({
+      comps:    this.svc.getKitComponents(productId),
+      products: this.svc.getProducts({ is_active: '1', per_page: 9999 }),
+    }).subscribe({
+      next: ({ comps, products }) => {
+        this.allActiveProducts.set(products.data);
+        this.components.set(comps.data);
+        this.rebuildBomForm(comps.data);
+      },
+      error: err => {
+        this.snack.open(err.error?.message || 'Error al cargar componentes del kit', 'OK', { duration: 4000 });
       },
     });
   }
@@ -92,35 +129,80 @@ export class ProductDetailPageComponent implements OnInit {
     while (this.bomArray.length) this.bomArray.removeAt(0);
     components.forEach(c => {
       this.bomArray.push(this.fb.group({
-        component_product_id: [c.component_product_id, Validators.required],
-        quantity_per_kit: [c.quantity_per_kit, [Validators.required, Validators.min(1)]],
-        sort_order: [c.sort_order ?? 0],
-        notes: [c.notes ?? ''],
+        id:                   [c.id],                                            // id del servidor (null = fila nueva)
+        component_product_id: [Number(c.component_product_id), Validators.required],
+        quantity_per_kit:     [c.quantity_per_kit, [Validators.required, Validators.min(1)]],
+        sort_order:           [c.sort_order ?? 0],
+        notes:                [c.notes ?? ''],
       }));
     });
   }
 
   addBomRow(): void {
     this.bomArray.push(this.fb.group({
+      id:                   [null],                                              // sin id → fila nueva no persistida
       component_product_id: [null as number | null, Validators.required],
-      quantity_per_kit: [1, [Validators.required, Validators.min(1)]],
-      sort_order: [this.bomArray.length + 1],
-      notes: [''],
+      quantity_per_kit:     [1, [Validators.required, Validators.min(1)]],
+      sort_order:           [this.bomArray.length + 1],
+      notes:                [''],
     }));
   }
 
-  removeBomRow(i: number): void { this.bomArray.removeAt(i); }
+  /**
+   * Elimina un componente del kit.
+   * - Fila nueva (sin id): se quita directo del FormArray sin llamar a la API.
+   * - Fila persistida (con id): pide confirmación y llama a
+   *   DELETE /api/v1/products/{productId}/kit-components/{componentId}
+   */
+  deleteKitComponent(index: number): void {
+    const ctrl       = this.bomArray.at(index);
+    const componentId: number | null = ctrl.get('id')?.value ?? null;
 
+    // Fila no guardada aún → eliminar localmente
+    if (!componentId) {
+      this.bomArray.removeAt(index);
+      return;
+    }
+
+    const p = this.product();
+    if (!p) return;
+
+    this.dialog.open(ConfirmDialogComponent, {
+      data: {
+        title:        'Eliminar componente',
+        message:      '¿Eliminar este componente del kit? Esta acción no se puede deshacer.',
+        confirmColor: 'warn',
+      },
+      width: '420px',
+    }).afterClosed().subscribe(ok => {
+      if (!ok) return;
+      this.svc.deleteKitComponent(p.id, componentId).subscribe({
+        next: () => {
+          this.snack.open('Componente eliminado del kit', 'OK', { duration: 3000 });
+          this.bomArray.removeAt(index);
+          this.components.update(comps => comps.filter(c => c.id !== componentId));
+        },
+        error: err => {
+          this.snack.open(err.error?.message || 'Error al eliminar componente', 'OK', { duration: 4000 });
+        },
+      });
+    });
+  }
+
+  /**
+   * Sincroniza la receta completa del kit.
+   * PUT /api/v1/products/{productId}/kit-components  →  body: { components: [...] }
+   */
   saveBom(): void {
     if (this.bomForm.invalid || this.savingBom()) return;
     const p = this.product();
     if (!p) return;
     this.savingBom.set(true);
     const components = (this.bomForm.value.components as any[]).map(c => ({
-      component_product_id: c.component_product_id,
-      quantity_per_kit: c.quantity_per_kit,
-      sort_order: c.sort_order ?? 0,
-      notes: c.notes || null,
+      component_product_id: Number(c.component_product_id),
+      quantity_per_kit:     c.quantity_per_kit,
+      sort_order:           c.sort_order ?? 0,
+      notes:                c.notes || null,
     }));
     this.svc.syncKitComponents(p.id, components).subscribe({
       next: () => {
@@ -135,9 +217,56 @@ export class ProductDetailPageComponent implements OnInit {
     });
   }
 
-  /** Navega al tab global de Empaques/Presentaciones en Catálogo */
-  goToGlobalPresentations(): void {
-    this.router.navigate(['/catalog'], { queryParams: { tab: 4 } });
+  /** Abre el wizard para crear o editar un empaque del producto actual */
+  openPresentationForm(pres?: ProductPresentation): void {
+    const p = this.product();
+    if (!p) return;
+    // Las opciones de padre son el catálogo global excluyendo la presentación en edición
+    const catalogPres = pres
+      ? this.catalogPresentations().filter(pr => pr.id !== pres.id)
+      : this.catalogPresentations();
+    const data: PresentationDialogData = {
+      presentation: pres ?? null,
+      productId: p.id,
+      productName: p.name,
+      units: this.units(),
+      catalogPresentations: catalogPres,
+    };
+    this.dialog.open(PresentationFormDialogComponent, { data, width: '640px', maxHeight: '92vh' })
+      .afterClosed().subscribe(saved => {
+        if (saved) {
+          this.snack.open(pres ? 'Empaque actualizado' : 'Empaque creado y vinculado', 'OK', { duration: 3000 });
+          this.loadPresentations(p.id);
+          // Actualizar catálogo local con el nuevo empaque
+          this.svc.getCatalogPresentations().subscribe({ next: r => this.catalogPresentations.set(r.data) });
+        }
+      });
+  }
+
+  /**
+   * Desvincula un empaque de este producto (no lo elimina del catálogo global).
+   * DELETE /api/v1/products/{productId}/presentations/{presentationId}
+   */
+  deletePresentation(pres: ProductPresentation): void {
+    const p = this.product();
+    if (!p) return;
+    this.dialog.open(ConfirmDialogComponent, {
+      data: {
+        title: 'Desvincular empaque',
+        message: `¿Quitar el empaque "${pres.name}" de este producto?\nEl empaque seguirá disponible en el catálogo global.`,
+        confirmColor: 'warn',
+      },
+      width: '420px',
+    }).afterClosed().subscribe(ok => {
+      if (!ok) return;
+      this.svc.detachPresentation(p.id, pres.id).subscribe({
+        next: () => {
+          this.snack.open('Empaque desvinculado del producto', 'OK', { duration: 3000 });
+          this.loadPresentations(p.id);
+        },
+        error: err => this.snack.open(err.error?.message || 'Error al desvincular', 'OK', { duration: 4000 }),
+      });
+    });
   }
 
   back(): void { this.router.navigate(['/catalog']); }
