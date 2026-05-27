@@ -132,16 +132,10 @@
           Dimensiones físicas
           <span style="font-weight:400;text-transform:none;color:#a0aec0">(opcional)</span>
         </p>
-        <div class="row-2">
-          <mat-form-field appearance="outline" class="w-full">
-            <mat-label>Volumen por unidad (cm³)</mat-label>
-            <input matInput type="number" min="0" formControlName="volume_cm3"
-                   placeholder="Ej. 1200" />
-            <mat-hint class="small-hint">Para calcular capacidad de ubicaciones</mat-hint>
-            @if (stepInv.get('volume_cm3')?.hasError('min') && stepInv.get('volume_cm3')?.touched) {
-              <mat-error>Debe ser ≥ 0</mat-error>
-            }
-          </mat-form-field>
+        <div class="row-2" style="align-items:flex-start">
+          <!-- Calculadora de volumen: emite cm³ directamente al control -->
+          <app-volume-calculator formControlName="volume_cm3" />
+
           <mat-form-field appearance="outline" class="w-full">
             <mat-label>Peso por unidad (kg)</mat-label>
             <input matInput type="number" min="0" formControlName="weight_kg"

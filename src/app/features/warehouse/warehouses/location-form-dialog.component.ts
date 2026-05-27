@@ -10,11 +10,12 @@ import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { WarehouseService, Location, Zone } from '../warehouse.service';
 import { FormErrorsComponent } from '../../../shared/components/form-errors/form-errors.component';
+import { VolumeCalculatorComponent } from '../../../shared/components/volume-calculator/volume-calculator.component';
 
 @Component({
   selector: 'app-location-form-dialog',
   standalone: true,
-  imports: [CommonModule, ReactiveFormsModule, MatDialogModule, MatFormFieldModule, MatInputModule, MatSelectModule, MatButtonModule, MatSlideToggleModule, MatProgressSpinnerModule, FormErrorsComponent],
+  imports: [CommonModule, ReactiveFormsModule, MatDialogModule, MatFormFieldModule, MatInputModule, MatSelectModule, MatButtonModule, MatSlideToggleModule, MatProgressSpinnerModule, FormErrorsComponent, VolumeCalculatorComponent],
   template: `
     <h2 mat-dialog-title>{{ data.location ? 'Editar Ubicación' : 'Nueva Ubicación' }}</h2>
     <mat-dialog-content>
@@ -34,12 +35,10 @@ import { FormErrorsComponent } from '../../../shared/components/form-errors/form
         </div>
 
         <p class="section-label">Capacidad física <span class="optional-hint">(opcional)</span></p>
-        <div class="two-col">
-          <mat-form-field appearance="outline">
-            <mat-label>Volumen disponible (cm³)</mat-label>
-            <input matInput type="number" min="0" formControlName="volume_cm3" placeholder="50000" />
-            <mat-hint class="dim-hint">Volumen total de la ubicación</mat-hint>
-          </mat-form-field>
+        <div class="two-col" style="align-items:flex-start">
+          <!-- Calculadora de volumen: emite cm³ directamente al control -->
+          <app-volume-calculator formControlName="volume_cm3" />
+
           <mat-form-field appearance="outline">
             <mat-label>Peso máximo (kg)</mat-label>
             <input matInput type="number" min="0" formControlName="max_weight_kg" placeholder="200" />

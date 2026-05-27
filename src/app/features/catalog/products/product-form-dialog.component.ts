@@ -15,6 +15,7 @@ import { MatChipsModule } from '@angular/material/chips';
 import { switchMap, map, of, forkJoin } from 'rxjs';
 import { CatalogService, Product, Category, UnitOfMeasure, ProductPresentation } from '../catalog.service';
 import { FormErrorsComponent } from '../../../shared/components/form-errors/form-errors.component';
+import { VolumeCalculatorComponent } from '../../../shared/components/volume-calculator/volume-calculator.component';
 
 export interface ProductDialogData {
   product: Product | null;
@@ -36,6 +37,7 @@ export interface ProductDialogData {
     MatButtonModule, MatIconModule, MatSlideToggleModule,
     MatProgressSpinnerModule, MatTooltipModule, MatChipsModule,
     FormErrorsComponent,
+    VolumeCalculatorComponent,
   ],
   templateUrl: './product-form-dialog.component.html',
   styles: [`
