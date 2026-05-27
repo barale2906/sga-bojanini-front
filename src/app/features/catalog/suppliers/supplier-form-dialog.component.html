@@ -1,0 +1,505 @@
+<h2 mat-dialog-title>
+  {{ isEdit ? 'Editar Proveedor' : 'Nuevo Proveedor' }}
+</h2>
+
+<mat-dialog-content style="padding:0 0 0.25rem; min-width:680px; max-width:780px; overflow-y:auto">
+  <app-form-errors [errors]="errors()"></app-form-errors>
+
+  <mat-stepper #stepper linear>
+
+    <!-- ═══════════════════════════════════════════════════════════
+         PASO 1 · Datos generales
+    ════════════════════════════════════════════════════════════ -->
+    <mat-step [stepControl]="stepGeneral" label="Datos">
+      <form [formGroup]="stepGeneral" class="step-body">
+
+        <mat-form-field appearance="outline" class="w-full">
+          <mat-label>Razón social / Nombre *</mat-label>
+          <input matInput formControlName="name" placeholder="MediSuministros S.A.S." />
+          @if (stepGeneral.get('name')?.hasError('required') && stepGeneral.get('name')?.touched) {
+            <mat-error>El nombre es requerido</mat-error>
+          }
+        </mat-form-field>
+
+        <mat-form-field appearance="outline" class="w-full">
+          <mat-label>NIT / Tax ID</mat-label>
+          <input matInput formControlName="tax_id" placeholder="900123456-1" />
+          @if (fe()['tax_id']) { <mat-error>{{ fe()['tax_id'][0] }}</mat-error> }
+        </mat-form-field>
+
+        <div class="row-2">
+          <mat-form-field appearance="outline" class="w-full">
+            <mat-label>Contacto</mat-label>
+            <input matInput formControlName="contact_name" placeholder="Juan Pérez" />
+          </mat-form-field>
+          <mat-form-field appearance="outline" class="w-full">
+            <mat-label>Teléfono</mat-label>
+            <input matInput formControlName="phone" placeholder="3001234567" />
+          </mat-form-field>
+        </div>
+
+        <mat-form-field appearance="outline" class="w-full">
+          <mat-label>Correo electrónico</mat-label>
+          <input matInput formControlName="email" type="email" placeholder="ventas@proveedor.com" />
+          @if (stepGeneral.get('email')?.hasError('email') && stepGeneral.get('email')?.touched) {
+            <mat-error>Correo inválido</mat-error>
+          }
+        </mat-form-field>
+
+        <mat-form-field appearance="outline" class="w-full">
+          <mat-label>Dirección</mat-label>
+          <input matInput formControlName="address" placeholder="Calle 100 # 10-20" />
+        </mat-form-field>
+
+        <mat-form-field appearance="outline" class="w-full">
+          <mat-label>Notas</mat-label>
+          <textarea matInput formControlName="notes" rows="2" placeholder="Observaciones opcionales..."></textarea>
+        </mat-form-field>
+
+        <div class="step-nav">
+          <span></span>
+          <button mat-raised-button color="primary" matStepperNext type="button">
+            Siguiente <mat-icon>arrow_forward</mat-icon>
+          </button>
+        </div>
+      </form>
+    </mat-step>
+
+    <!-- ═══════════════════════════════════════════════════════════
+         PASO 2 · Productos
+    ════════════════════════════════════════════════════════════ -->
+    <mat-step label="Productos">
+      <div class="step-body">
+
+        <p class="step-hint">
+          Gestiona los productos <strong>simples</strong> que distribuye este proveedor.
+          Puedes agregar uno a uno o seleccionar todos los de una categoría.
+        </p>
+
+        <!-- Cargando productos asignados -->
+        @if (loadingProducts()) {
+          <div class="loading-row">
+            <mat-spinner diameter="20"></mat-spinner>
+            <span class="step-hint">Cargando productos asignados…</span>
+          </div>
+        }
+
+        @if (!loadingProducts()) {
+
+          <!-- ── Lista de productos asignados ─────────────────── -->
+          @if (workingProducts().length === 0) {
+            <div class="empty-products">
+              <mat-icon>inventory_2</mat-icon>
+              <p style="margin:0">Sin productos asignados aún.</p>
+            </div>
+          } @else {
+            <div>
+              <p class="section-label">
+                Productos asignados ({{ workingProducts().length }})
+              </p>
+              <div class="products-list">
+                @for (wp of workingProducts(); track wp.productId) {
+
+                  <div class="product-row"
+                       [class.product-row--new]="wp.isNew"
+                       [class.product-row--expanded]="expandedEditId() === wp.productId">
+
+                    <!-- Fila principal -->
+                    <div class="product-row-main">
+                      <div class="product-info">
+                        <span class="product-name">{{ wp.name }}</span>
+                        <code class="code-tag">{{ wp.code }}</code>
+                        <span class="product-cat">{{ wp.categoryName }}</span>
+                      </div>
+                      <div class="product-meta">
+                        @if (wp.pivot.is_preferred) {
+                          <mat-icon class="star-icon" matTooltip="Proveedor preferido">star</mat-icon>
+                        }
+                        @if (wp.pivot.unit_price > 0) {
+                          <span class="price-tag">${{ wp.pivot.unit_price | number:'1.0-0' }}</span>
+                        }
+                        @if (wp.pivot.lead_time_days) {
+                          <span class="lead-tag">{{ wp.pivot.lead_time_days }}d</span>
+                        }
+                      </div>
+                      <div class="product-actions">
+                        <button mat-icon-button type="button"
+                                (click)="openEditPivot(wp)"
+                                [color]="expandedEditId() === wp.productId ? 'primary' : ''"
+                                [matTooltip]="expandedEditId() === wp.productId ? 'Cerrar' : 'Editar detalles'">
+                          <mat-icon>{{ expandedEditId() === wp.productId ? 'expand_less' : 'edit' }}</mat-icon>
+                        </button>
+                        <button mat-icon-button color="warn" type="button"
+                                (click)="removeProduct(wp.productId)"
+                                matTooltip="Quitar del proveedor">
+                          <mat-icon>remove_circle_outline</mat-icon>
+                        </button>
+                      </div>
+                    </div>
+
+                    <!-- Panel de edición de pivot -->
+                    @if (expandedEditId() === wp.productId) {
+                      <div class="pivot-edit-panel" [formGroup]="editPivotForm">
+
+                        <div class="row-2">
+                          <mat-form-field appearance="outline" class="w-full">
+                            <mat-label>SKU del proveedor</mat-label>
+                            <input matInput formControlName="supplier_sku" placeholder="Cód. proveedor" />
+                          </mat-form-field>
+                          <mat-form-field appearance="outline" class="w-full">
+                            <mat-label>Precio unitario</mat-label>
+                            <span matPrefix>$&nbsp;</span>
+                            <input matInput type="number" min="0" formControlName="unit_price" />
+                          </mat-form-field>
+                        </div>
+
+                        <div class="row-2">
+                          <mat-form-field appearance="outline" class="w-full">
+                            <mat-label>Lead time (días)</mat-label>
+                            <input matInput type="number" min="0" formControlName="lead_time_days" />
+                          </mat-form-field>
+                          <mat-form-field appearance="outline" class="w-full">
+                            <mat-label>Presentación de compra</mat-label>
+                            <mat-select formControlName="product_presentation_id">
+                              <mat-option [value]="null">Ninguna</mat-option>
+                              @for (pres of data.catalogPresentations; track pres.id) {
+                                <mat-option [value]="pres.id">{{ pres.name }} (× {{ pres.factor_to_base }})</mat-option>
+                              }
+                            </mat-select>
+                          </mat-form-field>
+                        </div>
+
+                        <mat-slide-toggle formControlName="is_preferred" color="primary">
+                          Proveedor preferido para este producto ⭐
+                        </mat-slide-toggle>
+
+                        <div style="display:flex;gap:0.5rem;margin-top:0.25rem">
+                          <button mat-stroked-button type="button" (click)="expandedEditId.set(null)">
+                            Cancelar
+                          </button>
+                          <button mat-raised-button color="primary" type="button"
+                                  (click)="saveEditPivot(wp.productId)">
+                            <mat-icon>check</mat-icon> Aplicar
+                          </button>
+                        </div>
+                      </div>
+                    }
+
+                  </div>
+
+                }
+              </div>
+            </div>
+          }
+
+          <mat-divider style="margin:0.85rem 0"></mat-divider>
+
+          <!-- ── Agregar productos ────────────────────────────── -->
+          <p class="section-label" style="margin-bottom:0.4rem">Agregar productos</p>
+
+          <!-- Toggle Individual / Por categoría -->
+          <div class="add-mode-toggle">
+            <button mat-stroked-button type="button"
+                    [class.active-toggle]="addMode() === 'individual'"
+                    (click)="addMode.set('individual')">
+              <mat-icon>add_box</mat-icon>&nbsp;Por producto
+            </button>
+            <button mat-stroked-button type="button"
+                    [class.active-toggle]="addMode() === 'category'"
+                    (click)="addMode.set('category'); selectCategory(null)">
+              <mat-icon>category</mat-icon>&nbsp;Por categoría
+            </button>
+          </div>
+
+          <!-- ══════════════════════════════════════════════════
+               MODO INDIVIDUAL
+          ═══════════════════════════════════════════════════ -->
+          @if (addMode() === 'individual') {
+            <div style="display:flex;flex-direction:column;gap:0.5rem;margin-top:0.5rem">
+
+              <!-- Buscador -->
+              <mat-form-field appearance="outline" class="w-full">
+                <mat-label>Buscar producto</mat-label>
+                <mat-icon matPrefix>search</mat-icon>
+                <input matInput
+                       [value]="productSearch()"
+                       (input)="productSearch.set($any($event.target).value)"
+                       placeholder="Nombre o código…" />
+                @if (productSearch()) {
+                  <button matSuffix mat-icon-button type="button"
+                          (click)="productSearch.set(''); selectedAddProductId.set(null)">
+                    <mat-icon style="font-size:1rem;height:1rem;width:1rem">close</mat-icon>
+                  </button>
+                }
+                <mat-hint>{{ filteredProducts().length }} producto(s) disponibles</mat-hint>
+              </mat-form-field>
+
+              <!-- Lista de selección -->
+              @if (filteredProducts().length > 0) {
+                <div class="product-picker">
+                  @for (p of filteredProducts().slice(0, 8); track p.id) {
+                    <div class="picker-item"
+                         [class.picker-item--selected]="selectedAddProductId() === p.id"
+                         (click)="selectedAddProductId.set(p.id)">
+                      <div class="pres-check">
+                        @if (selectedAddProductId() === p.id) {
+                          <mat-icon>check</mat-icon>
+                        }
+                      </div>
+                      <span class="product-name">{{ p.name }}</span>
+                      <code class="code-tag">{{ p.code }}</code>
+                      <span class="product-cat" style="margin-left:auto">
+                        {{ p.category?.name ?? getCategoryName(p.category_id) }}
+                      </span>
+                    </div>
+                  }
+                  @if (filteredProducts().length > 8) {
+                    <p class="step-hint" style="text-align:center;margin:0.2rem 0 0">
+                      …{{ filteredProducts().length - 8 }} más. Refina la búsqueda.
+                    </p>
+                  }
+                </div>
+              } @else if (productSearch()) {
+                <p class="pres-empty">Sin resultados para "{{ productSearch() }}"</p>
+              }
+
+              <!-- Datos del pivot para el producto seleccionado -->
+              @if (selectedAddProductId() !== null) {
+                <div class="pivot-form" [formGroup]="addProductForm">
+                  <p class="step-hint" style="font-weight:600;color:#4a5568;margin-bottom:0.2rem">
+                    Datos de compra (opcionales)
+                  </p>
+                  <div class="row-2">
+                    <mat-form-field appearance="outline" class="w-full">
+                      <mat-label>SKU del proveedor</mat-label>
+                      <input matInput formControlName="supplier_sku" placeholder="Cód. proveedor" />
+                    </mat-form-field>
+                    <mat-form-field appearance="outline" class="w-full">
+                      <mat-label>Precio unitario</mat-label>
+                      <span matPrefix>$&nbsp;</span>
+                      <input matInput type="number" min="0" formControlName="unit_price" />
+                    </mat-form-field>
+                  </div>
+                  <div class="row-2">
+                    <mat-form-field appearance="outline" class="w-full">
+                      <mat-label>Lead time (días)</mat-label>
+                      <input matInput type="number" min="0" formControlName="lead_time_days" />
+                    </mat-form-field>
+                    <mat-form-field appearance="outline" class="w-full">
+                      <mat-label>Presentación de compra</mat-label>
+                      <mat-select formControlName="product_presentation_id">
+                        <mat-option [value]="null">Ninguna</mat-option>
+                        @for (pres of data.catalogPresentations; track pres.id) {
+                          <mat-option [value]="pres.id">{{ pres.name }} (× {{ pres.factor_to_base }})</mat-option>
+                        }
+                      </mat-select>
+                    </mat-form-field>
+                  </div>
+                  <mat-slide-toggle formControlName="is_preferred" color="primary">
+                    Proveedor preferido para este producto ⭐
+                  </mat-slide-toggle>
+                </div>
+              }
+
+              <button mat-raised-button color="primary" type="button"
+                      [disabled]="selectedAddProductId() === null"
+                      (click)="addProduct()">
+                <mat-icon>add</mat-icon> Agregar producto
+              </button>
+            </div>
+          }
+
+          <!-- ══════════════════════════════════════════════════
+               MODO POR CATEGORÍA
+          ═══════════════════════════════════════════════════ -->
+          @if (addMode() === 'category') {
+            <div style="display:flex;flex-direction:column;gap:0.5rem;margin-top:0.5rem">
+
+              <p class="step-hint">
+                Selecciona una categoría para previsualizar sus productos y elegir cuáles agregar.
+                Solo se incluyen productos <strong>simples activos</strong> no asignados aún.
+              </p>
+
+              <!-- Selector de categoría -->
+              <mat-form-field appearance="outline" class="w-full">
+                <mat-label>Categoría</mat-label>
+                <mat-select [value]="selectedBatchCategoryId()"
+                            (selectionChange)="selectCategory($event.value)">
+                  <mat-option [value]="null">— Selecciona una categoría —</mat-option>
+                  @for (cat of data.categories; track cat.id) {
+                    <mat-option [value]="cat.id">{{ cat.name }}</mat-option>
+                  }
+                </mat-select>
+              </mat-form-field>
+
+              <!-- Previsualización de productos de la categoría -->
+              @if (selectedBatchCategoryId() !== null) {
+
+                @if (categoryProducts().length === 0) {
+                  <div class="cat-empty">
+                    <mat-icon style="font-size:1.75rem;height:1.75rem;width:1.75rem;display:block;margin:0 auto 0.4rem;color:#cbd5e0">
+                      inventory_2
+                    </mat-icon>
+                    Todos los productos de esta categoría ya están asignados o no hay activos.
+                  </div>
+                } @else {
+
+                  <!-- Panel de previsualización con checklist -->
+                  <div class="cat-preview">
+                    <div class="cat-preview-header">
+                      <span>{{ categoryProducts().length }} producto(s) disponibles</span>
+                      <button mat-button type="button" style="font-size:0.75rem;padding:0 0.5rem;height:28px"
+                              (click)="toggleSelectAllCategory()">
+                        {{ selectedCountInCategory() === categoryProducts().length ? 'Deseleccionar todo' : 'Seleccionar todo' }}
+                      </button>
+                    </div>
+                    <div class="cat-preview-list">
+                      @for (p of categoryProducts(); track p.id) {
+                        <div class="cat-preview-item"
+                             [class.cat-preview-item--checked]="isCategoryProductSelected(p.id)"
+                             (click)="toggleCategoryProduct(p.id)">
+                          <div class="cat-check" [class.cat-check--on]="isCategoryProductSelected(p.id)">
+                            @if (isCategoryProductSelected(p.id)) {
+                              <mat-icon>check</mat-icon>
+                            }
+                          </div>
+                          <span class="product-name" style="flex:1">{{ p.name }}</span>
+                          <code class="code-tag">{{ p.code }}</code>
+                        </div>
+                      }
+                    </div>
+                  </div>
+
+                  <!-- Valores por defecto del pivot -->
+                  @if (selectedCountInCategory() > 0) {
+                    <div class="pivot-form" [formGroup]="addCategoryForm">
+                      <p class="step-hint" style="font-weight:600;color:#4a5568;margin-bottom:0.2rem">
+                        Datos de compra por defecto ({{ selectedCountInCategory() }} producto(s))
+                      </p>
+                      <div class="row-2">
+                        <mat-form-field appearance="outline" class="w-full">
+                          <mat-label>Precio unitario base</mat-label>
+                          <span matPrefix>$&nbsp;</span>
+                          <input matInput type="number" min="0" formControlName="unit_price" />
+                        </mat-form-field>
+                        <mat-form-field appearance="outline" class="w-full">
+                          <mat-label>Lead time (días)</mat-label>
+                          <input matInput type="number" min="0" formControlName="lead_time_days" />
+                        </mat-form-field>
+                      </div>
+                      <mat-slide-toggle formControlName="is_preferred" color="primary">
+                        Proveedor preferido (para todos) ⭐
+                      </mat-slide-toggle>
+                    </div>
+
+                    <button mat-raised-button color="primary" type="button"
+                            (click)="addSelectedCategoryProducts()">
+                      <mat-icon>playlist_add</mat-icon>
+                      Agregar {{ selectedCountInCategory() }} producto(s) seleccionado(s)
+                    </button>
+                  }
+
+                }
+              }
+
+            </div>
+          }
+
+        }<!-- end !loadingProducts -->
+
+        <div class="step-nav">
+          <button mat-stroked-button matStepperPrevious type="button">
+            <mat-icon>arrow_back</mat-icon> Atrás
+          </button>
+          <button mat-raised-button color="primary" matStepperNext type="button">
+            Siguiente <mat-icon>arrow_forward</mat-icon>
+          </button>
+        </div>
+      </div>
+    </mat-step>
+
+    <!-- ═══════════════════════════════════════════════════════════
+         PASO 3 · Confirmar y guardar
+    ════════════════════════════════════════════════════════════ -->
+    <mat-step label="Confirmar">
+      <div class="step-body">
+        <p class="step-hint">Revisa el resumen antes de guardar.</p>
+
+        <!-- Resumen datos generales -->
+        <div class="summary-box">
+          <div class="summary-row">
+            <span class="slabel">Razón social</span>
+            <strong>{{ stepGeneral.get('name')?.value || '—' }}</strong>
+          </div>
+          @if (stepGeneral.get('tax_id')?.value) {
+            <div class="summary-row">
+              <span class="slabel">NIT</span>
+              <span>{{ stepGeneral.get('tax_id')?.value }}</span>
+            </div>
+          }
+          @if (stepGeneral.get('contact_name')?.value) {
+            <div class="summary-row">
+              <span class="slabel">Contacto</span>
+              <span>{{ stepGeneral.get('contact_name')?.value }}</span>
+            </div>
+          }
+          @if (stepGeneral.get('phone')?.value) {
+            <div class="summary-row">
+              <span class="slabel">Teléfono</span>
+              <span>{{ stepGeneral.get('phone')?.value }}</span>
+            </div>
+          }
+          @if (stepGeneral.get('email')?.value) {
+            <div class="summary-row">
+              <span class="slabel">Correo</span>
+              <span>{{ stepGeneral.get('email')?.value }}</span>
+            </div>
+          }
+          @if (stepGeneral.get('address')?.value) {
+            <div class="summary-row">
+              <span class="slabel">Dirección</span>
+              <span>{{ stepGeneral.get('address')?.value }}</span>
+            </div>
+          }
+          <div class="summary-row">
+            <span class="slabel">Productos asignados</span>
+            @if (workingProducts().length > 0) {
+              <span>
+                {{ workingProducts().length }}
+                producto{{ workingProducts().length !== 1 ? 's' : '' }}
+              </span>
+            } @else {
+              <span style="color:#a0aec0">Sin productos</span>
+            }
+          </div>
+        </div>
+
+        <!-- Estado activo -->
+        <div [formGroup]="stepGeneral" style="margin-top:0.5rem">
+          <mat-slide-toggle formControlName="is_active" color="primary">
+            {{ stepGeneral.get('is_active')?.value ? '✅ Activo' : '⛔ Inactivo' }}
+          </mat-slide-toggle>
+        </div>
+
+        <div class="step-nav">
+          <button mat-stroked-button matStepperPrevious type="button">
+            <mat-icon>arrow_back</mat-icon> Atrás
+          </button>
+          <button mat-raised-button color="primary"
+                  (click)="save()"
+                  [disabled]="saving()">
+            @if (saving()) {
+              <mat-spinner diameter="18" style="display:inline-block;margin-right:6px"></mat-spinner>
+            }
+            {{ isEdit ? 'Guardar cambios' : 'Crear proveedor' }}
+          </button>
+        </div>
+      </div>
+    </mat-step>
+
+  </mat-stepper>
+</mat-dialog-content>
+
+<mat-dialog-actions align="end">
+  <button mat-button [mat-dialog-close]="false">Cancelar</button>
+</mat-dialog-actions>

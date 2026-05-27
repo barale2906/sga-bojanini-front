@@ -21,7 +21,7 @@ import { PermissionDirective } from '../../shared/directives/permission.directiv
 import { CategoryFormDialogComponent, CategoryDialogData } from './categories/category-form-dialog.component';
 import { UomFormDialogComponent } from './units/uom-form-dialog.component';
 import { ProductFormDialogComponent, ProductDialogData } from './products/product-form-dialog.component';
-import { SupplierFormDialogComponent } from './suppliers/supplier-form-dialog.component';
+import { SupplierFormDialogComponent, SupplierDialogData } from './suppliers/supplier-form-dialog.component';
 import { ImportDialogComponent, ImportEntity } from './import/import-dialog.component';
 import { PresentationFormDialogComponent, PresentationDialogData } from './products/presentation-form-dialog.component';
 import { PresProductsDialogComponent, PresProductsDialogData } from './products/pres-products-dialog.component';
@@ -254,10 +254,29 @@ export class CatalogPageComponent implements OnInit {
   // ── Proveedores ─────────────────────────────────────────────
 
   openSupplierForm(sup?: Supplier): void {
-    this.dialog.open(SupplierFormDialogComponent, { data: sup ?? null, width: '560px' })
-      .afterClosed().subscribe(saved => {
-        if (saved) { this.snack.open(sup ? 'Proveedor actualizado' : 'Proveedor creado', 'OK', { duration: 3000 }); this.loadSuppliers(); }
-      });
+    const open = (prods: Product[], pres: ProductPresentation[]) => {
+      const data: SupplierDialogData = {
+        supplier:             sup ?? null,
+        categories:           this.categories(),
+        products:             prods,
+        catalogPresentations: pres,
+      };
+      this.dialog.open(SupplierFormDialogComponent, { data, width: '780px', maxHeight: '92vh' })
+        .afterClosed().subscribe(saved => {
+          if (saved) {
+            this.snack.open(sup ? 'Proveedor actualizado' : 'Proveedor creado', 'OK', { duration: 3000 });
+            this.loadSuppliers();
+          }
+        });
+    };
+
+    forkJoin({
+      prods: this.svc.getProducts({ is_active: '1', per_page: 9999, product_type: 'simple' }),
+      pres:  this.svc.getCatalogPresentations({ is_active: '1' }),
+    }).subscribe({
+      next:  ({ prods, pres }) => open(prods.data, pres.data),
+      error: ()                => open([], []),
+    });
   }
 
   deleteSupplier(sup: Supplier): void {

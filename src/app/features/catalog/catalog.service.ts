@@ -96,6 +96,30 @@ export interface Supplier {
   is_active: boolean;
 }
 
+export interface SupplierProductPivot {
+  supplier_sku: string | null;
+  product_presentation_id: number | null;
+  lead_time_days: number | null;
+  unit_price: number;
+  is_preferred: boolean;
+}
+
+/** Producto con datos del pivot proveedor↔producto */
+export interface SupplierProduct extends Product {
+  pivot: SupplierProductPivot;
+}
+
+export interface SupplierCategoryAssignResult {
+  assigned: number;
+  skipped: number;
+  category: string;
+}
+
+export interface SupplierCategoryRemoveResult {
+  removed: number;
+  category: string;
+}
+
 export interface ImportResult {
   total: number;
   success: number;
@@ -351,6 +375,35 @@ export class CatalogService {
 
   deleteSupplier(id: number): Observable<ApiResponse<null>> {
     return this.http.delete<ApiResponse<null>>(`${this.api}/suppliers/${id}`);
+  }
+
+  // ── Productos del proveedor ──────────────────────────────────
+
+  getSupplierProducts(supplierId: number): Observable<ApiResponse<SupplierProduct[]>> {
+    return this.http.get<ApiResponse<SupplierProduct[]>>(`${this.api}/suppliers/${supplierId}/products`);
+  }
+
+  assignSupplierProduct(supplierId: number, productId: number, payload: Partial<SupplierProductPivot> = {}): Observable<ApiResponse<SupplierProduct>> {
+    return this.http.post<ApiResponse<SupplierProduct>>(`${this.api}/suppliers/${supplierId}/products/${productId}`, payload);
+  }
+
+  assignSupplierProductsByCategory(
+    supplierId: number,
+    payload: { category_id: number; lead_time_days?: number | null; unit_price?: number; is_preferred?: boolean },
+  ): Observable<ApiResponse<SupplierCategoryAssignResult>> {
+    return this.http.post<ApiResponse<SupplierCategoryAssignResult>>(`${this.api}/suppliers/${supplierId}/products/by-category`, payload);
+  }
+
+  updateSupplierProductPivot(supplierId: number, productId: number, payload: Partial<SupplierProductPivot>): Observable<ApiResponse<SupplierProduct>> {
+    return this.http.put<ApiResponse<SupplierProduct>>(`${this.api}/suppliers/${supplierId}/products/${productId}`, payload);
+  }
+
+  removeSupplierProduct(supplierId: number, productId: number): Observable<ApiResponse<null>> {
+    return this.http.delete<ApiResponse<null>>(`${this.api}/suppliers/${supplierId}/products/${productId}`);
+  }
+
+  removeSupplierProductsByCategory(supplierId: number, categoryId: number): Observable<ApiResponse<SupplierCategoryRemoveResult>> {
+    return this.http.delete<ApiResponse<SupplierCategoryRemoveResult>>(`${this.api}/suppliers/${supplierId}/products/by-category`, { body: { category_id: categoryId } });
   }
 
   // ── Importación masiva ───────────────────────────────────────
