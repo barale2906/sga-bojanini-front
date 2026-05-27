@@ -7,145 +7,618 @@
   <app-form-errors [errors]="errors()"></app-form-errors>
 
   <form [formGroup]="form" class="form-grid">
-    <!-- Producto -->
+
+    <!-- ── Producto ── -->
     <mat-form-field appearance="outline" class="span2">
       <mat-label>Producto *</mat-label>
       <mat-select formControlName="product_id">
-        @for (p of data.products; track p.id) { <mat-option [value]="p.id">{{ p.code }} — {{ p.name }}</mat-option> }
+        @for (p of data.products; track p.id) {
+          <mat-option [value]="p.id">{{ p.code }} — {{ p.name }}</mat-option>
+        }
       </mat-select>
     </mat-form-field>
 
-    <!-- Almacén -->
+    <!-- ── Almacén ── -->
     <mat-form-field appearance="outline" class="span2">
       <mat-label>Almacén *</mat-label>
       <mat-select formControlName="warehouse_id">
-        @for (w of data.warehouses; track w.id) { <mat-option [value]="w.id">{{ w.name }}</mat-option> }
+        @for (w of data.warehouses; track w.id) {
+          <mat-option [value]="w.id">{{ w.name }}</mat-option>
+        }
       </mat-select>
     </mat-form-field>
 
-    <!-- ENTRADA: lot, fecha, cantidad -->
+
+    <!-- ══════════════════════ ENTRADA ══════════════════════════ -->
     @if (isEntry) {
-      <mat-form-field appearance="outline"><mat-label>N° de Lote</mat-label><input matInput formControlName="lot_number" placeholder="LOT-2026-001" /></mat-form-field>
-      <mat-form-field appearance="outline"><mat-label>Fecha de Vencimiento</mat-label><input matInput type="date" formControlName="expiration_date" /></mat-form-field>
-      <mat-form-field appearance="outline"><mat-label>Fecha de Fabricación</mat-label><input matInput type="date" formControlName="manufacturing_date" /></mat-form-field>
-      <mat-form-field appearance="outline"><mat-label>Ubicación</mat-label>
-        <mat-select formControlName="location_id">
-          <mat-option [value]="null">Sin ubicación</mat-option>
-          @for (l of locations(); track l.id) { <mat-option [value]="l.id">{{ l.name }}</mat-option> }
-        </mat-select>
+
+      <!-- Datos del lote -->
+      <mat-form-field appearance="outline">
+        <mat-label>N° de Lote</mat-label>
+        <input matInput formControlName="lot_number" placeholder="LOT-2026-001" />
+      </mat-form-field>
+      <mat-form-field appearance="outline">
+        <mat-label>Fecha de Vencimiento</mat-label>
+        <input matInput type="date" formControlName="expiration_date" />
+      </mat-form-field>
+      <mat-form-field appearance="outline">
+        <mat-label>Fecha de Fabricación</mat-label>
+        <input matInput type="date" formControlName="manufacturing_date" />
       </mat-form-field>
 
-      <!-- Selector de modo de ingreso -->
-      <div class="span2 mode-toggle">
-        <label>Modo de ingreso:</label>
-        <button mat-stroked-button type="button" [class.active]="!usePresentationMode()" (click)="usePresentationMode.set(false)">
-          Unidad base directa
-        </button>
-        <button mat-stroked-button type="button" [class.active]="usePresentationMode()" (click)="usePresentationMode.set(true)"
-                [disabled]="presentations().length === 0"
-                [matTooltip]="presentations().length === 0 ? 'Este producto no tiene presentaciones configuradas. Configúralas en Catálogo → producto → Presentaciones.' : 'Ingresar por empaque (caja, paquete, etc.)'">
-          Por empaque / presentación
-        </button>
-      </div>
-
-      <!-- Aviso cuando no hay presentaciones -->
-      @if (usePresentationMode() && presentations().length === 0 && form.get('product_id')?.value) {
-        <div class="span2 no-pres-warn">
-          <mat-icon>info</mat-icon>
-          Este producto no tiene presentaciones de empaque configuradas.
-          Dirígete al <strong>Catálogo → Detalle del producto → Presentaciones de empaque</strong>
-          para definir cajas, paquetes y sus factores de conversión.
+      <!-- Toggle distribución (solo si hay almacén) -->
+      @if (form.get('warehouse_id')?.value) {
+        <div class="span2 dist-toggle-row">
+          <button mat-stroked-button type="button"
+                  [class.active]="!useDistribution()"
+                  (click)="useDistribution() && toggleDistribution()">
+            <mat-icon>place</mat-icon> Una ubicación
+          </button>
+          <button mat-stroked-button type="button"
+                  [class.active]="useDistribution()"
+                  (click)="!useDistribution() && toggleDistribution()">
+            <mat-icon>call_split</mat-icon> Distribuir en varias
+          </button>
         </div>
       }
 
-      <!-- Modo: unidad base directa -->
-      @if (!usePresentationMode()) {
-        <mat-form-field appearance="outline" class="span2">
-          <mat-label>Cantidad en {{ selectedProduct?.base_unit?.abbreviation || 'unidad base' }} *</mat-label>
-          <input matInput type="number" formControlName="quantity_base" min="1" />
-          <mat-hint>Ingresa directamente el número de {{ selectedProduct?.base_unit?.name || 'unidades base' }}</mat-hint>
-        </mat-form-field>
-      }
+      <!-- ── Modo ÚNICA ubicación ── -->
+      @if (!useDistribution()) {
 
-      <!-- Modo: por presentación/empaque -->
-      @if (usePresentationMode()) {
-        <mat-form-field appearance="outline">
-          <mat-label>Presentación / empaque *</mat-label>
-          <mat-select formControlName="product_presentation_id">
-            @for (pr of presentations(); track pr.id) {
-              <mat-option [value]="pr.id">
-                {{ pr.name }}
-                <span style="color:#718096;font-size:0.85em"> — 1 und = {{ pr.factor_to_base }} {{ selectedProduct?.base_unit?.abbreviation || 'base' }}</span>
-              </mat-option>
+        <mat-form-field appearance="outline" class="span2">
+          <mat-label>Ubicación</mat-label>
+          <mat-select formControlName="location_id">
+            <mat-option [value]="null">Sin ubicación específica</mat-option>
+            @for (l of locations(); track l.id) {
+              <mat-option [value]="l.id">{{ l.name }}</mat-option>
             }
           </mat-select>
-          @if (selectedPresentation) {
-            <mat-hint>
-              Factor: 1 {{ selectedPresentation.name }} = <strong>{{ selectedPresentation.factor_to_base }}</strong>
-              {{ selectedProduct?.base_unit?.abbreviation || 'uds.' }} en inventario
-            </mat-hint>
-          }
         </mat-form-field>
 
-        <mat-form-field appearance="outline">
-          <mat-label>Cantidad de empaques *</mat-label>
-          <input matInput type="number" formControlName="quantity_in_presentation" min="1" />
-          @if (selectedPresentation) {
-            <mat-hint>{{ selectedPresentation.name }}{{ (form.get('quantity_in_presentation')?.value || 0) > 1 ? 's' : '' }}</mat-hint>
-          }
-        </mat-form-field>
-
-        <!-- Preview de conversión -->
-        @if (previewBaseUnits !== null) {
-          <div class="span2 conversion-preview">
-            <mat-icon>calculate</mat-icon>
-            <span>
-              <strong>{{ form.get('quantity_in_presentation')?.value }}</strong>
-              {{ selectedPresentation?.name }}
-              =
-              <strong class="base-qty">{{ previewBaseUnits }}</strong>
-              {{ selectedProduct?.base_unit?.abbreviation || 'unidades base' }} ingresarán al inventario
-            </span>
+        <!-- Panel de capacidad de la ubicación seleccionada -->
+        @if (loadingSingleCap()) {
+          <div class="span2 cap-loading">
+            <mat-spinner diameter="14"></mat-spinner>
+            <span>Verificando capacidad...</span>
           </div>
         }
-      }
+        @if (!loadingSingleCap() && singleLocCapacity(); as cap) {
+          <div class="span2 cap-panel" [class]="'cap-panel--' + projStatus(cap, effectiveBaseQty)">
+            <div class="cap-panel-header">
+              <mat-icon class="cap-icon">
+                {{ projStatus(cap, effectiveBaseQty) === 'danger' ? 'error' :
+                   projStatus(cap, effectiveBaseQty) === 'warn'   ? 'warning' :
+                   projStatus(cap, effectiveBaseQty) === 'ok'     ? 'check_circle' : 'info' }}
+              </mat-icon>
+              <strong>{{ cap.name }}</strong> — capacidad disponible
+              <span class="cap-status-pill cap-pill--{{ projStatus(cap, effectiveBaseQty) }}">
+                @switch (projStatus(cap, effectiveBaseQty)) {
+                  @case ('ok')     { ✓ Sin problemas }
+                  @case ('warn')   { ⚠ Espacio ajustado }
+                  @case ('danger') { ✗ Excede capacidad }
+                  @case ('nodims') { — Sin dimensiones de producto }
+                  @case ('nodata') { — Sin capacidad configurada }
+                }
+              </span>
+            </div>
 
-      <mat-form-field appearance="outline" class="span2"><mat-label>Notas</mat-label><textarea matInput formControlName="notes" rows="2"></textarea></mat-form-field>
-    }
+            <!-- Volumen -->
+            @if (cap.capacity_volume.max_cm3 !== null) {
+              <div class="cap-row">
+                <span class="cap-row-label">📦 Volumen</span>
+                <div class="mini-bar">
+                  <div class="mini-bar__fill mini-bar__fill--{{ projStatus(cap, effectiveBaseQty) }}"
+                       [style.width.%]="cap.capacity_volume.usage_pct ?? 0"></div>
+                </div>
+                <span class="cap-row-pct">{{ fmtPct(cap.capacity_volume.usage_pct) }}</span>
+                <span class="cap-row-detail">libre: {{ _fmtVol(cap.capacity_volume.available_cm3) }}</span>
+                @if (neededVol(effectiveBaseQty); as nv) {
+                  <span class="cap-row-needed">→ usará {{ _fmtVol(nv) }}</span>
+                }
+              </div>
+            } @else {
+              <div class="cap-row">
+                <span class="cap-row-label">📦 Volumen</span>
+                <span class="cap-row-detail">Usando {{ _fmtVol(cap.capacity_volume.used_cm3) }} · sin límite</span>
+              </div>
+            }
 
-    <!-- TRANSFERENCIA: ubicación origen y destino -->
+            <!-- Peso -->
+            @if (cap.capacity_weight.max_kg !== null) {
+              <div class="cap-row">
+                <span class="cap-row-label">⚖ Peso</span>
+                <div class="mini-bar">
+                  <div class="mini-bar__fill mini-bar__fill--{{ projStatus(cap, effectiveBaseQty) }}"
+                       [style.width.%]="cap.capacity_weight.usage_pct ?? 0"></div>
+                </div>
+                <span class="cap-row-pct">{{ fmtPct(cap.capacity_weight.usage_pct) }}</span>
+                <span class="cap-row-detail">libre: {{ _fmtKg(cap.capacity_weight.available_kg) }}</span>
+                @if (neededWgt(effectiveBaseQty); as nw) {
+                  <span class="cap-row-needed">→ usará {{ _fmtKg(nw) }}</span>
+                }
+              </div>
+            } @else {
+              <div class="cap-row">
+                <span class="cap-row-label">⚖ Peso</span>
+                <span class="cap-row-detail">Usando {{ _fmtKg(cap.capacity_weight.used_kg) }} · sin límite</span>
+              </div>
+            }
+          </div>
+        }
+
+        <!-- ── Modo de ingreso (base vs presentación) ── -->
+        <div class="span2 mode-toggle">
+          <label>Modo de ingreso:</label>
+          <button mat-stroked-button type="button" [class.active]="!usePresentationMode()" (click)="usePresentationMode.set(false)">
+            Unidad base directa
+          </button>
+          <button mat-stroked-button type="button" [class.active]="usePresentationMode()" (click)="usePresentationMode.set(true)"
+                  [disabled]="presentations().length === 0"
+                  [matTooltip]="presentations().length === 0 ? 'Este producto no tiene presentaciones configuradas.' : 'Ingresar por empaque'">
+            Por empaque / presentación
+          </button>
+        </div>
+
+        @if (usePresentationMode() && presentations().length === 0 && form.get('product_id')?.value) {
+          <div class="span2 no-pres-warn">
+            <mat-icon>info</mat-icon>
+            Este producto no tiene presentaciones de empaque configuradas.
+            Dirígete al <strong>Catálogo → Detalle del producto → Presentaciones de empaque</strong>.
+          </div>
+        }
+
+        @if (!usePresentationMode()) {
+          <mat-form-field appearance="outline" class="span2">
+            <mat-label>Cantidad en {{ selectedProduct?.base_unit?.abbreviation || 'unidad base' }} *</mat-label>
+            <input matInput type="number" formControlName="quantity_base" min="1" />
+            <mat-hint>Número de {{ selectedProduct?.base_unit?.name || 'unidades base' }}</mat-hint>
+          </mat-form-field>
+        }
+
+        @if (usePresentationMode()) {
+          <mat-form-field appearance="outline">
+            <mat-label>Presentación / empaque *</mat-label>
+            <mat-select formControlName="product_presentation_id">
+              @for (pr of presentations(); track pr.id) {
+                <mat-option [value]="pr.id">
+                  {{ pr.name }}
+                  <span style="color:#718096;font-size:0.85em"> — 1 und = {{ pr.factor_to_base }} {{ selectedProduct?.base_unit?.abbreviation || 'base' }}</span>
+                </mat-option>
+              }
+            </mat-select>
+            @if (selectedPresentation) {
+              <mat-hint>1 {{ selectedPresentation.name }} = <strong>{{ selectedPresentation.factor_to_base }}</strong> {{ selectedProduct?.base_unit?.abbreviation || 'uds.' }}</mat-hint>
+            }
+          </mat-form-field>
+
+          <mat-form-field appearance="outline">
+            <mat-label>Cantidad de empaques *</mat-label>
+            <input matInput type="number" formControlName="quantity_in_presentation" min="1" />
+            @if (selectedPresentation) {
+              <mat-hint>{{ selectedPresentation.name }}{{ (form.get('quantity_in_presentation')?.value || 0) > 1 ? 's' : '' }}</mat-hint>
+            }
+          </mat-form-field>
+
+          @if (previewBaseUnits !== null) {
+            <div class="span2 conversion-preview">
+              <mat-icon>calculate</mat-icon>
+              <span>
+                <strong>{{ form.get('quantity_in_presentation')?.value }}</strong>
+                {{ selectedPresentation?.name }}
+                =
+                <strong class="base-qty">{{ previewBaseUnits }}</strong>
+                {{ selectedProduct?.base_unit?.abbreviation || 'unidades base' }} ingresarán al inventario
+              </span>
+            </div>
+          }
+        }
+
+      } <!-- /!useDistribution() -->
+
+      <!-- ── Modo MÚLTIPLES ubicaciones ── -->
+      @if (useDistribution()) {
+
+        <div class="span2 dist-section" [formGroup]="distributionForm">
+          <div class="dist-section-header">
+            <div class="dist-section-title">
+              <mat-icon>call_split</mat-icon>
+              Distribución en ubicaciones
+            </div>
+            <button mat-stroked-button type="button" (click)="addEntryRow()">
+              <mat-icon>add</mat-icon> Agregar ubicación
+            </button>
+          </div>
+
+          <div formArrayName="entryRows" class="dist-rows-wrap">
+            @for (ctrl of entryRows.controls; track $index; let i = $index) {
+              <div class="dist-row" [formGroupName]="$index">
+                <!-- Ubicación -->
+                <mat-form-field appearance="outline" class="dist-loc-field">
+                  <mat-label>Ubicación {{ i + 1 }}</mat-label>
+                  <mat-select formControlName="location_id"
+                              (selectionChange)="onEntryRowLocChange(i, $event.value)">
+                    @for (l of locations(); track l.id) {
+                      <mat-option [value]="l.id">{{ l.name }}</mat-option>
+                    }
+                  </mat-select>
+                </mat-form-field>
+
+                <!-- Cantidad (uds base) -->
+                <mat-form-field appearance="outline" class="dist-qty-field">
+                  <mat-label>Cant. ({{ selectedProduct?.base_unit?.abbreviation || 'uds' }})</mat-label>
+                  <input matInput type="number" formControlName="quantity_base" min="1" />
+                </mat-form-field>
+
+                <!-- Badge de capacidad -->
+                <div class="dist-cap-badge dist-cap-badge--{{ projStatus(entryRowCaps()[i], asGroup(ctrl).get('quantity_base')?.value ?? 0) }}">
+                  @if (entryRowCaps()[i] === null && asGroup(ctrl).get('location_id')?.value) {
+                    <mat-spinner diameter="12"></mat-spinner>
+                  } @else if (entryRowCaps()[i]) {
+                    @switch (projStatus(entryRowCaps()[i], asGroup(ctrl).get('quantity_base')?.value ?? 0)) {
+                      @case ('ok')     { <mat-icon class="badge-icon">check_circle</mat-icon> ok }
+                      @case ('warn')   { <mat-icon class="badge-icon">warning</mat-icon> ajustado }
+                      @case ('danger') { <mat-icon class="badge-icon">error</mat-icon> excede }
+                      @case ('nodims') { <mat-icon class="badge-icon">info</mat-icon> sin dims }
+                      @case ('nodata') { <mat-icon class="badge-icon">info</mat-icon> sin límite }
+                    }
+                  } @else { — }
+                </div>
+
+                <!-- Eliminar fila -->
+                <button mat-icon-button color="warn" type="button"
+                        (click)="removeEntryRow(i)"
+                        [disabled]="entryRows.length <= 1"
+                        matTooltip="Quitar fila">
+                  <mat-icon>remove_circle_outline</mat-icon>
+                </button>
+              </div>
+            }
+          </div>
+
+          <!-- Total -->
+          <div class="dist-total" [class.dist-total--ok]="entryDistTotal > 0">
+            Total asignado: <strong>{{ entryDistTotal }}</strong>
+            {{ selectedProduct?.base_unit?.abbreviation || 'uds base' }}
+            en {{ entryRows.length }} ubicación{{ entryRows.length !== 1 ? 'es' : '' }}
+          </div>
+        </div>
+
+      } <!-- /useDistribution() entry -->
+
+      <!-- Notas -->
+      <mat-form-field appearance="outline" class="span2">
+        <mat-label>Notas</mat-label>
+        <textarea matInput formControlName="notes" rows="2"></textarea>
+      </mat-form-field>
+
+    } <!-- /isEntry -->
+
+
+    <!-- ══════════════════════ TRANSFERENCIA ════════════════════ -->
     @if (isTransfer) {
-      <mat-form-field appearance="outline"><mat-label>Ubicación origen</mat-label>
+
+      <!-- Origen -->
+      <mat-form-field appearance="outline" class="span2">
+        <mat-label>Ubicación origen</mat-label>
         <mat-select formControlName="location_from_id">
           @for (l of locations(); track l.id) { <mat-option [value]="l.id">{{ l.name }}</mat-option> }
         </mat-select>
       </mat-form-field>
-      <mat-form-field appearance="outline"><mat-label>Ubicación destino</mat-label>
-        <mat-select formControlName="location_to_id">
-          @for (l of locations(); track l.id) { <mat-option [value]="l.id">{{ l.name }}</mat-option> }
-        </mat-select>
+
+      <!-- Toggle distribución -->
+      @if (form.get('warehouse_id')?.value) {
+        <div class="span2 dist-toggle-row">
+          <button mat-stroked-button type="button"
+                  [class.active]="!useDistribution()"
+                  (click)="useDistribution() && toggleDistribution()">
+            <mat-icon>place</mat-icon> Un destino
+          </button>
+          <button mat-stroked-button type="button"
+                  [class.active]="useDistribution()"
+                  (click)="!useDistribution() && toggleDistribution()">
+            <mat-icon>call_split</mat-icon> Distribuir en varios destinos
+          </button>
+        </div>
+      }
+
+      <!-- ── Destino único ── -->
+      @if (!useDistribution()) {
+
+        <mat-form-field appearance="outline" class="span2">
+          <mat-label>Ubicación destino</mat-label>
+          <mat-select formControlName="location_to_id">
+            @for (l of locations(); track l.id) { <mat-option [value]="l.id">{{ l.name }}</mat-option> }
+          </mat-select>
+        </mat-form-field>
+
+        <!-- Panel de capacidad del destino -->
+        @if (loadingDestCap()) {
+          <div class="span2 cap-loading">
+            <mat-spinner diameter="14"></mat-spinner>
+            <span>Verificando capacidad del destino...</span>
+          </div>
+        }
+        @if (!loadingDestCap() && destLocCapacity(); as cap) {
+          <div class="span2 cap-panel" [class]="'cap-panel--' + projStatus(cap, +(form.get('quantity')?.value ?? 0))">
+            <div class="cap-panel-header">
+              <mat-icon class="cap-icon">
+                {{ projStatus(cap, +(form.get('quantity')?.value ?? 0)) === 'danger' ? 'error' :
+                   projStatus(cap, +(form.get('quantity')?.value ?? 0)) === 'warn'   ? 'warning' :
+                   projStatus(cap, +(form.get('quantity')?.value ?? 0)) === 'ok'     ? 'check_circle' : 'info' }}
+              </mat-icon>
+              <strong>{{ cap.name }}</strong> — capacidad disponible
+              <span class="cap-status-pill cap-pill--{{ projStatus(cap, +(form.get('quantity')?.value ?? 0)) }}">
+                @switch (projStatus(cap, +(form.get('quantity')?.value ?? 0))) {
+                  @case ('ok')     { ✓ Sin problemas }
+                  @case ('warn')   { ⚠ Espacio ajustado }
+                  @case ('danger') { ✗ Excede capacidad }
+                  @case ('nodims') { — Sin dimensiones de producto }
+                  @case ('nodata') { — Sin capacidad configurada }
+                }
+              </span>
+            </div>
+
+            @if (cap.capacity_volume.max_cm3 !== null) {
+              <div class="cap-row">
+                <span class="cap-row-label">📦 Volumen</span>
+                <div class="mini-bar">
+                  <div class="mini-bar__fill mini-bar__fill--{{ projStatus(cap, +(form.get('quantity')?.value ?? 0)) }}"
+                       [style.width.%]="cap.capacity_volume.usage_pct ?? 0"></div>
+                </div>
+                <span class="cap-row-pct">{{ fmtPct(cap.capacity_volume.usage_pct) }}</span>
+                <span class="cap-row-detail">libre: {{ _fmtVol(cap.capacity_volume.available_cm3) }}</span>
+                @if (neededVol(+(form.get('quantity')?.value ?? 0)); as nv) {
+                  <span class="cap-row-needed">→ usará {{ _fmtVol(nv) }}</span>
+                }
+              </div>
+            }
+
+            @if (cap.capacity_weight.max_kg !== null) {
+              <div class="cap-row">
+                <span class="cap-row-label">⚖ Peso</span>
+                <div class="mini-bar">
+                  <div class="mini-bar__fill mini-bar__fill--{{ projStatus(cap, +(form.get('quantity')?.value ?? 0)) }}"
+                       [style.width.%]="cap.capacity_weight.usage_pct ?? 0"></div>
+                </div>
+                <span class="cap-row-pct">{{ fmtPct(cap.capacity_weight.usage_pct) }}</span>
+                <span class="cap-row-detail">libre: {{ _fmtKg(cap.capacity_weight.available_kg) }}</span>
+                @if (neededWgt(+(form.get('quantity')?.value ?? 0)); as nw) {
+                  <span class="cap-row-needed">→ usará {{ _fmtKg(nw) }}</span>
+                }
+              </div>
+            }
+          </div>
+        }
+
+        <mat-form-field appearance="outline" class="span2">
+          <mat-label>Cantidad *</mat-label>
+          <input matInput type="number" formControlName="quantity" min="1" />
+        </mat-form-field>
+
+      } <!-- /!useDistribution() transfer -->
+
+      <!-- ── Distribución a múltiples destinos ── -->
+      @if (useDistribution()) {
+
+        <div class="span2 dist-section" [formGroup]="distributionForm">
+          <div class="dist-section-header">
+            <div class="dist-section-title">
+              <mat-icon>call_split</mat-icon>
+              Distribución en destinos
+            </div>
+            <button mat-stroked-button type="button" (click)="addTransferRow()">
+              <mat-icon>add</mat-icon> Agregar destino
+            </button>
+          </div>
+
+          <div formArrayName="transferRows" class="dist-rows-wrap">
+            @for (ctrl of transferRows.controls; track $index; let i = $index) {
+              <div class="dist-row" [formGroupName]="$index">
+                <mat-form-field appearance="outline" class="dist-loc-field">
+                  <mat-label>Destino {{ i + 1 }}</mat-label>
+                  <mat-select formControlName="location_to_id"
+                              (selectionChange)="onTransferRowLocChange(i, $event.value)">
+                    @for (l of locations(); track l.id) {
+                      <mat-option [value]="l.id">{{ l.name }}</mat-option>
+                    }
+                  </mat-select>
+                </mat-form-field>
+
+                <mat-form-field appearance="outline" class="dist-qty-field">
+                  <mat-label>Cantidad</mat-label>
+                  <input matInput type="number" formControlName="quantity" min="1" />
+                </mat-form-field>
+
+                <div class="dist-cap-badge dist-cap-badge--{{ projStatus(transferRowCaps()[i], asGroup(ctrl).get('quantity')?.value ?? 0) }}">
+                  @if (transferRowCaps()[i] === null && asGroup(ctrl).get('location_to_id')?.value) {
+                    <mat-spinner diameter="12"></mat-spinner>
+                  } @else if (transferRowCaps()[i]) {
+                    @switch (projStatus(transferRowCaps()[i], asGroup(ctrl).get('quantity')?.value ?? 0)) {
+                      @case ('ok')     { <mat-icon class="badge-icon">check_circle</mat-icon> ok }
+                      @case ('warn')   { <mat-icon class="badge-icon">warning</mat-icon> ajustado }
+                      @case ('danger') { <mat-icon class="badge-icon">error</mat-icon> excede }
+                      @case ('nodims') { <mat-icon class="badge-icon">info</mat-icon> sin dims }
+                      @case ('nodata') { <mat-icon class="badge-icon">info</mat-icon> sin límite }
+                    }
+                  } @else { — }
+                </div>
+
+                <button mat-icon-button color="warn" type="button"
+                        (click)="removeTransferRow(i)"
+                        [disabled]="transferRows.length <= 1"
+                        matTooltip="Quitar destino">
+                  <mat-icon>remove_circle_outline</mat-icon>
+                </button>
+              </div>
+            }
+          </div>
+
+          <div class="dist-total" [class.dist-total--ok]="transferDistTotal > 0">
+            Total a transferir: <strong>{{ transferDistTotal }}</strong>
+            {{ selectedProduct?.base_unit?.abbreviation || 'uds' }}
+            hacia {{ transferRows.length }} ubicación{{ transferRows.length !== 1 ? 'es' : '' }}
+          </div>
+        </div>
+
+      } <!-- /useDistribution() transfer -->
+
+      <mat-form-field appearance="outline" class="span2">
+        <mat-label>Motivo</mat-label>
+        <input matInput formControlName="reason" />
       </mat-form-field>
-      <mat-form-field appearance="outline" class="span2"><mat-label>Cantidad *</mat-label><input matInput type="number" formControlName="quantity" min="1" /></mat-form-field>
-      <mat-form-field appearance="outline" class="span2"><mat-label>Motivo</mat-label><input matInput formControlName="reason" /></mat-form-field>
-    }
 
-    <!-- AJUSTE: cantidad positiva o negativa -->
+    } <!-- /isTransfer -->
+
+
+    <!-- ══════════════════════ AJUSTE ════════════════════════════ -->
     @if (isAdjustment) {
-      <mat-form-field appearance="outline"><mat-label>Cantidad (+ agregar / - quitar) *</mat-label><input matInput type="number" formControlName="quantity" /></mat-form-field>
-      <mat-form-field appearance="outline"><mat-label>Motivo *</mat-label><input matInput formControlName="reason" placeholder="Ajuste por conteo físico" /></mat-form-field>
+      <mat-form-field appearance="outline">
+        <mat-label>Cantidad (+ agregar / − quitar) *</mat-label>
+        <input matInput type="number" formControlName="quantity" />
+      </mat-form-field>
+      <mat-form-field appearance="outline">
+        <mat-label>Motivo *</mat-label>
+        <input matInput formControlName="reason" placeholder="Ajuste por conteo físico" />
+      </mat-form-field>
     }
 
-    <!-- SALIDA / DEVOLUCIÓN -->
+    <!-- ══════════════════════ SALIDA / DEVOLUCIÓN ═══════════════ -->
     @if (isExit || isReturn) {
-      <mat-form-field appearance="outline" class="span2"><mat-label>Cantidad *</mat-label><input matInput type="number" formControlName="quantity" min="1" /></mat-form-field>
-      <mat-form-field appearance="outline" class="span2"><mat-label>Motivo</mat-label><input matInput formControlName="reason" /></mat-form-field>
+
+      <!-- ── Paso 2: Stock disponible (solo EXIT) ── -->
+      @if (isExit) {
+
+        <!-- Spinner mientras carga -->
+        @if (loadingStock()) {
+          <div class="span2 fefo-loading">
+            <mat-spinner diameter="14"></mat-spinner>
+            <span>Verificando stock disponible...</span>
+          </div>
+        }
+
+        <!-- Panel de resultado -->
+        @if (!loadingStock() && stockSummary(); as s) {
+          <div class="span2 stock-summary-panel stock-summary-panel--{{ stockStatusClass }}">
+            <mat-icon class="stock-summary-icon">
+              {{ s.available_quantity === 0 ? 'remove_shopping_cart' : stockStatusClass === 'warn' ? 'warning' : 'inventory_2' }}
+            </mat-icon>
+            <div class="stock-summary-info">
+              <span class="stock-summary-label">
+                Stock disponible en <strong>{{ selectedWarehouseName }}</strong>
+              </span>
+              <span class="stock-summary-qty" [class.stock-qty--zero]="s.available_quantity === 0">
+                {{ s.available_quantity }} {{ selectedProduct?.base_unit?.abbreviation || 'uds' }}
+              </span>
+            </div>
+          </div>
+        }
+
+        <!-- Bloqueo total cuando no hay stock -->
+        @if (hasZeroStock) {
+          <div class="span2 zero-stock-block">
+            <mat-icon>block</mat-icon>
+            <div class="zero-stock-text">
+              <strong>Sin unidades disponibles para despachar</strong>
+              <span>No hay stock de este producto en {{ selectedWarehouseName }}. Selecciona otro almacén o verifica las entradas registradas.</span>
+            </div>
+          </div>
+        }
+
+      }
+
+      <!-- ── Campos operativos: solo visibles si hay stock (o si es Devolución) ── -->
+      @if (!hasZeroStock) {
+
+        <!-- Paso 3: Lotes FEFO (solo EXIT) -->
+        @if (isExit) {
+          @if (loadingFefo()) {
+            <div class="span2 fefo-loading">
+              <mat-spinner diameter="14"></mat-spinner>
+              <span>Consultando lotes FEFO...</span>
+            </div>
+          }
+          @if (!loadingFefo() && fefoLotes().length > 0) {
+            <div class="span2 fefo-panel">
+              <div class="fefo-panel-header">
+                <mat-icon>fact_check</mat-icon>
+                <span>Lotes disponibles — orden FEFO</span>
+                <span class="fefo-hint">El sistema descontará primero del marcado con ★</span>
+              </div>
+              <div class="fefo-rows">
+                @for (lote of fefoLotes(); track lote.id; let first = $first) {
+                  <div class="fefo-row" [class.fefo-row--first]="first">
+                    <span class="fefo-priority">{{ first ? '★' : '·' }}</span>
+                    <span class="fefo-lot">{{ lote.lot_number }}</span>
+                    <span class="fefo-exp" [class.fefo-exp--near]="(lote.days_until_expiry ?? 999) <= 30">
+                      vence {{ lote.expiration_date | date:'dd/MM/yyyy' }}
+                      @if (lote.days_until_expiry !== null) {
+                        <span class="fefo-days">({{ lote.days_until_expiry }}d)</span>
+                      }
+                    </span>
+                    <span class="fefo-qty">
+                      {{ lote.quantity_available }} {{ selectedProduct?.base_unit?.abbreviation || 'uds' }}
+                    </span>
+                    @if (lote.locations.length) {
+                      <span class="fefo-loc">
+                        <mat-icon class="fefo-loc-icon">place</mat-icon>
+                        {{ lote.locations[0].location_name }}
+                        @if (lote.locations[0].zone) { · {{ lote.locations[0].zone.zone_name }} }
+                      </span>
+                    }
+                  </div>
+                }
+              </div>
+            </div>
+          }
+        }
+
+        <!-- Cantidad -->
+        <mat-form-field appearance="outline" class="span2">
+          <mat-label>Cantidad *</mat-label>
+          <input matInput type="number" formControlName="quantity" min="1" />
+          @if (isExit && stockSummary()) {
+            <mat-hint>
+              Disponible: {{ stockSummary()!.available_quantity }}
+              {{ selectedProduct?.base_unit?.abbreviation || 'uds' }}
+            </mat-hint>
+          }
+        </mat-form-field>
+
+        <!-- Ubicación de retiro (opcional, solo EXIT con almacén seleccionado) -->
+        @if (isExit && form.get('warehouse_id')?.value) {
+          <mat-form-field appearance="outline" class="span2">
+            <mat-label>Ubicación de retiro físico (opcional)</mat-label>
+            <mat-select formControlName="location_id">
+              <mat-option [value]="null">
+                Sin especificar — FEFO automático
+                @if (fefoFirstLocation) { (se usará: {{ fefoFirstLocation }}) }
+              </mat-option>
+              @for (l of locations(); track l.id) {
+                <mat-option [value]="l.id">{{ l.name }}</mat-option>
+              }
+            </mat-select>
+            <mat-hint>Si no se especifica, el sistema aplica FEFO automáticamente</mat-hint>
+          </mat-form-field>
+        }
+
+        <!-- Motivo -->
+        <mat-form-field appearance="outline" class="span2">
+          <mat-label>Motivo</mat-label>
+          <input matInput formControlName="reason" />
+        </mat-form-field>
+
+      } <!-- /!hasZeroStock -->
+
     }
+
   </form>
 </mat-dialog-content>
 
 <mat-dialog-actions align="end">
   <button mat-button [mat-dialog-close]="false">Cancelar</button>
-  <button mat-raised-button color="primary" (click)="save()" [disabled]="form.invalid || saving()">
-    @if (saving()) { <mat-spinner diameter="18"></mat-spinner> } Registrar
+  <button mat-raised-button color="primary" (click)="save()"
+          [disabled]="!isFormReady || saving()">
+    @if (saving()) { <mat-spinner diameter="18"></mat-spinner> }
+    Registrar
   </button>
 </mat-dialog-actions>

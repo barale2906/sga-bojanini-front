@@ -20,29 +20,64 @@ import { FormErrorsComponent } from '../../../shared/components/form-errors/form
     <mat-dialog-content>
       <app-form-errors [errors]="errors()"></app-form-errors>
       <form [formGroup]="form" class="dialog-form">
+
         <mat-form-field appearance="outline" class="w-full">
           <mat-label>Zona *</mat-label>
           <mat-select formControlName="zone_id">
             @for (z of data.zones; track z.id) { <mat-option [value]="z.id">{{ z.name }}</mat-option> }
           </mat-select>
         </mat-form-field>
+
         <div class="two-col">
           <mat-form-field appearance="outline"><mat-label>Nombre *</mat-label><input matInput formControlName="name" placeholder="Estante A1" /></mat-form-field>
           <mat-form-field appearance="outline"><mat-label>Código *</mat-label><input matInput formControlName="code" placeholder="EA-01" /></mat-form-field>
         </div>
-        <mat-form-field appearance="outline" class="w-full"><mat-label>Capacidad</mat-label><input matInput type="number" formControlName="capacity" /></mat-form-field>
-        <mat-form-field appearance="outline" class="w-full"><mat-label>Descripción</mat-label><textarea matInput formControlName="description" rows="2"></textarea></mat-form-field>
-        <mat-slide-toggle formControlName="is_active" color="primary">{{ form.get('is_active')?.value ? 'Activa' : 'Inactiva' }}</mat-slide-toggle>
+
+        <p class="section-label">Capacidad física <span class="optional-hint">(opcional)</span></p>
+        <div class="two-col">
+          <mat-form-field appearance="outline">
+            <mat-label>Volumen disponible (cm³)</mat-label>
+            <input matInput type="number" min="0" formControlName="volume_cm3" placeholder="50000" />
+            <mat-hint class="dim-hint">Volumen total de la ubicación</mat-hint>
+          </mat-form-field>
+          <mat-form-field appearance="outline">
+            <mat-label>Peso máximo (kg)</mat-label>
+            <input matInput type="number" min="0" formControlName="max_weight_kg" placeholder="200" />
+            <mat-hint class="dim-hint">Carga máxima soportada</mat-hint>
+          </mat-form-field>
+        </div>
+
+        <mat-form-field appearance="outline" class="w-full">
+          <mat-label>Descripción</mat-label>
+          <textarea matInput formControlName="description" rows="2"></textarea>
+        </mat-form-field>
+
+        <mat-slide-toggle formControlName="is_active" color="primary">
+          {{ form.get('is_active')?.value ? 'Activa' : 'Inactiva' }}
+        </mat-slide-toggle>
+
       </form>
     </mat-dialog-content>
     <mat-dialog-actions align="end">
       <button mat-button [mat-dialog-close]="false">Cancelar</button>
       <button mat-raised-button color="primary" (click)="save()" [disabled]="form.invalid || saving()">
-        @if (saving()) { <mat-spinner diameter="18"></mat-spinner> } {{ data.location ? 'Guardar' : 'Crear' }}
+        @if (saving()) { <mat-spinner diameter="18"></mat-spinner> }
+        {{ data.location ? 'Guardar' : 'Crear' }}
       </button>
     </mat-dialog-actions>
   `,
-  styles: ['.dialog-form { display:flex; flex-direction:column; gap:0.25rem; padding:0.5rem 0; } .w-full { width:100%; } .two-col { display:grid; grid-template-columns:1fr 1fr; gap:0.5rem; }'],
+  styles: [`
+    .dialog-form { display:flex; flex-direction:column; gap:0.25rem; padding:0.5rem 0; }
+    .w-full { width:100%; }
+    .two-col { display:grid; grid-template-columns:1fr 1fr; gap:0.5rem; }
+    .section-label {
+      font-size:0.75rem; font-weight:700; color:#4a5568;
+      text-transform:uppercase; letter-spacing:0.04em;
+      margin:0.4rem 0 0;
+    }
+    .optional-hint { font-weight:400; text-transform:none; color:#a0aec0; font-size:0.75rem; }
+    ::ng-deep .dim-hint { font-size:0.65rem !important; color:#b0bec5 !important; }
+  `],
 })
 export class LocationFormDialogComponent implements OnInit {
   data: { location: Location | null; zones: Zone[] } = inject(MAT_DIALOG_DATA);
@@ -54,12 +89,13 @@ export class LocationFormDialogComponent implements OnInit {
   errors = signal<string[]>([]);
 
   form = this.fb.group({
-    zone_id: [null as number | null, Validators.required],
-    name: ['', Validators.required],
-    code: ['', Validators.required],
-    capacity: [null as number | null],
-    description: [''],
-    is_active: [true],
+    zone_id:        [null as number | null, Validators.required],
+    name:           ['', Validators.required],
+    code:           ['', Validators.required],
+    volume_cm3:     [null as number | null],
+    max_weight_kg:  [null as number | null],
+    description:    [''],
+    is_active:      [true],
   });
 
   ngOnInit(): void {
@@ -69,9 +105,14 @@ export class LocationFormDialogComponent implements OnInit {
   save(): void {
     if (this.form.invalid || this.saving()) return;
     this.saving.set(true);
+    const payload = {
+      ...this.form.value,
+      volume_cm3:    this.form.value.volume_cm3    ?? null,
+      max_weight_kg: this.form.value.max_weight_kg ?? null,
+    };
     const req$ = this.data.location
-      ? this.svc.updateLocation(this.data.location.id, this.form.value as any)
-      : this.svc.createLocation(this.form.value as any);
+      ? this.svc.updateLocation(this.data.location.id, payload as any)
+      : this.svc.createLocation(payload as any);
     req$.subscribe({
       next: () => this.ref.close(true),
       error: err => {

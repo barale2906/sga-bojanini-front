@@ -120,13 +120,32 @@ export class InventoryPageComponent implements OnInit {
   }
 
   openMovement(type: string): void {
+    // Entrada y transferencia pueden tener distribución multi-ubicación → más ancho
+    const needsWide = type === 'entry' || type === 'transfer';
     this.dialog.open(MovementFormDialogComponent, {
       data: { type, warehouses: this.warehouses(), products: this.products(), inventorySvc: this.svc },
-      width: '620px', maxWidth: '95vw',
-    }).afterClosed().subscribe(ok => {
-      if (ok) {
+      width: needsWide ? '760px' : '620px', maxWidth: '95vw', maxHeight: '94vh',
+    }).afterClosed().subscribe(result => {
+      // result puede ser: true (otros tipos) | { ok: true, batch } (EXIT) | false/null (cancelado)
+      const ok = result === true || (result && result.ok);
+      if (!ok) return;
+
+      this.loadStock(); this.loadMovements(); this.loadBatches();
+
+      // Para EXIT: mostrar en el snack el lote FEFO descontado y su ubicación
+      if (type === 'exit' && result?.batch) {
+        const b = result.batch;
+        const loc = b.locations?.[0];
+        const locStr = loc
+          ? `${loc.location_name}${loc.zone ? ' · ' + loc.zone.zone_name : ''}`
+          : 'sin ubicación';
+        this.snack.open(
+          `Salida registrada — Lote: ${b.lot_number} — Ubicación: ${locStr}`,
+          'OK',
+          { duration: 6000 }
+        );
+      } else {
         this.snack.open('Movimiento registrado', 'OK', { duration: 3000 });
-        this.loadStock(); this.loadMovements(); this.loadBatches();
       }
     });
   }

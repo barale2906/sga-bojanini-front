@@ -127,6 +127,32 @@
           }
         </mat-form-field>
 
+        <!-- ── Dimensiones físicas (aplica a simple y kit) ─────── -->
+        <p class="section-label">
+          Dimensiones físicas
+          <span style="font-weight:400;text-transform:none;color:#a0aec0">(opcional)</span>
+        </p>
+        <div class="row-2">
+          <mat-form-field appearance="outline" class="w-full">
+            <mat-label>Volumen por unidad (cm³)</mat-label>
+            <input matInput type="number" min="0" formControlName="volume_cm3"
+                   placeholder="Ej. 1200" />
+            <mat-hint class="small-hint">Para calcular capacidad de ubicaciones</mat-hint>
+            @if (stepInv.get('volume_cm3')?.hasError('min') && stepInv.get('volume_cm3')?.touched) {
+              <mat-error>Debe ser ≥ 0</mat-error>
+            }
+          </mat-form-field>
+          <mat-form-field appearance="outline" class="w-full">
+            <mat-label>Peso por unidad (kg)</mat-label>
+            <input matInput type="number" min="0" formControlName="weight_kg"
+                   placeholder="Ej. 0.85" />
+            <mat-hint class="small-hint">Para calcular peso máximo de ubicaciones</mat-hint>
+            @if (stepInv.get('weight_kg')?.hasError('min') && stepInv.get('weight_kg')?.touched) {
+              <mat-error>Debe ser ≥ 0</mat-error>
+            }
+          </mat-form-field>
+        </div>
+
         <!-- ── Solo simple: cadena de frío + umbrales ──────────── -->
         @if (!isKit()) {
           <mat-slide-toggle formControlName="requires_cold_chain" color="accent">
@@ -429,6 +455,18 @@
             <span class="slabel">Unidad base</span>
             <span>{{ selectedBaseUnitAbbr() }}</span>
           </div>
+          @if (stepInv.get('volume_cm3')?.value != null) {
+            <div class="summary-row">
+              <span class="slabel">Volumen/unidad</span>
+              <span>{{ stepInv.get('volume_cm3')?.value | number:'1.0-2' }} cm³</span>
+            </div>
+          }
+          @if (stepInv.get('weight_kg')?.value != null) {
+            <div class="summary-row">
+              <span class="slabel">Peso/unidad</span>
+              <span>{{ stepInv.get('weight_kg')?.value | number:'1.0-3' }} kg</span>
+            </div>
+          }
           @if (!isKit()) {
             <div class="summary-row">
               <span class="slabel">Empaques</span>

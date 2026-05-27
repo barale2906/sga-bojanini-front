@@ -183,6 +183,8 @@ export class ProductFormDialogComponent implements OnInit {
     reorder_quantity:  [0, Validators.min(0)],
     min_stock:         [0, Validators.min(0)],
     max_stock:         [0, Validators.min(0)],
+    volume_cm3:        [null as number | null, Validators.min(0)],
+    weight_kg:         [null as number | null, Validators.min(0)],
     components:        this.fb.array([]),
   });
 
@@ -279,6 +281,8 @@ export class ProductFormDialogComponent implements OnInit {
         reorder_quantity: p.reorder_quantity,
         min_stock: p.min_stock,
         max_stock: p.max_stock,
+        volume_cm3: p.volume_cm3 ?? null,
+        weight_kg:  p.weight_kg  ?? null,
       });
       this.stepFinal.patchValue({ is_active: p.is_active });
 
@@ -352,6 +356,8 @@ export class ProductFormDialogComponent implements OnInit {
       reorder_quantity:    iv.reorder_quantity ?? 0,
       min_stock:           iv.min_stock ?? 0,
       max_stock:           iv.max_stock ?? 0,
+      volume_cm3:          iv.volume_cm3  != null ? Number(iv.volume_cm3)  : null,
+      weight_kg:           iv.weight_kg   != null ? Number(iv.weight_kg)   : null,
       is_active:           sf.is_active ?? true,
     };
 

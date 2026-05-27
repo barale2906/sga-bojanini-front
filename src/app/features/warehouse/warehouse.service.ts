@@ -32,9 +32,54 @@ export interface Location {
   zone_id: number;
   name: string;
   code: string;
-  capacity: number | null;
+  volume_cm3: number | null;
+  max_weight_kg: number | null;
   description: string | null;
   is_active: boolean;
+}
+
+// ── Capacidad física ──────────────────────────────────────────
+
+export interface CapacityVolume {
+  max_cm3: number | null;
+  used_cm3: number;
+  available_cm3: number | null;
+  usage_pct: number | null;
+}
+
+export interface CapacityWeight {
+  max_kg: number | null;
+  used_kg: number;
+  available_kg: number | null;
+  usage_pct: number | null;
+}
+
+export interface LocationCapacity {
+  id: number;
+  name: string;
+  code: string;
+  zone_id: number;
+  capacity_volume: CapacityVolume;
+  capacity_weight: CapacityWeight;
+}
+
+export interface ZoneCapacity {
+  id: number;
+  name: string;
+  code: string;
+  warehouse_id: number;
+  capacity_volume: CapacityVolume;
+  capacity_weight: CapacityWeight;
+  locations: LocationCapacity[];
+}
+
+export interface WarehouseCapacity {
+  id: number;
+  name: string;
+  code: string;
+  capacity_volume: CapacityVolume;
+  capacity_weight: CapacityWeight;
+  zones: ZoneCapacity[];
 }
 
 @Injectable({ providedIn: 'root' })
@@ -115,5 +160,19 @@ export class WarehouseService {
 
   deleteLocation(id: number): Observable<ApiResponse<null>> {
     return this.http.delete<ApiResponse<null>>(`${this.api}/locations/${id}`);
+  }
+
+  // ── Capacidad física ──────────────────────────────────────────
+
+  getLocationCapacity(id: number): Observable<ApiResponse<LocationCapacity>> {
+    return this.http.get<ApiResponse<LocationCapacity>>(`${this.api}/locations/${id}/capacity`);
+  }
+
+  getZoneCapacity(id: number): Observable<ApiResponse<ZoneCapacity>> {
+    return this.http.get<ApiResponse<ZoneCapacity>>(`${this.api}/zones/${id}/capacity`);
+  }
+
+  getWarehouseCapacity(id: number): Observable<ApiResponse<WarehouseCapacity>> {
+    return this.http.get<ApiResponse<WarehouseCapacity>>(`${this.api}/warehouses/${id}/capacity`);
   }
 }

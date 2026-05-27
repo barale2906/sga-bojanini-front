@@ -13,6 +13,40 @@ export interface Batch {
   product?: { id: number; code: string; name: string };
 }
 
+/** Detalle de lote con ubicaciones físicas (respuesta de /products/{id}/batches y /batches/{id}) */
+export interface BatchDetail {
+  id: number;
+  product_id: number;
+  lot_number: string;
+  expiration_date: string | null;
+  manufacturing_date: string | null;
+  quantity_received: number;
+  quantity_available: number;
+  status: 'active' | 'expired' | 'depleted';
+  days_until_expiry: number | null;
+  received_at: string;
+  product?: { id: number; code: string; name: string };
+  locations: BatchLocation[];
+}
+
+export interface BatchLocation {
+  location_id: number;
+  location_name: string;
+  location_code: string;
+  quantity: number;
+  zone: { zone_id: number; zone_name: string; zone_code: string } | null;
+}
+
+/** Respuesta de GET /stock/summary */
+export interface StockSummary {
+  product_id:         number;
+  warehouse_id:       number;
+  total_quantity:     number;
+  reserved_quantity:  number;
+  available_quantity: number;
+  last_movement_at:   string | null;
+}
+
 export interface StockItem {
   product: { id: number; code: string; name: string };
   warehouse: { id: number; name: string; code: string };
@@ -43,11 +77,23 @@ export class InventoryService {
     if (f.page) p = p.set('page', String(f.page));
     return this.http.get<PaginatedResponse<Batch>>(`${this.api}/batches`, { params: p });
   }
+
   getExpiringBatches(): Observable<ApiResponse<Batch[]>> {
     return this.http.get<ApiResponse<Batch[]>>(`${this.api}/batches/expiring`);
   }
+
   getExpiredBatches(): Observable<ApiResponse<Batch[]>> {
     return this.http.get<ApiResponse<Batch[]>>(`${this.api}/batches/expired`);
+  }
+
+  /** Paso 5 — Detalle de un lote individual (post-salida) */
+  getBatchById(batchId: number): Observable<ApiResponse<BatchDetail>> {
+    return this.http.get<ApiResponse<BatchDetail>>(`${this.api}/batches/${batchId}`);
+  }
+
+  /** Paso 3 — Lotes del producto ordenados FEFO (expiration_date ASC) */
+  getProductBatches(productId: number): Observable<ApiResponse<BatchDetail[]>> {
+    return this.http.get<ApiResponse<BatchDetail[]>>(`${this.api}/products/${productId}/batches`);
   }
 
   // Stock
@@ -59,8 +105,17 @@ export class InventoryService {
     if (f.page) p = p.set('page', String(f.page));
     return this.http.get<PaginatedResponse<StockItem>>(`${this.api}/stock`, { params: p });
   }
+
   getLowStock(): Observable<ApiResponse<StockItem[]>> {
     return this.http.get<ApiResponse<StockItem[]>>(`${this.api}/stock/low`);
+  }
+
+  /** Paso 2 — Resumen de stock por producto y almacén */
+  getStockSummary(warehouseId: number, productId: number): Observable<ApiResponse<StockSummary>> {
+    const params = new HttpParams()
+      .set('warehouse_id', String(warehouseId))
+      .set('product_id', String(productId));
+    return this.http.get<ApiResponse<StockSummary>>(`${this.api}/stock/summary`, { params });
   }
 
   // Movements

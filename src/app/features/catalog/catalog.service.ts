@@ -38,6 +38,10 @@ export interface Product {
   reorder_quantity: number;
   min_stock: number;
   max_stock: number;
+  /** Volumen de una unidad del producto en cm³ (para cálculo de capacidad de ubicaciones) */
+  volume_cm3: number | null;
+  /** Peso de una unidad del producto en kg (para cálculo de capacidad de ubicaciones) */
+  weight_kg: number | null;
   is_active: boolean;
   category?: Pick<Category, 'id' | 'name' | 'code'>;
   base_unit?: Pick<UnitOfMeasure, 'id' | 'name' | 'abbreviation'>;

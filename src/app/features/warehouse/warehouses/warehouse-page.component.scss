@@ -31,3 +31,114 @@
 
 .act { /* global col-actions en styles.scss */ }
 .no-data { text-align: center; padding: 2.5rem; color: #a0aec0; }
+
+// ── Capacidad física ─────────────────────────────────────────
+
+.cap-empty {
+  text-align: center; color: #a0aec0; padding: 3rem 1rem;
+  mat-icon { font-size: 3rem; height: 3rem; width: 3rem; display: block; margin: 0 auto 0.75rem; }
+  p { margin: 0; font-size: 0.95rem; }
+}
+
+.cap-header {
+  margin-bottom: 1rem;
+  .cap-title {
+    display: flex; align-items: center; gap: 0.5rem;
+    font-size: 1.1rem; font-weight: 700; color: #2d3748; margin: 0;
+    mat-icon { color: #718096; }
+  }
+}
+
+// KPI cards del almacén
+.cap-kpis {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1.5rem;
+  @media (max-width: 600px) { grid-template-columns: 1fr; }
+}
+
+.cap-kpi-card {
+  background: #fff; border: 1px solid #e2e8f0; border-radius: 10px;
+  padding: 1rem 1.25rem; display: flex; flex-direction: column; gap: 0.5rem;
+}
+
+.cap-kpi-label {
+  display: flex; align-items: center; gap: 0.4rem;
+  font-size: 0.8rem; font-weight: 700; color: #4a5568; text-transform: uppercase; letter-spacing: 0.04em;
+}
+.cap-kpi-icon { font-size: 1rem; height: 1rem; width: 1rem; }
+
+.cap-kpi-detail { font-size: 0.8rem; color: #718096; }
+
+// Barra de progreso
+.cap-bar-wrap { display: flex; align-items: center; gap: 0.6rem; }
+.cap-bar {
+  flex: 1; height: 10px; background: #edf2f7; border-radius: 9999px; overflow: hidden;
+  &--sm { height: 7px; }
+}
+.cap-bar__fill {
+  height: 100%; border-radius: 9999px; transition: width 0.4s ease;
+  &.cap--low       { background: #48bb78; }
+  &.cap--mid       { background: #ed8936; }
+  &.cap--high      { background: #e53e3e; }
+  &.cap--undefined { background: #cbd5e0; width: 0 !important; }
+}
+
+.cap-pct {
+  font-size: 0.8rem; font-weight: 700; color: #4a5568; white-space: nowrap; min-width: 60px; text-align: right;
+  &--sm { font-size: 0.73rem; min-width: 52px; }
+}
+
+// Acordeón de zonas
+.cap-accordion { margin-bottom: 1rem; }
+.cap-zone-panel { margin-bottom: 0.5rem; border-radius: 8px !important; border: 1px solid #e2e8f0; }
+
+.cap-zone-summary { display: flex; align-items: center; gap: 0.5rem; }
+
+.cap-zone-pill {
+  display: inline-flex; padding: 0.1rem 0.5rem; border-radius: 9999px;
+  font-size: 0.7rem; font-weight: 600;
+  &.cap--low       { background: #c6f6d5; color: #276749; }
+  &.cap--mid       { background: #feebc8; color: #7b341e; }
+  &.cap--high      { background: #fed7d7; color: #c53030; }
+  &.cap--undefined { background: #e2e8f0; color: #718096; }
+}
+
+.cap-zone-locations { font-size: 0.75rem; color: #a0aec0; }
+
+.cap-zone-kpis {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem;
+  padding: 0.75rem 0 0.5rem;
+  @media (max-width: 500px) { grid-template-columns: 1fr; }
+}
+
+.cap-mini-kpi { display: flex; flex-direction: column; gap: 0.3rem; }
+.cap-mini-label { font-size: 0.72rem; font-weight: 700; color: #718096; text-transform: uppercase; }
+.cap-mini-detail { font-size: 0.72rem; color: #a0aec0; }
+
+.cap-no-zones { color: #a0aec0; font-size: 0.9rem; margin: 0.5rem 0 1rem; }
+
+// Mapa de ubicaciones (heatmap)
+.loc-grid {
+  display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 0.75rem;
+}
+
+.loc-cell {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  width: 80px; min-height: 56px;
+  border-radius: 8px; cursor: default; padding: 0.4rem 0.3rem;
+  border: 2px solid transparent; transition: transform 0.1s;
+  &:hover { transform: scale(1.05); }
+
+  &.cap--low       { background: #c6f6d5; border-color: #9ae6b4; }
+  &.cap--mid       { background: #feebc8; border-color: #fbd38d; }
+  &.cap--high      { background: #fed7d7; border-color: #feb2b2; }
+  &.cap--undefined { background: #edf2f7; border-color: #e2e8f0; }
+}
+
+.loc-cell-code {
+  font-family: monospace; font-size: 0.7rem; font-weight: 700; color: #2d3748;
+  text-align: center; word-break: break-all; line-height: 1.1;
+}
+
+.loc-cell-pct {
+  font-size: 0.68rem; color: #4a5568; margin-top: 0.2rem;
+}

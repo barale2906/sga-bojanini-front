@@ -139,7 +139,14 @@
         <table mat-table [dataSource]="locations()">
           <ng-container matColumnDef="code"><th mat-header-cell *matHeaderCellDef>Código</th><td mat-cell *matCellDef="let l"><code class="code-tag">{{ l.code }}</code></td></ng-container>
           <ng-container matColumnDef="name"><th mat-header-cell *matHeaderCellDef>Nombre</th><td mat-cell *matCellDef="let l">{{ l.name }}</td></ng-container>
-          <ng-container matColumnDef="capacity"><th mat-header-cell *matHeaderCellDef>Capacidad</th><td mat-cell *matCellDef="let l">{{ l.capacity || '—' }}</td></ng-container>
+          <ng-container matColumnDef="volume_cm3">
+            <th mat-header-cell *matHeaderCellDef>Volumen (cm³)</th>
+            <td mat-cell *matCellDef="let l">{{ l.volume_cm3 != null ? (l.volume_cm3 | number:'1.0-0') : '—' }}</td>
+          </ng-container>
+          <ng-container matColumnDef="max_weight_kg">
+            <th mat-header-cell *matHeaderCellDef>Peso máx. (kg)</th>
+            <td mat-cell *matCellDef="let l">{{ l.max_weight_kg != null ? (l.max_weight_kg | number:'1.0-2') : '—' }}</td>
+          </ng-container>
           <ng-container matColumnDef="is_active"><th mat-header-cell *matHeaderCellDef>Estado</th><td mat-cell *matCellDef="let l"><span class="badge" [class.badge--on]="l.is_active" [class.badge--off]="!l.is_active">{{ l.is_active ? 'Activa' : 'Inactiva' }}</span></td></ng-container>
           <ng-container matColumnDef="actions"><th mat-header-cell *matHeaderCellDef class="act">Acciones</th>
             <td mat-cell *matCellDef="let l" class="act">
@@ -154,4 +161,155 @@
       </div>
     </div>
   </mat-tab>
+  <!-- ── TAB 4: CAPACIDAD ── -->
+  <mat-tab label="Capacidad">
+    <div class="tab-body">
+
+      <!-- Selector de almacén -->
+      <div class="tab-toolbar" [formGroup]="capFilters">
+        <mat-form-field appearance="outline" class="select-field" style="min-width:260px">
+          <mat-label>Seleccionar almacén</mat-label>
+          <mat-select formControlName="warehouse_id">
+            <mat-option value="">— Selecciona un almacén —</mat-option>
+            @for (w of warehouses(); track w.id) {
+              <mat-option [value]="w.id">{{ w.name }} ({{ w.code }})</mat-option>
+            }
+          </mat-select>
+        </mat-form-field>
+      </div>
+
+      <app-loading-spinner [loading]="loadingCapacity()" [inline]="true"></app-loading-spinner>
+
+      <!-- Sin almacén seleccionado -->
+      @if (!loadingCapacity() && !warehouseCapacity()) {
+        <div class="cap-empty">
+          <mat-icon>warehouse</mat-icon>
+          <p>Selecciona un almacén para ver su uso de capacidad.</p>
+        </div>
+      }
+
+      <!-- Dashboard de capacidad -->
+      @if (warehouseCapacity(); as cap) {
+        <!-- KPIs globales del almacén -->
+        <div class="cap-header">
+          <h3 class="cap-title">
+            <mat-icon>warehouse</mat-icon>
+            {{ cap.name }}
+            <code class="code-tag">{{ cap.code }}</code>
+          </h3>
+        </div>
+
+        <div class="cap-kpis">
+          <!-- Volumen -->
+          <div class="cap-kpi-card">
+            <div class="cap-kpi-label">
+              <mat-icon class="cap-kpi-icon">straighten</mat-icon>
+              Volumen
+            </div>
+            <div class="cap-bar-wrap">
+              <div class="cap-bar">
+                <div class="cap-bar__fill {{ capClass(cap.capacity_volume.usage_pct) }}"
+                     [style.width.%]="cap.capacity_volume.usage_pct ?? 0"></div>
+              </div>
+              <span class="cap-pct">{{ fmtPct(cap.capacity_volume.usage_pct) }}</span>
+            </div>
+            <div class="cap-kpi-detail">
+              {{ volBadge(cap.capacity_volume) }}
+            </div>
+          </div>
+
+          <!-- Peso -->
+          <div class="cap-kpi-card">
+            <div class="cap-kpi-label">
+              <mat-icon class="cap-kpi-icon">scale</mat-icon>
+              Peso
+            </div>
+            <div class="cap-bar-wrap">
+              <div class="cap-bar">
+                <div class="cap-bar__fill {{ capClass(cap.capacity_weight.usage_pct) }}"
+                     [style.width.%]="cap.capacity_weight.usage_pct ?? 0"></div>
+              </div>
+              <span class="cap-pct">{{ fmtPct(cap.capacity_weight.usage_pct) }}</span>
+            </div>
+            <div class="cap-kpi-detail">
+              {{ wgtBadge(cap.capacity_weight) }}
+            </div>
+          </div>
+        </div>
+
+        <!-- Zonas + ubicaciones -->
+        @if (cap.zones.length === 0) {
+          <p class="cap-no-zones">Este almacén no tiene zonas configuradas.</p>
+        }
+
+        <mat-accordion class="cap-accordion" multi>
+          @for (zone of cap.zones; track zone.id) {
+            <mat-expansion-panel class="cap-zone-panel">
+              <mat-expansion-panel-header>
+                <mat-panel-title>
+                  <code class="code-tag" style="margin-right:0.5rem">{{ zone.code }}</code>
+                  {{ zone.name }}
+                </mat-panel-title>
+                <mat-panel-description>
+                  <span class="cap-zone-summary">
+                    <span class="cap-zone-pill {{ capClass(zone.capacity_volume.usage_pct) }}">
+                      Vol: {{ fmtPct(zone.capacity_volume.usage_pct) }}
+                    </span>
+                    <span class="cap-zone-pill {{ capClass(zone.capacity_weight.usage_pct) }}">
+                      Peso: {{ fmtPct(zone.capacity_weight.usage_pct) }}
+                    </span>
+                    <span class="cap-zone-locations">{{ zone.locations.length }} ubicaciones</span>
+                  </span>
+                </mat-panel-description>
+              </mat-expansion-panel-header>
+
+              <!-- Resumen de la zona -->
+              <div class="cap-zone-kpis">
+                <div class="cap-mini-kpi">
+                  <span class="cap-mini-label">Volumen zona</span>
+                  <div class="cap-bar-wrap">
+                    <div class="cap-bar cap-bar--sm">
+                      <div class="cap-bar__fill {{ capClass(zone.capacity_volume.usage_pct) }}"
+                           [style.width.%]="zone.capacity_volume.usage_pct ?? 0"></div>
+                    </div>
+                    <span class="cap-pct cap-pct--sm">{{ fmtPct(zone.capacity_volume.usage_pct) }}</span>
+                  </div>
+                  <span class="cap-mini-detail">{{ volBadge(zone.capacity_volume) }}</span>
+                </div>
+                <div class="cap-mini-kpi">
+                  <span class="cap-mini-label">Peso zona</span>
+                  <div class="cap-bar-wrap">
+                    <div class="cap-bar cap-bar--sm">
+                      <div class="cap-bar__fill {{ capClass(zone.capacity_weight.usage_pct) }}"
+                           [style.width.%]="zone.capacity_weight.usage_pct ?? 0"></div>
+                    </div>
+                    <span class="cap-pct cap-pct--sm">{{ fmtPct(zone.capacity_weight.usage_pct) }}</span>
+                  </div>
+                  <span class="cap-mini-detail">{{ wgtBadge(zone.capacity_weight) }}</span>
+                </div>
+              </div>
+
+              <!-- Mapa de ubicaciones (heatmap) -->
+              @if (zone.locations.length > 0) {
+                <div class="loc-grid">
+                  @for (loc of zone.locations; track loc.id) {
+                    <div class="loc-cell {{ capClass(loc.capacity_volume.usage_pct) }}"
+                         [matTooltip]="loc.name + ' · Vol: ' + fmtPct(loc.capacity_volume.usage_pct) + ' · Peso: ' + fmtPct(loc.capacity_weight.usage_pct)">
+                      <span class="loc-cell-code">{{ loc.code }}</span>
+                      <span class="loc-cell-pct">{{ fmtPct(loc.capacity_volume.usage_pct) }}</span>
+                    </div>
+                  }
+                </div>
+              } @else {
+                <p style="color:#a0aec0;font-size:0.85rem;margin:0.5rem 0 0">Sin ubicaciones en esta zona.</p>
+              }
+
+            </mat-expansion-panel>
+          }
+        </mat-accordion>
+      }
+
+    </div>
+  </mat-tab>
+
 </mat-tab-group>
