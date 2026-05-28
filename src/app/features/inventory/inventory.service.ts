@@ -55,11 +55,38 @@ export interface StockItem {
 }
 
 export interface Movement {
-  id: number; product_id: number; warehouse_id: number;
-  movement_type: string; quantity: number; reason: string | null;
+  id: number;
+  product_id: number;
+  warehouse_id: number;
+  batch_id: number | null;
+  movement_type: string;
+  quantity: number;
+  reason: string | null;
+  user_id: number;
   created_at: string;
+  product_name: string;
+  batch_lot_number: string | null;
+  user_name: string;
+  // Nested objects (algunos endpoints los incluyen)
   product?: { id: number; code: string; name: string };
   warehouse?: { id: number; name: string };
+}
+
+export interface MovementReportRow {
+  date: string;
+  type: string;
+  product: string;
+  warehouse: string;
+  quantity: number;
+  user: string;
+}
+
+export interface MovementReport {
+  generated: string;
+  date_from: string;
+  date_to: string;
+  headers: string[];
+  rows: MovementReportRow[];
 }
 
 @Injectable({ providedIn: 'root' })
@@ -119,14 +146,32 @@ export class InventoryService {
   }
 
   // Movements
-  getMovements(f: { warehouse_id?: number; product_id?: number; movement_type?: string; per_page?: number; page?: number } = {}): Observable<PaginatedResponse<Movement>> {
+  getMovements(f: {
+    warehouse_id?: number;
+    product_id?: number;
+    movement_type?: string;
+    date_from?: string;
+    date_to?: string;
+    per_page?: number;
+    page?: number;
+  } = {}): Observable<PaginatedResponse<Movement>> {
     let p = new HttpParams();
-    if (f.warehouse_id) p = p.set('warehouse_id', String(f.warehouse_id));
-    if (f.product_id) p = p.set('product_id', String(f.product_id));
+    if (f.warehouse_id)  p = p.set('warehouse_id',  String(f.warehouse_id));
+    if (f.product_id)    p = p.set('product_id',    String(f.product_id));
     if (f.movement_type) p = p.set('movement_type', f.movement_type);
-    if (f.per_page) p = p.set('per_page', String(f.per_page));
-    if (f.page) p = p.set('page', String(f.page));
+    if (f.date_from)     p = p.set('date_from',     f.date_from);
+    if (f.date_to)       p = p.set('date_to',       f.date_to);
+    if (f.per_page)      p = p.set('per_page',      String(f.per_page));
+    if (f.page)          p = p.set('page',          String(f.page));
     return this.http.get<PaginatedResponse<Movement>>(`${this.api}/movements`, { params: p });
+  }
+
+  getMovementsReport(f: { date_from?: string; date_to?: string; type?: string } = {}): Observable<ApiResponse<MovementReport>> {
+    let p = new HttpParams();
+    if (f.date_from) p = p.set('date_from', f.date_from);
+    if (f.date_to) p = p.set('date_to', f.date_to);
+    if (f.type) p = p.set('type', f.type);
+    return this.http.get<ApiResponse<MovementReport>>(`${this.api}/reports/movements`, { params: p });
   }
 
   entry(payload: any): Observable<ApiResponse<any>> {

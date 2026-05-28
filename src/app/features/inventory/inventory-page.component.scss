@@ -6,7 +6,14 @@
 }
 .action-bar { display: flex; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 1.5rem; }
 .tab-body { padding: 1.5rem 0; }
-.tab-toolbar { display: flex; gap: 0.75rem; align-items: flex-end; flex-wrap: wrap; margin-bottom: 1rem; .sel { width: 180px; } }
+.tab-toolbar {
+  display: flex; gap: 0.75rem; align-items: flex-end; flex-wrap: wrap; margin-bottom: 1rem;
+  .sel { width: 180px; }
+  .date-field {
+    width: 170px;
+    input[type="date"] { cursor: pointer; }
+  }
+}
 .table-wrap { border-radius: 8px; overflow: hidden; background: #fff; }
 .prod-cell { display: flex; align-items: center; gap: 0.5rem; }
 .code-tag { background: #EDF2F7; color: #4a5568; padding: 0.15rem 0.5rem; border-radius: 4px; font-size: 0.8rem; font-family: monospace; }
