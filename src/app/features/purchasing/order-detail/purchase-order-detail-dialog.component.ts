@@ -33,7 +33,7 @@ export class PurchaseOrderDetailDialogComponent implements OnInit {
   errors = signal<string[]>([]);
   commentsForm = this.fb.group({ comments: [''] });
 
-  itemCols = ['product', 'presentation', 'quantity', 'unit_price', 'subtotal'];
+  itemCols = ['product', 'presentation', 'quantity', 'unit_price', 'tax_rate', 'subtotal'];
   receiveForm = this.fb.group({ items: this.fb.array([]) });
   get receiveItems() { return this.receiveForm.get('items') as FormArray; }
 
@@ -88,7 +88,7 @@ export class PurchaseOrderDetailDialogComponent implements OnInit {
     });
   }
 
-  formatCurrency(v: number): string {
-    return new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(v);
+  formatCurrency(v: number | string): string {
+    return new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(Number(v));
   }
 }

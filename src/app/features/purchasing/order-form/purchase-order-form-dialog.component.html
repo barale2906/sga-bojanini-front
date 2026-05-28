@@ -1,13 +1,27 @@
-<h2 mat-dialog-title>Nueva Orden de Compra</h2>
+<h2 mat-dialog-title>
+  Nueva Orden de Compra
+  @if (data.orderLabel) { <span class="order-label">{{ data.orderLabel }}</span> }
+  @if (data.prefillItems?.length > 0 && !data.orderLabel) { <span class="order-label">desde sugerencias de reorden</span> }
+</h2>
 <mat-dialog-content>
   <app-form-errors [errors]="errors()"></app-form-errors>
   <form [formGroup]="form" class="form-layout">
     <div class="header-row">
-      <mat-form-field appearance="outline"><mat-label>Proveedor *</mat-label>
-        <mat-select formControlName="supplier_id">
-          @for (s of data.suppliers; track s.id) { <mat-option [value]="s.id">{{ s.name }}</mat-option> }
-        </mat-select>
-      </mat-form-field>
+      <div class="supplier-field-wrap">
+        <mat-form-field appearance="outline" class="w-full"><mat-label>Proveedor *</mat-label>
+          <mat-select formControlName="supplier_id" (selectionChange)="onSupplierChange($event.value)">
+            @for (s of filteredSuppliers(); track s.id) {
+              <mat-option [value]="s.id">
+                {{ s.name }}
+                @if (isPreferredSupplier(s.id)) { <span style="color:#d69e2e"> ★</span> }
+              </mat-option>
+            }
+          </mat-select>
+        </mat-form-field>
+        @if (filteredSuppliers().length < data.suppliers?.length) {
+          <span class="supplier-hint">{{ filteredSuppliers().length }} de {{ data.suppliers?.length }} proveedores ofrecen estos productos</span>
+        }
+      </div>
       <mat-form-field appearance="outline"><mat-label>Almacén destino *</mat-label>
         <mat-select formControlName="warehouse_id">
           @for (w of data.warehouses; track w.id) { <mat-option [value]="w.id">{{ w.name }}</mat-option> }
@@ -39,7 +53,7 @@
                 @if (getItemPresentations($index).length === 0 && $any(item).get('product_id')?.value) {
                   <mat-option disabled>Sin presentaciones configuradas</mat-option>
                 }
-                @for (pr of getItemPresentations($index); track pr.id) {
+                @for (pr of getAvailablePresentations($index); track pr.id) {
                   <mat-option [value]="pr.id">
                     {{ pr.name }}
                     <span style="color:#718096;font-size:0.83em"> · ×{{ pr.factor_to_base }}</span>
@@ -65,6 +79,13 @@
             <mat-form-field appearance="outline" class="item-price">
               <mat-label>Precio unit. *</mat-label>
               <input matInput type="number" formControlName="unit_price" min="0" />
+            </mat-form-field>
+
+            <!-- IVA -->
+            <mat-form-field appearance="outline" class="item-tax">
+              <mat-label>IVA %</mat-label>
+              <input matInput type="number" formControlName="tax_rate" min="0" max="100" step="1" placeholder="0" />
+              <mat-hint>Vacío = exento</mat-hint>
             </mat-form-field>
 
             <!-- Eliminar ítem -->
@@ -97,15 +118,27 @@
     </div>
     <button mat-stroked-button type="button" (click)="addItem()"><mat-icon>add</mat-icon> Agregar ítem</button>
 
-    <div class="total-row">
-      <span>Total estimado:</span>
-      <strong>{{ formatCurrency(calcTotal()) }}</strong>
+    <div class="totals-block">
+      <div class="total-line">
+        <span>Subtotal:</span>
+        <span>{{ formatCurrency(totals.subtotal) }}</span>
+      </div>
+      @for (t of totals.taxBreakdown; track t.rate) {
+        <div class="total-line tax-line">
+          <span>IVA {{ t.rate }}%:</span>
+          <span>{{ formatCurrency(t.amount) }}</span>
+        </div>
+      }
+      <div class="total-line total-final">
+        <span>Total estimado:</span>
+        <strong>{{ formatCurrency(totals.total) }}</strong>
+      </div>
     </div>
   </form>
 </mat-dialog-content>
 <mat-dialog-actions align="end">
   <button mat-button [mat-dialog-close]="false">Cancelar</button>
-  <button mat-raised-button color="primary" (click)="save()" [disabled]="form.invalid || saving()">
+  <button mat-raised-button color="primary" (click)="save()" [disabled]="form.invalid || saving() || hasDuplicates">
     @if (saving()) { <mat-spinner diameter="18"></mat-spinner> } Crear Orden (borrador)
   </button>
 </mat-dialog-actions>

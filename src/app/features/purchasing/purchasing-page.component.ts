@@ -10,9 +10,11 @@ import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatSelectModule } from '@angular/material/select';
 import { MatTooltipModule } from '@angular/material/tooltip';
+import { MatCheckboxModule } from '@angular/material/checkbox';
 import { MatDialog } from '@angular/material/dialog';
 import { MatSnackBar } from '@angular/material/snack-bar';
-import { PurchasingService, PurchaseOrder } from './purchasing.service';
+import { SelectionModel } from '@angular/cdk/collections';
+import { PurchasingService, PurchaseOrder, ReorderSuggestion } from './purchasing.service';
 import { CatalogService } from '../catalog/catalog.service';
 import { WarehouseService } from '../warehouse/warehouse.service';
 import { PaginationMeta } from '../../core/models/api-response.model';
@@ -29,7 +31,7 @@ import { PurchaseOrderDetailDialogComponent } from './order-detail/purchase-orde
   standalone: true,
   imports: [
     CommonModule, ReactiveFormsModule, MatTabsModule, MatTableModule, MatPaginatorModule,
-    MatButtonModule, MatIconModule, MatFormFieldModule, MatInputModule, MatSelectModule, MatTooltipModule,
+    MatButtonModule, MatIconModule, MatFormFieldModule, MatInputModule, MatSelectModule, MatTooltipModule, MatCheckboxModule,
     PageHeaderComponent, LoadingSpinnerComponent, PermissionDirective, DateFormatPipe,
   ],
   templateUrl: './purchasing-page.component.html',
@@ -45,12 +47,13 @@ export class PurchasingPageComponent implements OnInit {
 
   orders = signal<PurchaseOrder[]>([]);
   meta = signal<PaginationMeta>({ current_page: 1, last_page: 1, per_page: 25, total: 0 });
-  suggestions = signal<any[]>([]);
+  suggestions = signal<ReorderSuggestion[]>([]);
   loading = signal(false);
 
   cols = ['actions', 'code', 'supplier', 'warehouse', 'status', 'total', 'created_at'];
-  suggCols = ['product', 'current_stock', 'reorder_point', 'suggested_qty', 'supplier'];
+  suggCols = ['select', 'product', 'current_stock', 'reorder_point', 'suggested_qty', 'supplier', 'actions'];
   filters = this.fb.group({ status: [''] });
+  selectedSugg = new SelectionModel<ReorderSuggestion>(true, []);
 
   statuses = ['draft','pending_approval','approved','sent','partially_received','received','rejected','cancelled'];
 
@@ -77,14 +80,23 @@ export class PurchasingPageComponent implements OnInit {
   }
 
   loadSuggestions(): void {
-    this.svc.getSuggestions().subscribe({ next: r => this.suggestions.set(r.data), error: () => {} });
+    this.svc.getSuggestions().subscribe({
+      next: r => { this.suggestions.set(r.data); this.selectedSugg.clear(); },
+      error: () => {},
+    });
   }
 
   openNewOrder(): void {
     this.dialog.open(PurchaseOrderFormDialogComponent, {
       data: { order: null, suppliers: this.suppliers(), warehouses: this.warehouses(), products: this.products(), purchasingSvc: this.svc, catalogSvc: this.cSvc },
       width: '900px', maxWidth: '95vw', maxHeight: '90vh',
-    }).afterClosed().subscribe(ok => { if (ok) { this.snack.open('Orden creada', 'OK', { duration: 3000 }); this.loadOrders(); } });
+    }).afterClosed().subscribe(ok => {
+      if (ok) {
+        this.snack.open('Orden creada', 'OK', { duration: 3000 });
+        this.loadOrders();
+        this.loadSuggestions();
+      }
+    });
   }
 
   openDetail(order: PurchaseOrder): void {
@@ -107,5 +119,68 @@ export class PurchasingPageComponent implements OnInit {
 
   formatCurrency(v: number): string {
     return new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(v);
+  }
+
+  isAllSuggSelected(): boolean {
+    return this.suggestions().length > 0 && this.selectedSugg.selected.length === this.suggestions().length;
+  }
+
+  toggleAllSugg(): void {
+    if (this.isAllSuggSelected()) {
+      this.selectedSugg.clear();
+    } else {
+      this.suggestions().forEach(s => this.selectedSugg.select(s));
+    }
+  }
+
+  createOrdersFromSuggestions(): void {
+    const selected = this.selectedSugg.selected;
+    if (!selected.length) return;
+
+    const groupMap = new Map<string, { supplier: ReorderSuggestion['preferred_supplier'] | null; items: ReorderSuggestion[] }>();
+    for (const s of selected) {
+      const key = s.preferred_supplier ? String(s.preferred_supplier.id) : '__sin_proveedor__';
+      if (!groupMap.has(key)) groupMap.set(key, { supplier: s.preferred_supplier ?? null, items: [] });
+      groupMap.get(key)!.items.push(s);
+    }
+    const groups = Array.from(groupMap.values());
+    this.openSuggOrderSequentially(groups, 0);
+  }
+
+  private openSuggOrderSequentially(
+    groups: Array<{ supplier: ReorderSuggestion['preferred_supplier'] | null; items: ReorderSuggestion[] }>,
+    index: number
+  ): void {
+    if (index >= groups.length) return;
+    const group = groups[index];
+    const total = groups.length;
+
+    this.dialog.open(PurchaseOrderFormDialogComponent, {
+      data: {
+        order: null,
+        suppliers: this.suppliers(),
+        warehouses: this.warehouses(),
+        products: this.products(),
+        purchasingSvc: this.svc,
+        catalogSvc: this.cSvc,
+        prefillSupplierId: group.supplier?.id ?? null,
+        prefillItems: group.items.map(s => ({ product_id: s.product_id, suggested_quantity: s.suggested_quantity })),
+        orderLabel: total > 1 ? `Orden ${index + 1} de ${total}${group.supplier ? ' — ' + group.supplier.name : ''}` : null,
+      },
+      width: '900px', maxWidth: '95vw', maxHeight: '90vh',
+    }).afterClosed().subscribe(ok => {
+      if (ok) {
+        const msg = total > 1 ? `Orden ${index + 1}/${total} creada` : 'Orden creada';
+        this.snack.open(msg, 'OK', { duration: 3000 });
+        this.loadOrders();
+        // Eliminar inmediatamente los productos gestionados de la lista
+        const orderedIds = new Set(group.items.map(s => s.product_id));
+        this.suggestions.update(list => list.filter(s => !orderedIds.has(s.product_id)));
+        group.items.forEach(s => this.selectedSugg.deselect(s));
+        // Recargar desde el backend para sincronizar estado real
+        this.loadSuggestions();
+      }
+      this.openSuggOrderSequentially(groups, index + 1);
+    });
   }
 }

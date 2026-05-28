@@ -109,6 +109,11 @@ export interface SupplierProduct extends Product {
   pivot: SupplierProductPivot;
 }
 
+/** Proveedor con datos del pivot proveedor↔producto (vista desde el producto) */
+export interface ProductSupplier extends Supplier {
+  pivot: SupplierProductPivot;
+}
+
 export interface SupplierCategoryAssignResult {
   assigned: number;
   skipped: number;
@@ -381,6 +386,10 @@ export class CatalogService {
 
   getSupplierProducts(supplierId: number): Observable<ApiResponse<SupplierProduct[]>> {
     return this.http.get<ApiResponse<SupplierProduct[]>>(`${this.api}/suppliers/${supplierId}/products`);
+  }
+
+  getProductSuppliers(productId: number): Observable<ApiResponse<ProductSupplier[]>> {
+    return this.http.get<ApiResponse<ProductSupplier[]>>(`${this.api}/products/${productId}/suppliers`);
   }
 
   assignSupplierProduct(supplierId: number, productId: number, payload: Partial<SupplierProductPivot> = {}): Observable<ApiResponse<SupplierProduct>> {

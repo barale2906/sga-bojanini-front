@@ -4,9 +4,18 @@ import { Observable } from 'rxjs';
 import { environment } from '../../../environments/environment';
 import { ApiResponse, PaginatedResponse } from '../../core/models/api-response.model';
 
+export interface TaxBreakdownLine {
+  tax_rate: number;
+  tax_amount: number;
+}
+
 export interface PurchaseOrderItem {
   id?: number; product_id: number; product_presentation_id: number;
-  quantity: number; unit_price: number; notes?: string;
+  quantity: number; unit_price: number | string;
+  tax_rate?: number | string;
+  tax_amount?: number | string;
+  total_price?: number | string;
+  notes?: string;
   product?: { id: number; code: string; name: string };
   presentation?: { id: number; name: string; factor_to_base: number };
   subtotal?: number;
@@ -15,10 +24,22 @@ export interface PurchaseOrderItem {
 export interface PurchaseOrder {
   id: number; code: string; supplier_id: number; warehouse_id: number;
   status: string; notes: string | null; expected_delivery_date: string | null;
-  subtotal: number; tax_amount: number; total_amount: number; created_at: string;
+  subtotal: number | string; tax_amount: number | string; total_amount: number | string;
+  created_at: string;
   supplier?: { id: number; name: string };
   warehouse?: { id: number; name: string };
   items?: PurchaseOrderItem[];
+  tax_breakdown?: TaxBreakdownLine[];
+}
+
+export interface ReorderSuggestion {
+  product_id: number;
+  product_name: string;
+  product_code: string;
+  current_stock: number;
+  reorder_point: number;
+  suggested_quantity: number;
+  preferred_supplier?: { id: number; name: string };
 }
 
 export interface ApprovalFlow {
@@ -75,8 +96,8 @@ export class PurchasingService {
     return this.http.post<ApiResponse<PurchaseOrder>>(`${this.api}/purchase-orders/${id}/receive`, { items });
   }
 
-  getSuggestions(): Observable<ApiResponse<any[]>> {
-    return this.http.get<ApiResponse<any[]>>(`${this.api}/purchase-orders/suggestions`);
+  getSuggestions(): Observable<ApiResponse<ReorderSuggestion[]>> {
+    return this.http.get<ApiResponse<ReorderSuggestion[]>>(`${this.api}/purchase-orders/suggestions`);
   }
 
   // Approval Flows

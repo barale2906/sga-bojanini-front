@@ -23,13 +23,32 @@
     <ng-container matColumnDef="presentation"><th mat-header-cell *matHeaderCellDef>Presentación</th><td mat-cell *matCellDef="let i">{{ i.presentation?.name || '—' }}</td></ng-container>
     <ng-container matColumnDef="quantity"><th mat-header-cell *matHeaderCellDef>Cant.</th><td mat-cell *matCellDef="let i">{{ i.quantity }}</td></ng-container>
     <ng-container matColumnDef="unit_price"><th mat-header-cell *matHeaderCellDef>Precio unit.</th><td mat-cell *matCellDef="let i">{{ formatCurrency(i.unit_price) }}</td></ng-container>
-    <ng-container matColumnDef="subtotal"><th mat-header-cell *matHeaderCellDef>Subtotal</th><td mat-cell *matCellDef="let i">{{ formatCurrency(i.subtotal || i.unit_price * i.quantity) }}</td></ng-container>
+    <ng-container matColumnDef="tax_rate">
+      <th mat-header-cell *matHeaderCellDef>IVA</th>
+      <td mat-cell *matCellDef="let i">
+        @if (+i.tax_rate > 0) {
+          <span class="tax-badge">{{ +i.tax_rate | number:'1.0-0' }}%</span>
+        } @else {
+          <span class="exempt-badge">Exento</span>
+        }
+      </td>
+    </ng-container>
+    <ng-container matColumnDef="subtotal"><th mat-header-cell *matHeaderCellDef>Total ítem</th><td mat-cell *matCellDef="let i">{{ formatCurrency(i.total_price ?? i.unit_price) }}</td></ng-container>
     <tr mat-header-row *matHeaderRowDef="itemCols"></tr>
     <tr mat-row *matRowDef="let r; columns: itemCols;"></tr>
     <tr class="mat-row" *matNoDataRow><td class="no-data" [attr.colspan]="itemCols.length">Sin ítems</td></tr>
   </table>
 
-  <mat-divider style="margin:1rem 0"></mat-divider>
+  <!-- Desglose de totales -->
+  <div class="order-totals">
+    <div class="totals-line"><span>Subtotal:</span><span>{{ formatCurrency(order().subtotal) }}</span></div>
+    @for (t of order().tax_breakdown || []; track t.tax_rate) {
+      <div class="totals-line tax-line"><span>IVA {{ t.tax_rate | number:'1.0-2' }}%:</span><span>{{ formatCurrency(t.tax_amount) }}</span></div>
+    }
+    <div class="totals-line totals-final"><span>Total:</span><strong>{{ formatCurrency(order().total_amount) }}</strong></div>
+  </div>
+
+  <mat-divider style="margin:0.5rem 0 1rem"></mat-divider>
 
   <!-- Acciones de flujo -->
   <h3>Flujo de Aprobación</h3>
