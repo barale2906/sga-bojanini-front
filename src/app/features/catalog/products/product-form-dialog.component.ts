@@ -13,7 +13,7 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { MatChipsModule } from '@angular/material/chips';
 import { switchMap, map, of, forkJoin } from 'rxjs';
-import { CatalogService, Product, Category, UnitOfMeasure, ProductPresentation } from '../catalog.service';
+import { CatalogService, Product, Category, UnitOfMeasure, ProductPresentation, ProductClassification } from '../catalog.service';
 import { FormErrorsComponent } from '../../../shared/components/form-errors/form-errors.component';
 import { VolumeCalculatorComponent } from '../../../shared/components/volume-calculator/volume-calculator.component';
 
@@ -21,10 +21,9 @@ export interface ProductDialogData {
   product: Product | null;
   categories: Category[];
   units: UnitOfMeasure[];
-  /** Productos simples activos para elegir componentes de kit */
   simpleProducts: Product[];
-  /** Empaques del catálogo global para seleccionar en el paso de presentaciones */
   catalogPresentations: ProductPresentation[];
+  classifications: ProductClassification[];
 }
 
 @Component({
@@ -53,6 +52,15 @@ export interface ProductDialogData {
     .section-label {
       font-size:0.78rem; font-weight:700; color:#4a5568;
       text-transform:uppercase; letter-spacing:0.04em; margin:0.25rem 0 0;
+    }
+
+    /* Info hint (clasificación) */
+    .info-hint {
+      display:flex; align-items:center; gap:0.5rem;
+      padding:0.5rem 0.75rem;
+      background:#ebf8ff; border:1px solid #bee3f8;
+      border-radius:6px; font-size:0.82rem; color:#2c5282;
+      mat-icon { flex-shrink:0; color:#3182ce; }
     }
 
     /* Tipo de producto cards */
@@ -128,6 +136,16 @@ export class ProductFormDialogComponent implements OnInit {
 
   isKit = computed(() => this._typeSig() === 'kit');
 
+  // ── Clasificación reactiva ─────────────────────────────────
+  _classifSig            = signal<ProductClassification | null>(null);
+  selectedClassification = computed(() => this._classifSig());
+  showConcentration      = computed(() => this._classifSig()?.has_concentration ?? false);
+  showRiskLevel          = computed(() => this._classifSig()?.has_risk_level ?? false);
+  showLabBrand           = computed(() => this._classifSig()?.has_lab_brand ?? false);
+  showPharmaFields       = computed(() => this._classifSig()?.has_pharma_fields ?? false);
+  showDeviceFields       = computed(() => this._classifSig()?.has_device_fields ?? false);
+  showSanitaryReg        = computed(() => this._classifSig()?.has_sanitary_registration ?? false);
+
   // ── Presentaciones ─────────────────────────────────────────
   selectedPresentationIds  = signal<Set<number>>(new Set());
   _originalPresIds         = signal<Set<number>>(new Set());
@@ -176,6 +194,17 @@ export class ProductFormDialogComponent implements OnInit {
     sku:         [null as string | null],
     category_id: [null as number | null, Validators.required],
     description: [''],
+  });
+
+  stepClassif = this.fb.group({
+    classification_id:       [null as number | null],
+    concentration:           [null as string | null, Validators.maxLength(100)],
+    risk_level:              [null as string | null, Validators.maxLength(100)],
+    lab_brand:               [null as string | null, Validators.maxLength(255)],
+    pharmaceutical_form:     [null as string | null, Validators.maxLength(150)],
+    commercial_presentation: [null as string | null, Validators.maxLength(150)],
+    serie_reference:         [null as string | null, Validators.maxLength(150)],
+    useful_life:             [null as string | null, Validators.maxLength(100)],
   });
 
   stepInv = this.fb.group({
@@ -269,6 +298,13 @@ export class ProductFormDialogComponent implements OnInit {
       this._baseUnitSig.set(v);
     });
 
+    // Sincronizar _classifSig y validadores dinámicos
+    this.stepClassif.get('classification_id')!.valueChanges.subscribe(id => {
+      const classif = id ? (this.data.classifications.find(c => c.id === id) ?? null) : null;
+      this._classifSig.set(classif);
+      this._updateLabBrandValidator(classif);
+    });
+
     if (this.data.product) {
       const p = this.data.product;
       this._typeSig.set(p.product_type);
@@ -276,6 +312,22 @@ export class ProductFormDialogComponent implements OnInit {
 
       this.stepTipo.patchValue({ product_type: p.product_type });
       this.stepIdent.patchValue({ name: p.name, code: p.code, sku: p.sku, category_id: p.category_id, description: p.description ?? '' });
+      this.stepClassif.patchValue({
+        classification_id:       p.classification_id ?? null,
+        concentration:           p.concentration           ?? null,
+        risk_level:              p.risk_level              ?? null,
+        lab_brand:               p.lab_brand               ?? null,
+        pharmaceutical_form:     p.pharmaceutical_form     ?? null,
+        commercial_presentation: p.commercial_presentation ?? null,
+        serie_reference:         p.serie_reference         ?? null,
+        useful_life:             p.useful_life             ?? null,
+      });
+      if (p.classification_id) {
+        const classif = this.data.classifications.find(c => c.id === p.classification_id)
+          ?? (p.classification ?? null);
+        this._classifSig.set(classif);
+        this._updateLabBrandValidator(classif);
+      }
       this.stepInv.patchValue({
         base_unit_id: p.base_unit_id,
         requires_cold_chain: p.requires_cold_chain,
@@ -294,6 +346,16 @@ export class ProductFormDialogComponent implements OnInit {
         this._loadAssignedPresentations(p.id);
       }
     }
+  }
+
+  private _updateLabBrandValidator(classif: ProductClassification | null | undefined): void {
+    const ctrl = this.stepClassif.get('lab_brand')!;
+    if (classif?.has_lab_brand) {
+      ctrl.setValidators([Validators.required, Validators.maxLength(255)]);
+    } else {
+      ctrl.setValidators([Validators.maxLength(255)]);
+    }
+    ctrl.updateValueAndValidity();
   }
 
   private _loadExistingComponents(productId: number): void {
@@ -342,25 +404,34 @@ export class ProductFormDialogComponent implements OnInit {
 
     const ti = this.stepTipo.value;
     const si = this.stepIdent.value;
+    const sc = this.stepClassif.value;
     const iv = this.stepInv.value;
     const sf = this.stepFinal.value;
 
     const basePayload: any = {
-      product_type:        ti.product_type,
-      name:                si.name,
-      code:                si.code,
-      sku:                 si.sku || null,
-      category_id:         si.category_id,
-      description:         si.description || null,
-      base_unit_id:        iv.base_unit_id,
-      requires_cold_chain: iv.requires_cold_chain,
-      reorder_point:       iv.reorder_point ?? 0,
-      reorder_quantity:    iv.reorder_quantity ?? 0,
-      min_stock:           iv.min_stock ?? 0,
-      max_stock:           iv.max_stock ?? 0,
-      volume_cm3:          iv.volume_cm3  != null ? Number(iv.volume_cm3)  : null,
-      weight_kg:           iv.weight_kg   != null ? Number(iv.weight_kg)   : null,
-      is_active:           sf.is_active ?? true,
+      product_type:            ti.product_type,
+      name:                    si.name,
+      code:                    si.code,
+      sku:                     si.sku || null,
+      category_id:             si.category_id,
+      description:             si.description || null,
+      classification_id:       sc.classification_id || null,
+      concentration:           sc.concentration           || null,
+      risk_level:              sc.risk_level              || null,
+      lab_brand:               sc.lab_brand               || null,
+      pharmaceutical_form:     sc.pharmaceutical_form     || null,
+      commercial_presentation: sc.commercial_presentation || null,
+      serie_reference:         sc.serie_reference         || null,
+      useful_life:             sc.useful_life             || null,
+      base_unit_id:            iv.base_unit_id,
+      requires_cold_chain:     iv.requires_cold_chain,
+      reorder_point:           iv.reorder_point ?? 0,
+      reorder_quantity:        iv.reorder_quantity ?? 0,
+      min_stock:               iv.min_stock ?? 0,
+      max_stock:               iv.max_stock ?? 0,
+      volume_cm3:              iv.volume_cm3 != null ? Number(iv.volume_cm3) : null,
+      weight_kg:               iv.weight_kg  != null ? Number(iv.weight_kg)  : null,
+      is_active:               sf.is_active ?? true,
     };
 
     const kitComponents = (iv.components as any[]).map(c => ({

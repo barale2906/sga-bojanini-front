@@ -28,6 +28,7 @@ export interface Product {
   id: number;
   category_id: number;
   base_unit_id: number;
+  classification_id: number | null;
   product_type: 'simple' | 'kit';
   name: string;
   code: string;
@@ -38,13 +39,20 @@ export interface Product {
   reorder_quantity: number;
   min_stock: number;
   max_stock: number;
-  /** Volumen de una unidad del producto en cm³ (para cálculo de capacidad de ubicaciones) */
   volume_cm3: number | null;
-  /** Peso de una unidad del producto en kg (para cálculo de capacidad de ubicaciones) */
   weight_kg: number | null;
+  concentration: string | null;
+  risk_level: string | null;
+  lab_brand: string | null;
+  pharmaceutical_form: string | null;
+  commercial_presentation: string | null;
+  serie_reference: string | null;
+  useful_life: string | null;
   is_active: boolean;
   category?: Pick<Category, 'id' | 'name' | 'code'>;
   base_unit?: Pick<UnitOfMeasure, 'id' | 'name' | 'abbreviation'>;
+  classification?: ProductClassification;
+  sanitary_registrations?: SanitaryRegistration[];
   components?: KitComponent[];
   created_at?: string;
 }
@@ -143,6 +151,29 @@ export interface KitExplosionLine {
   component_code: string;
   component_name: string;
   quantity_base: number;
+}
+
+export interface ProductClassification {
+  id: number;
+  code: string;
+  name: string;
+  description: string | null;
+  has_sanitary_registration: boolean;
+  has_concentration: boolean;
+  has_risk_level: boolean;
+  has_pharma_fields: boolean;
+  has_device_fields: boolean;
+  has_lab_brand: boolean;
+  is_active: boolean;
+}
+
+export interface SanitaryRegistration {
+  id: number;
+  product_id: number;
+  registration_number: string;
+  expiry_date: string;
+  is_active: boolean;
+  is_expired: boolean;
 }
 
 // ── Service ──────────────────────────────────────────────────────
@@ -413,6 +444,51 @@ export class CatalogService {
 
   removeSupplierProductsByCategory(supplierId: number, categoryId: number): Observable<ApiResponse<SupplierCategoryRemoveResult>> {
     return this.http.delete<ApiResponse<SupplierCategoryRemoveResult>>(`${this.api}/suppliers/${supplierId}/products/by-category`, { body: { category_id: categoryId } });
+  }
+
+  // ── Clasificaciones de Producto ──────────────────────────────
+
+  getProductClassifications(filters: { search?: string; is_active?: string } = {}): Observable<ApiResponse<ProductClassification[]>> {
+    let params = new HttpParams();
+    if (filters.search) params = params.set('search', filters.search);
+    if (filters.is_active !== undefined && filters.is_active !== '') params = params.set('is_active', filters.is_active);
+    return this.http.get<ApiResponse<ProductClassification[]>>(`${this.api}/product-classifications`, { params });
+  }
+
+  getProductClassification(id: number): Observable<ApiResponse<ProductClassification>> {
+    return this.http.get<ApiResponse<ProductClassification>>(`${this.api}/product-classifications/${id}`);
+  }
+
+  createProductClassification(payload: Partial<ProductClassification>): Observable<ApiResponse<ProductClassification>> {
+    return this.http.post<ApiResponse<ProductClassification>>(`${this.api}/product-classifications`, payload);
+  }
+
+  updateProductClassification(id: number, payload: Partial<ProductClassification>): Observable<ApiResponse<ProductClassification>> {
+    return this.http.put<ApiResponse<ProductClassification>>(`${this.api}/product-classifications/${id}`, payload);
+  }
+
+  deleteProductClassification(id: number): Observable<ApiResponse<null>> {
+    return this.http.delete<ApiResponse<null>>(`${this.api}/product-classifications/${id}`);
+  }
+
+  // ── Registros Sanitarios ─────────────────────────────────────
+
+  getSanitaryRegistrations(productId: number, filters: { only_active?: boolean } = {}): Observable<ApiResponse<SanitaryRegistration[]>> {
+    let params = new HttpParams();
+    if (filters.only_active) params = params.set('only_active', 'true');
+    return this.http.get<ApiResponse<SanitaryRegistration[]>>(`${this.api}/products/${productId}/sanitary-registrations`, { params });
+  }
+
+  createSanitaryRegistration(productId: number, payload: Partial<SanitaryRegistration>): Observable<ApiResponse<SanitaryRegistration>> {
+    return this.http.post<ApiResponse<SanitaryRegistration>>(`${this.api}/products/${productId}/sanitary-registrations`, payload);
+  }
+
+  updateSanitaryRegistration(productId: number, regId: number, payload: Partial<SanitaryRegistration>): Observable<ApiResponse<SanitaryRegistration>> {
+    return this.http.put<ApiResponse<SanitaryRegistration>>(`${this.api}/products/${productId}/sanitary-registrations/${regId}`, payload);
+  }
+
+  deleteSanitaryRegistration(productId: number, regId: number): Observable<ApiResponse<null>> {
+    return this.http.delete<ApiResponse<null>>(`${this.api}/products/${productId}/sanitary-registrations/${regId}`);
   }
 
   // ── Importación masiva ───────────────────────────────────────

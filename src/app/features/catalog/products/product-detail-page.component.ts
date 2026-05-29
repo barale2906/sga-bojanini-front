@@ -16,12 +16,13 @@ import { MatTooltipModule } from '@angular/material/tooltip';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { MatChipsModule } from '@angular/material/chips';
 import { MatDialog } from '@angular/material/dialog';
-import { CatalogService, Product, ProductPresentation, KitComponent, UnitOfMeasure } from '../catalog.service';
+import { CatalogService, Product, ProductPresentation, KitComponent, UnitOfMeasure, SanitaryRegistration } from '../catalog.service';
 import { PageHeaderComponent } from '../../../shared/components/page-header/page-header.component';
 import { LoadingSpinnerComponent } from '../../../shared/components/loading-spinner/loading-spinner.component';
 import { PermissionDirective } from '../../../shared/directives/permission.directive';
 import { ConfirmDialogComponent } from '../../../shared/components/confirm-dialog/confirm-dialog.component';
 import { PresentationFormDialogComponent, PresentationDialogData } from './presentation-form-dialog.component';
+import { SanitaryRegistrationFormDialogComponent, SanitaryRegistrationDialogData } from './sanitary-registration-form-dialog.component';
 
 @Component({
   selector: 'app-product-detail-page',
@@ -33,6 +34,7 @@ import { PresentationFormDialogComponent, PresentationDialogData } from './prese
     MatTooltipModule, MatChipsModule,
     PageHeaderComponent, LoadingSpinnerComponent, PermissionDirective,
     ConfirmDialogComponent, PresentationFormDialogComponent,
+    SanitaryRegistrationFormDialogComponent,
   ],
   templateUrl: './product-detail-page.component.html',
   styleUrl: './product-detail-page.component.scss',
@@ -45,15 +47,16 @@ export class ProductDetailPageComponent implements OnInit {
   private dialog = inject(MatDialog);
   private fb = inject(FormBuilder);
 
-  product        = signal<Product | null>(null);
-  presentations  = signal<ProductPresentation[]>([]);
-  components     = signal<KitComponent[]>([]);
-  units          = signal<UnitOfMeasure[]>([]);
+  product               = signal<Product | null>(null);
+  presentations         = signal<ProductPresentation[]>([]);
+  components            = signal<KitComponent[]>([]);
+  units                 = signal<UnitOfMeasure[]>([]);
+  sanitaryRegistrations = signal<SanitaryRegistration[]>([]);
   /** Todas las presentaciones del catálogo global (para el selector de padre en el dialog) */
   catalogPresentations = signal<ProductPresentation[]>([]);
-  allActiveProducts = signal<Product[]>([]);
-  loading        = signal(true);
-  savingBom      = signal(false);
+  allActiveProducts     = signal<Product[]>([]);
+  loading               = signal(true);
+  savingBom             = signal(false);
 
   /**
    * Signal computado: productos disponibles como componentes del kit.
@@ -68,6 +71,7 @@ export class ProductDetailPageComponent implements OnInit {
 
   presCols = ['actions', 'hierarchy', 'unit_abbr', 'factor_to_base', 'quantity_per_parent', 'is_purchase_default', 'is_active'];
   bomCols  = ['sort_order', 'component_code', 'component_name', 'quantity_per_kit', 'actions'];
+  regCols  = ['actions', 'registration_number', 'expiry_date', 'is_expired', 'is_active'];
 
   // BOM form
   bomForm = this.fb.group({ components: this.fb.array([]) });
@@ -92,6 +96,9 @@ export class ProductDetailPageComponent implements OnInit {
         } else {
           this.loadComponents(id);
         }
+        if (r.data.classification?.has_sanitary_registration) {
+          this.loadSanitaryRegistrations(id);
+        }
       },
       error: () => { this.loading.set(false); this.router.navigate(['/catalog']); },
     });
@@ -99,6 +106,10 @@ export class ProductDetailPageComponent implements OnInit {
 
   loadPresentations(productId: number): void {
     this.svc.getPresentations(productId).subscribe({ next: r => this.presentations.set(r.data) });
+  }
+
+  loadSanitaryRegistrations(productId: number): void {
+    this.svc.getSanitaryRegistrations(productId).subscribe({ next: r => this.sanitaryRegistrations.set(r.data) });
   }
 
   /**
@@ -265,6 +276,45 @@ export class ProductDetailPageComponent implements OnInit {
           this.loadPresentations(p.id);
         },
         error: err => this.snack.open(err.error?.message || 'Error al desvincular', 'OK', { duration: 4000 }),
+      });
+    });
+  }
+
+  openSanitaryRegForm(reg?: SanitaryRegistration): void {
+    const p = this.product();
+    if (!p) return;
+    const data: SanitaryRegistrationDialogData = {
+      registration: reg ?? null,
+      productId:    p.id,
+      productName:  p.name,
+    };
+    this.dialog.open(SanitaryRegistrationFormDialogComponent, { data, width: '480px' })
+      .afterClosed().subscribe(saved => {
+        if (saved) {
+          this.snack.open(reg ? 'Registro sanitario actualizado' : 'Registro sanitario creado', 'OK', { duration: 3000 });
+          this.loadSanitaryRegistrations(p.id);
+        }
+      });
+  }
+
+  deleteSanitaryReg(reg: SanitaryRegistration): void {
+    const p = this.product();
+    if (!p) return;
+    this.dialog.open(ConfirmDialogComponent, {
+      data: {
+        title:        'Eliminar registro sanitario',
+        message:      `¿Eliminar el registro "${reg.registration_number}"? Esta acción no se puede deshacer.`,
+        confirmColor: 'warn',
+      },
+      width: '420px',
+    }).afterClosed().subscribe(ok => {
+      if (!ok) return;
+      this.svc.deleteSanitaryRegistration(p.id, reg.id).subscribe({
+        next: () => {
+          this.snack.open('Registro sanitario eliminado', 'OK', { duration: 3000 });
+          this.sanitaryRegistrations.update(regs => regs.filter(r => r.id !== reg.id));
+        },
+        error: err => this.snack.open(err.error?.message || 'Error al eliminar', 'OK', { duration: 4000 }),
       });
     });
   }

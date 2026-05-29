@@ -43,6 +43,67 @@
             <div class="info-item info-item--full"><span class="label">Descripción</span><span class="val">{{ p.description }}</span></div>
           }
         </div>
+
+        <!-- Sección de clasificación (solo si tiene clasificación asignada) -->
+        @if (p.classification) {
+          <div class="classif-section">
+            <p class="section-title">
+              <mat-icon>verified</mat-icon>
+              Clasificación Regulatoria
+            </p>
+            <div class="info-grid">
+              <div class="info-item">
+                <span class="label">Clasificación</span>
+                <span class="val">
+                  <code class="code-tag">{{ p.classification.code }}</code>
+                  {{ p.classification.name }}
+                </span>
+              </div>
+              @if (p.lab_brand) {
+                <div class="info-item">
+                  <span class="label">Laboratorio / Marca</span>
+                  <span class="val">{{ p.lab_brand }}</span>
+                </div>
+              }
+              @if (p.concentration) {
+                <div class="info-item">
+                  <span class="label">Concentración</span>
+                  <span class="val">{{ p.concentration }}</span>
+                </div>
+              }
+              @if (p.risk_level) {
+                <div class="info-item">
+                  <span class="label">Nivel de Riesgo</span>
+                  <span class="val">{{ p.risk_level }}</span>
+                </div>
+              }
+              @if (p.pharmaceutical_form) {
+                <div class="info-item">
+                  <span class="label">Forma Farmacéutica</span>
+                  <span class="val">{{ p.pharmaceutical_form }}</span>
+                </div>
+              }
+              @if (p.commercial_presentation) {
+                <div class="info-item">
+                  <span class="label">Pres. Comercial</span>
+                  <span class="val">{{ p.commercial_presentation }}</span>
+                </div>
+              }
+              @if (p.serie_reference) {
+                <div class="info-item">
+                  <span class="label">Serie / Referencia</span>
+                  <span class="val">{{ p.serie_reference }}</span>
+                </div>
+              }
+              @if (p.useful_life) {
+                <div class="info-item">
+                  <span class="label">Vida Útil</span>
+                  <span class="val">{{ p.useful_life }}</span>
+                </div>
+              }
+            </div>
+          </div>
+        }
       </div>
     </mat-tab>
 
@@ -251,6 +312,90 @@
               </button>
             </div>
           </form>
+        </div>
+      </mat-tab>
+    }
+
+    <!-- ── TAB: Registros Sanitarios (solo si la clasificación lo requiere) ── -->
+    @if (p.classification?.has_sanitary_registration) {
+      <mat-tab label="Reg. Sanitarios">
+        <div class="tab-body">
+
+          <div class="tab-toolbar">
+            <span class="toolbar-hint">
+              @if (sanitaryRegistrations().length === 0) {
+                <strong style="color:#c05621">Sin registros sanitarios configurados.</strong>
+              } @else {
+                {{ sanitaryRegistrations().length }} registro(s) sanitario(s)
+              }
+            </span>
+            <button *sgaPermission="'productos.editar'" mat-raised-button color="primary"
+                    (click)="openSanitaryRegForm()">
+              <mat-icon>add</mat-icon> Nuevo Registro
+            </button>
+          </div>
+
+          <div class="table-wrap mat-elevation-z1">
+            <table mat-table [dataSource]="sanitaryRegistrations()">
+
+              <ng-container matColumnDef="registration_number">
+                <th mat-header-cell *matHeaderCellDef>Número de Registro</th>
+                <td mat-cell *matCellDef="let r">
+                  <code class="code-tag">{{ r.registration_number }}</code>
+                </td>
+              </ng-container>
+
+              <ng-container matColumnDef="expiry_date">
+                <th mat-header-cell *matHeaderCellDef>Vence</th>
+                <td mat-cell *matCellDef="let r">
+                  {{ r.expiry_date | date:'dd/MM/yyyy' }}
+                </td>
+              </ng-container>
+
+              <ng-container matColumnDef="is_expired">
+                <th mat-header-cell *matHeaderCellDef>Vigencia</th>
+                <td mat-cell *matCellDef="let r">
+                  @if (r.is_expired) {
+                    <span class="badge badge--off">Vencido</span>
+                  } @else {
+                    <span class="badge badge--on">Vigente</span>
+                  }
+                </td>
+              </ng-container>
+
+              <ng-container matColumnDef="is_active">
+                <th mat-header-cell *matHeaderCellDef>Estado</th>
+                <td mat-cell *matCellDef="let r">
+                  <span class="badge" [class.badge--on]="r.is_active" [class.badge--off]="!r.is_active">
+                    {{ r.is_active ? 'Activo' : 'Inactivo' }}
+                  </span>
+                </td>
+              </ng-container>
+
+              <ng-container matColumnDef="actions">
+                <th mat-header-cell *matHeaderCellDef class="act">Acciones</th>
+                <td mat-cell *matCellDef="let r" class="act">
+                  <button *sgaPermission="'productos.editar'" mat-icon-button color="primary"
+                          (click)="openSanitaryRegForm(r)" matTooltip="Editar registro">
+                    <mat-icon>edit</mat-icon>
+                  </button>
+                  <button *sgaPermission="'productos.editar'" mat-icon-button color="warn"
+                          (click)="deleteSanitaryReg(r)" matTooltip="Eliminar registro">
+                    <mat-icon>delete</mat-icon>
+                  </button>
+                </td>
+              </ng-container>
+
+              <tr mat-header-row *matHeaderRowDef="regCols"></tr>
+              <tr mat-row *matRowDef="let row; columns: regCols;"></tr>
+              <tr class="mat-row" *matNoDataRow>
+                <td class="no-data" [attr.colspan]="regCols.length">
+                  Sin registros sanitarios. Agrega uno con el botón superior.
+                </td>
+              </tr>
+            </table>
+          </div>
+
         </div>
       </mat-tab>
     }

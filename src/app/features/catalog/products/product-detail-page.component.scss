@@ -58,6 +58,21 @@
 .act { /* global */ }
 .no-data { text-align: center; padding: 2.5rem; color: #a0aec0; }
 
+// ── Clasificación regulatoria ────────────────────────────────────
+
+.classif-section {
+  margin-top: 1.5rem; padding: 1rem;
+  background: #f0fff4; border: 1px solid #c6f6d5; border-radius: 8px;
+
+  .section-title {
+    display: flex; align-items: center; gap: 0.4rem;
+    font-size: 0.78rem; font-weight: 700; color: #276749;
+    text-transform: uppercase; letter-spacing: 0.05em;
+    margin: 0 0 0.75rem;
+    mat-icon { font-size: 1rem; height: 1rem; width: 1rem; }
+  }
+}
+
 // ── Presentaciones ──────────────────────────────────────────────
 
 .conv-guide {

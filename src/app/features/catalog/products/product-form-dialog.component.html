@@ -106,7 +106,122 @@
     </mat-step>
 
     <!-- ═══════════════════════════════════════════════════════
-         PASO 3 · Inventario (simple) / Receta BOM (kit)
+         PASO 3 · Clasificación regulatoria
+    ════════════════════════════════════════════════════════ -->
+    <mat-step [stepControl]="stepClassif" label="Clasificación">
+      <form [formGroup]="stepClassif" class="step-body">
+
+        <p class="step-hint">
+          Selecciona la clasificación regulatoria del producto.
+          Los campos adicionales se mostrarán según el tipo elegido.
+        </p>
+
+        <mat-form-field appearance="outline" class="w-full">
+          <mat-label>Clasificación</mat-label>
+          <mat-select formControlName="classification_id">
+            <mat-option [value]="null">— Sin clasificación —</mat-option>
+            @for (c of data.classifications; track c.id) {
+              <mat-option [value]="c.id">
+                <strong>{{ c.code }}</strong> — {{ c.name }}
+              </mat-option>
+            }
+          </mat-select>
+          @if (fe()['classification_id']) { <mat-error>{{ fe()['classification_id'][0] }}</mat-error> }
+        </mat-form-field>
+
+        @if (selectedClassification()) {
+
+          <!-- Laboratorio / Marca -->
+          @if (showLabBrand()) {
+            <mat-form-field appearance="outline" class="w-full">
+              <mat-label>Laboratorio / Marca *</mat-label>
+              <input matInput formControlName="lab_brand"
+                     placeholder="Ej. Genfar, Philips Healthcare..." />
+              @if (stepClassif.get('lab_brand')?.hasError('required') && stepClassif.get('lab_brand')?.touched) {
+                <mat-error>Laboratorio / Marca es requerido para esta clasificación</mat-error>
+              }
+              @if (fe()['lab_brand']) { <mat-error>{{ fe()['lab_brand'][0] }}</mat-error> }
+            </mat-form-field>
+          }
+
+          <!-- Concentración (Medicamentos) -->
+          @if (showConcentration()) {
+            <mat-form-field appearance="outline" class="w-full">
+              <mat-label>Concentración</mat-label>
+              <input matInput formControlName="concentration"
+                     placeholder="Ej. 500mg, 250mg/5ml" />
+              @if (fe()['concentration']) { <mat-error>{{ fe()['concentration'][0] }}</mat-error> }
+            </mat-form-field>
+          }
+
+          <!-- Nivel de Riesgo (Dispositivos Médicos) -->
+          @if (showRiskLevel()) {
+            <mat-form-field appearance="outline" class="w-full">
+              <mat-label>Nivel de Riesgo</mat-label>
+              <input matInput formControlName="risk_level"
+                     placeholder="Ej. Clase I, Clase IIA, Clase IIB" />
+              @if (fe()['risk_level']) { <mat-error>{{ fe()['risk_level'][0] }}</mat-error> }
+            </mat-form-field>
+          }
+
+          <!-- Campos farmacéuticos (Medicamentos) -->
+          @if (showPharmaFields()) {
+            <div class="row-2">
+              <mat-form-field appearance="outline" class="w-full">
+                <mat-label>Forma Farmacéutica</mat-label>
+                <input matInput formControlName="pharmaceutical_form"
+                       placeholder="Ej. Tableta, Cápsula, Jarabe" />
+                @if (fe()['pharmaceutical_form']) { <mat-error>{{ fe()['pharmaceutical_form'][0] }}</mat-error> }
+              </mat-form-field>
+              <mat-form-field appearance="outline" class="w-full">
+                <mat-label>Presentación Comercial</mat-label>
+                <input matInput formControlName="commercial_presentation"
+                       placeholder="Ej. Caja x 100 Tab" />
+                @if (fe()['commercial_presentation']) { <mat-error>{{ fe()['commercial_presentation'][0] }}</mat-error> }
+              </mat-form-field>
+            </div>
+          }
+
+          <!-- Campos de dispositivo médico -->
+          @if (showDeviceFields()) {
+            <div class="row-2">
+              <mat-form-field appearance="outline" class="w-full">
+                <mat-label>Serie / Referencia</mat-label>
+                <input matInput formControlName="serie_reference"
+                       placeholder="Ej. SRP-1000X" />
+                @if (fe()['serie_reference']) { <mat-error>{{ fe()['serie_reference'][0] }}</mat-error> }
+              </mat-form-field>
+              <mat-form-field appearance="outline" class="w-full">
+                <mat-label>Vida Útil</mat-label>
+                <input matInput formControlName="useful_life"
+                       placeholder="Ej. 10 años, Uso único" />
+                @if (fe()['useful_life']) { <mat-error>{{ fe()['useful_life'][0] }}</mat-error> }
+              </mat-form-field>
+            </div>
+          }
+
+          @if (showSanitaryReg()) {
+            <div class="info-hint">
+              <mat-icon>info</mat-icon>
+              Esta clasificación requiere <strong>&nbsp;Registros Sanitarios</strong>.
+              Podrás gestionarlos desde el detalle del producto una vez guardado.
+            </div>
+          }
+        }
+
+        <div class="step-nav">
+          <button mat-stroked-button matStepperPrevious type="button">
+            <mat-icon>arrow_back</mat-icon> Atrás
+          </button>
+          <button mat-raised-button color="primary" matStepperNext type="button">
+            Siguiente <mat-icon>arrow_forward</mat-icon>
+          </button>
+        </div>
+      </form>
+    </mat-step>
+
+    <!-- ═══════════════════════════════════════════════════════
+         PASO 4 · Inventario (simple) / Receta BOM (kit)
     ════════════════════════════════════════════════════════ -->
     <mat-step [stepControl]="stepInv" [label]="isKit() ? 'Receta' : 'Inventario'">
       <form [formGroup]="stepInv" class="step-body">
@@ -133,7 +248,6 @@
           <span style="font-weight:400;text-transform:none;color:#a0aec0">(opcional)</span>
         </p>
         <div class="row-2" style="align-items:flex-start">
-          <!-- Calculadora de volumen: emite cm³ directamente al control -->
           <app-volume-calculator formControlName="volume_cm3" />
 
           <mat-form-field appearance="outline" class="w-full">
@@ -196,7 +310,6 @@
           }
 
           @if (!loadingComponents()) {
-            <!-- Buscador de componentes -->
             <mat-form-field appearance="outline" class="w-full">
               <mat-label>Filtrar productos disponibles</mat-label>
               <mat-icon matPrefix>search</mat-icon>
@@ -217,7 +330,6 @@
               </mat-hint>
             </mat-form-field>
 
-            <!-- Filas BOM -->
             <div formArrayName="components">
               @for (ctrl of componentsArray.controls; track $index) {
                 <div class="kit-row" [formGroupName]="$index">
@@ -285,12 +397,11 @@
     </mat-step>
 
     <!-- ═══════════════════════════════════════════════════════
-         PASO 4 · Empaques / Presentaciones
+         PASO 5 · Empaques / Presentaciones
     ════════════════════════════════════════════════════════ -->
     <mat-step label="Empaques">
       <div class="step-body">
 
-        <!-- Kits: no aplica -->
         @if (isKit()) {
           <div style="text-align:center;padding:1.5rem;color:#a0aec0">
             <mat-icon style="font-size:2.5rem;height:2.5rem;width:2.5rem;display:block;margin:0 auto">
@@ -303,7 +414,6 @@
           </div>
         }
 
-        <!-- Simples: checklist de empaques -->
         @if (!isKit()) {
           <p class="step-hint">
             Selecciona los empaques en los que se compra o recibe este producto.
@@ -317,7 +427,6 @@
             </div>
           }
 
-          <!-- Buscador -->
           <mat-form-field appearance="outline" class="w-full pres-search">
             <mat-label>Buscar empaques</mat-label>
             <mat-icon matPrefix>search</mat-icon>
@@ -334,7 +443,6 @@
             }
           </mat-form-field>
 
-          <!-- Lista de empaques del catálogo -->
           @if ((data.catalogPresentations ?? []).length === 0) {
             <p class="pres-empty">No hay empaques disponibles en el catálogo global.</p>
           } @else if (filteredPresentations().length === 0) {
@@ -345,26 +453,20 @@
                 <div class="pres-item" [class.pres-item--selected]="isSelected(pres.id)"
                      (click)="togglePresentation(pres.id)">
 
-                  <!-- Checkbox visual -->
                   <div class="pres-check">
                     @if (isSelected(pres.id)) {
                       <mat-icon>check</mat-icon>
                     }
                   </div>
 
-                  <!-- Nivel -->
                   <span class="lvl-chip lvl-chip--{{ pres.level <= 3 ? pres.level : 3 }}">
                     L{{ pres.level }}
                   </span>
 
-                  <!-- Nombre + código -->
                   <span class="pres-name">{{ pres.name }}</span>
                   <span class="pres-code">{{ pres.code }}</span>
-
-                  <!-- Factor de conversión -->
                   <span class="pres-factor">× {{ pres.factor_to_base }}</span>
 
-                  <!-- Marcar como defecto (solo si está seleccionado) -->
                   @if (isSelected(pres.id)) {
                     <button mat-icon-button type="button"
                             (click)="setDefault(pres.id); $event.stopPropagation()"
@@ -382,7 +484,6 @@
             </div>
           }
 
-          <!-- Chips de empaques seleccionados -->
           @if (selectedPresentationIds().size > 0) {
             <div style="margin-top:0.75rem">
               <p class="section-label">Seleccionados ({{ selectedPresentationIds().size }})</p>
@@ -416,7 +517,7 @@
     </mat-step>
 
     <!-- ═══════════════════════════════════════════════════════
-         PASO 5 · Confirmar y guardar
+         PASO 6 · Confirmar y guardar
     ════════════════════════════════════════════════════════ -->
     <mat-step label="Confirmar">
       <div class="step-body">
@@ -445,6 +546,64 @@
             <span class="slabel">Categoría</span>
             <span>{{ getCategoryName(stepIdent.get('category_id')?.value) }}</span>
           </div>
+          @if (selectedClassification()) {
+            <div class="summary-row">
+              <span class="slabel">Clasificación</span>
+              <span><strong>{{ selectedClassification()!.code }}</strong> — {{ selectedClassification()!.name }}</span>
+            </div>
+            @if (showLabBrand() && stepClassif.get('lab_brand')?.value) {
+              <div class="summary-row">
+                <span class="slabel">Lab / Marca</span>
+                <span>{{ stepClassif.get('lab_brand')?.value }}</span>
+              </div>
+            }
+            @if (showConcentration() && stepClassif.get('concentration')?.value) {
+              <div class="summary-row">
+                <span class="slabel">Concentración</span>
+                <span>{{ stepClassif.get('concentration')?.value }}</span>
+              </div>
+            }
+            @if (showRiskLevel() && stepClassif.get('risk_level')?.value) {
+              <div class="summary-row">
+                <span class="slabel">Nivel Riesgo</span>
+                <span>{{ stepClassif.get('risk_level')?.value }}</span>
+              </div>
+            }
+            @if (showPharmaFields()) {
+              @if (stepClassif.get('pharmaceutical_form')?.value) {
+                <div class="summary-row">
+                  <span class="slabel">Forma Farmacéutica</span>
+                  <span>{{ stepClassif.get('pharmaceutical_form')?.value }}</span>
+                </div>
+              }
+              @if (stepClassif.get('commercial_presentation')?.value) {
+                <div class="summary-row">
+                  <span class="slabel">Pres. Comercial</span>
+                  <span>{{ stepClassif.get('commercial_presentation')?.value }}</span>
+                </div>
+              }
+            }
+            @if (showDeviceFields()) {
+              @if (stepClassif.get('serie_reference')?.value) {
+                <div class="summary-row">
+                  <span class="slabel">Serie / Ref.</span>
+                  <span>{{ stepClassif.get('serie_reference')?.value }}</span>
+                </div>
+              }
+              @if (stepClassif.get('useful_life')?.value) {
+                <div class="summary-row">
+                  <span class="slabel">Vida Útil</span>
+                  <span>{{ stepClassif.get('useful_life')?.value }}</span>
+                </div>
+              }
+            }
+            @if (showSanitaryReg()) {
+              <div class="summary-row">
+                <span class="slabel">Reg. Sanitarios</span>
+                <span style="color:#718096;font-size:0.8rem">Se gestionan desde el detalle del producto</span>
+              </div>
+            }
+          }
           <div class="summary-row">
             <span class="slabel">Unidad base</span>
             <span>{{ selectedBaseUnitAbbr() }}</span>
@@ -485,7 +644,6 @@
           }
         </div>
 
-        <!-- Estado activo/inactivo -->
         <div [formGroup]="stepFinal" style="margin-top:0.5rem">
           <mat-slide-toggle formControlName="is_active" color="primary">
             {{ stepFinal.get('is_active')?.value ? '✅ Activo' : '⛔ Inactivo' }}

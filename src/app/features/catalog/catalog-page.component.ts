@@ -13,7 +13,7 @@ import { MatTooltipModule } from '@angular/material/tooltip';
 import { MatDialog } from '@angular/material/dialog';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { debounceTime, distinctUntilChanged, forkJoin, of, catchError, map } from 'rxjs';
-import { CatalogService, Category, UnitOfMeasure, Product, ProductPresentation, Supplier } from './catalog.service';
+import { CatalogService, Category, UnitOfMeasure, Product, ProductPresentation, Supplier, ProductClassification } from './catalog.service';
 import { PageHeaderComponent } from '../../shared/components/page-header/page-header.component';
 import { LoadingSpinnerComponent } from '../../shared/components/loading-spinner/loading-spinner.component';
 import { ConfirmDialogComponent } from '../../shared/components/confirm-dialog/confirm-dialog.component';
@@ -210,13 +210,14 @@ export class CatalogPageComponent implements OnInit {
   // ── Productos ───────────────────────────────────────────────
 
   openProductForm(prod?: Product): void {
-    const open = (simples: Product[], pres: ProductPresentation[]) => {
+    const open = (simples: Product[], pres: ProductPresentation[], classifications: ProductClassification[]) => {
       const data: ProductDialogData = {
         product:              prod ?? null,
         categories:           this.categories(),
         units:                this.units(),
         simpleProducts:       simples.filter(p => p.id !== prod?.id),
         catalogPresentations: pres,
+        classifications,
       };
       this.dialog.open(ProductFormDialogComponent, { data, width: '720px', maxHeight: '92vh' })
         .afterClosed().subscribe(saved => {
@@ -228,11 +229,12 @@ export class CatalogPageComponent implements OnInit {
     };
 
     forkJoin({
-      simples: this.svc.getProducts({ product_type: 'simple', is_active: '1' }),
-      pres:    this.svc.getCatalogPresentations(),
+      simples:         this.svc.getProducts({ product_type: 'simple', is_active: '1' }),
+      pres:            this.svc.getCatalogPresentations(),
+      classifications: this.svc.getProductClassifications({ is_active: '1' }),
     }).subscribe({
-      next:  ({ simples, pres })  => open(simples.data, pres.data),
-      error: ()                   => open([], []),
+      next:  ({ simples, pres, classifications }) => open(simples.data, pres.data, classifications.data),
+      error: ()                                   => open([], [], []),
     });
   }
 
