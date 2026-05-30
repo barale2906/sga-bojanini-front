@@ -9,10 +9,12 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatTooltipModule } from '@angular/material/tooltip';
+import { MatDividerModule } from '@angular/material/divider';
 import { forkJoin, finalize } from 'rxjs';
 import { InventoryService, StockSummary, BatchDetail } from '../inventory.service';
-import { WarehouseService, Warehouse, Location, LocationCapacity } from '../../warehouse/warehouse.service';
-import { CatalogService, Product, ProductPresentation } from '../../catalog/catalog.service';
+import { WarehouseService, Warehouse, Location, LocationCapacity, Zone } from '../../warehouse/warehouse.service';
+import { CatalogService, Product, ProductPresentation, ProductClassification } from '../../catalog/catalog.service';
+import { PurchasingService, PurchaseOrder, PurchaseOrderItem } from '../../purchasing/purchasing.service';
 import { FormErrorsComponent } from '../../../shared/components/form-errors/form-errors.component';
 
 const TYPE_LABELS: Record<string, string> = {
@@ -20,42 +22,64 @@ const TYPE_LABELS: Record<string, string> = {
   adjustment: 'Ajuste de Inventario', return: 'Devolución a Proveedor',
 };
 
+export interface MovementDialogData {
+  type: string;
+  warehouses: Warehouse[];
+  products: Product[];
+  inventorySvc: InventoryService;
+  purchaseOrder?: PurchaseOrder;
+  purchaseOrderItem?: PurchaseOrderItem;
+  itemIndex?: number;
+  itemTotal?: number;
+}
+
 @Component({
   selector: 'app-movement-form-dialog',
   standalone: true,
   imports: [
     CommonModule, ReactiveFormsModule, MatDialogModule, MatFormFieldModule,
     MatInputModule, MatSelectModule, MatButtonModule, MatIconModule,
-    MatProgressSpinnerModule, MatTooltipModule, FormErrorsComponent,
+    MatProgressSpinnerModule, MatTooltipModule, MatDividerModule, FormErrorsComponent,
   ],
   templateUrl: './movement-form-dialog.component.html',
   styleUrl: './movement-form-dialog.component.scss',
 })
 export class MovementFormDialogComponent implements OnInit {
-  data: { type: string; warehouses: Warehouse[]; products: Product[]; inventorySvc: InventoryService } = inject(MAT_DIALOG_DATA);
-  private ref  = inject(MatDialogRef<MovementFormDialogComponent>);
-  private fb   = inject(FormBuilder);
-  private wSvc = inject(WarehouseService);
-  private cSvc = inject(CatalogService);
+  data: MovementDialogData = inject(MAT_DIALOG_DATA);
+  private ref          = inject(MatDialogRef<MovementFormDialogComponent>);
+  private fb           = inject(FormBuilder);
+  private wSvc         = inject(WarehouseService);
+  private cSvc         = inject(CatalogService);
+  private purchasingSvc = inject(PurchasingService);
 
   saving = signal(false);
   errors = signal<string[]>([]);
   locations = signal<Location[]>([]);
+  zones     = signal<Zone[]>([]);
   presentations = signal<ProductPresentation[]>([]);
   usePresentationMode = signal(false);
 
+  // ── Detalle de producto (clasificación + INVIMA) ─────────────
+  productDetail        = signal<Product | null>(null);
+  loadingProductDetail = signal(false);
+
+  // ── Selector de OC (cuando no viene del flujo directo de OC) ─
+  showPoLink           = signal(false);
+  pendingOrders        = signal<PurchaseOrder[]>([]);
+  loadingPendingOrders = signal(false);
+  _selectedPoId        = signal<number | null>(null);
+  _selectedPoItemId    = signal<number | null>(null);
+  _selectedPoItems     = signal<PurchaseOrderItem[]>([]);
+
   // ── Capacidad — ubicación única ──────────────────────────────
-  /** Capacidad de la ubicación de entrada (modo única) */
   singleLocCapacity = signal<LocationCapacity | null>(null);
   loadingSingleCap  = signal(false);
-  /** Capacidad de la ubicación destino (transferencia) */
   destLocCapacity   = signal<LocationCapacity | null>(null);
   loadingDestCap    = signal(false);
 
   // ── Modo multi-ubicación ─────────────────────────────────────
   useDistribution = signal(false);
 
-  /** FormArray para filas de entrada multi-ubicación */
   distributionForm = this.fb.group({
     entryRows:    this.fb.array([]),
     transferRows: this.fb.array([]),
@@ -63,21 +87,31 @@ export class MovementFormDialogComponent implements OnInit {
   get entryRows(): FormArray    { return this.distributionForm.get('entryRows')    as FormArray; }
   get transferRows(): FormArray { return this.distributionForm.get('transferRows') as FormArray; }
 
-  /** Capacidades cargadas por fila (paralelo al FormArray) */
   entryRowCaps    = signal<(LocationCapacity | null)[]>([]);
   transferRowCaps = signal<(LocationCapacity | null)[]>([]);
 
-  // ── FEFO / Stock (solo para EXIT) ───────────────────────────
-  /** Resumen de stock del producto en el almacén seleccionado (Paso 2) */
-  stockSummary      = signal<StockSummary | null>(null);
-  loadingStock      = signal(false);
-  /** Lotes en orden FEFO (Paso 3) */
-  fefoLotes         = signal<BatchDetail[]>([]);
-  loadingFefo       = signal(false);
-  /** Confirmación post-salida: lote efectivamente descontado (Paso 5) */
-  exitConfirmation  = signal<BatchDetail | null>(null);
+  // ── FEFO / Stock ─────────────────────────────────────────────
+  stockSummary     = signal<StockSummary | null>(null);
+  loadingStock     = signal(false);
+  fefoLotes        = signal<BatchDetail[]>([]);
+  loadingFefo      = signal(false);
+  exitConfirmation = signal<BatchDetail | null>(null);
 
-  // ── Getters ──────────────────────────────────────────────────
+  // ── Getters — OC vinculada ────────────────────────────────────
+
+  /** OC activa: la del contexto o la seleccionada manualmente */
+  get _linkedPo(): PurchaseOrder | null {
+    return this.data.purchaseOrder
+      ?? this.pendingOrders().find(o => o.id === this._selectedPoId()) ?? null;
+  }
+
+  /** Ítem activo: el del contexto o el seleccionado manualmente */
+  get _linkedPoItem(): PurchaseOrderItem | null {
+    return this.data.purchaseOrderItem
+      ?? this._selectedPoItems().find(i => i.id === this._selectedPoItemId()) ?? null;
+  }
+
+  // ── Getters generales ─────────────────────────────────────────
 
   get selectedProduct(): Product | null {
     const id = this.form.get('product_id')?.value;
@@ -97,36 +131,29 @@ export class MovementFormDialogComponent implements OnInit {
     return qty * pres.factor_to_base;
   }
 
-  /** Unidades base efectivas del movimiento actual */
   get effectiveBaseQty(): number {
     if (this.usePresentationMode() && this.previewBaseUnits !== null) return this.previewBaseUnits;
-    const v = this.form.value;
-    return Number(v.quantity_base) || 0;
+    return Number(this.form.value.quantity_base) || 0;
   }
 
-  /** Suma de cantidades en filas de distribución de entrada */
   get entryDistTotal(): number {
     return (this.entryRows.value as any[]).reduce((s: number, r: any) => s + (Number(r.quantity_base) || 0), 0);
   }
 
-  /** Suma de cantidades en filas de distribución de transferencia */
   get transferDistTotal(): number {
     return (this.transferRows.value as any[]).reduce((s: number, r: any) => s + (Number(r.quantity) || 0), 0);
   }
 
-  /** Nombre del almacén seleccionado (para mostrar en el panel de stock) */
   get selectedWarehouseName(): string {
     const id = this.form.get('warehouse_id')?.value;
     return this.data.warehouses.find(w => w.id === id)?.name ?? '';
   }
 
-  /** True cuando el stock ya fue consultado y vale 0 → bloquear formulario */
   get hasZeroStock(): boolean {
     const s = this.stockSummary();
     return this.isExit && s !== null && s.available_quantity === 0;
   }
 
-  /** Stock disponible con color semáforo para el panel de salida */
   get stockStatusClass(): 'ok' | 'warn' | 'danger' | 'loading' | 'none' {
     if (this.loadingStock()) return 'loading';
     const s = this.stockSummary();
@@ -138,11 +165,17 @@ export class MovementFormDialogComponent implements OnInit {
     return 'ok';
   }
 
-  /**
-   * Validación reactiva del botón Registrar.
-   * Reemplaza `form.invalid` para manejar correctamente los casos condicionales
-   * (entrada vs distribución, tipo de movimiento, etc.).
-   */
+  get hasActiveReg(): boolean {
+    const regs = this.productDetail()?.sanitary_registrations;
+    return !!(regs?.some(r => r.is_active && !r.is_expired));
+  }
+
+  get poPendingQty(): number {
+    const item = this._linkedPoItem;
+    if (!item) return 0;
+    return item.quantity_requested - (item.quantity_received ?? 0);
+  }
+
   get isFormReady(): boolean {
     const v = this.form.value;
     if (!v.product_id || !v.warehouse_id) return false;
@@ -163,9 +196,7 @@ export class MovementFormDialogComponent implements OnInit {
 
     if (this.isAdjustment) return !!(v.quantity) && !!v.reason;
 
-    // exit, return
     if (!v.quantity || (v.quantity ?? 0) < 1) return false;
-    // Bloquear si ya sabemos que no hay stock (Paso 2)
     if (this.isExit) {
       const s = this.stockSummary();
       if (s !== null && s.available_quantity === 0) return false;
@@ -183,6 +214,7 @@ export class MovementFormDialogComponent implements OnInit {
   form = this.fb.group({
     product_id:               [null as number | null, Validators.required],
     warehouse_id:             [null as number | null, Validators.required],
+    zone_id:                  [null as number | null],
     location_id:              [null as number | null],
     location_from_id:         [null as number | null],
     location_to_id:           [null as number | null],
@@ -198,59 +230,188 @@ export class MovementFormDialogComponent implements OnInit {
   });
 
   ngOnInit(): void {
-    // Almacén → cargar ubicaciones + FEFO si es EXIT
+    // Almacén → zonas + ubicaciones + FEFO
     this.form.get('warehouse_id')!.valueChanges.subscribe(wId => {
       this.singleLocCapacity.set(null);
       this.destLocCapacity.set(null);
       this._resetDistRows();
+      this.form.patchValue({ zone_id: null, location_id: null }, { emitEvent: false });
       if (wId) {
         this.wSvc.getWarehouseLocations(Number(wId)).subscribe({ next: r => this.locations.set(r.data), error: () => {} });
+        this.wSvc.getWarehouseZones(Number(wId)).subscribe({ next: r => this.zones.set(r.data), error: () => {} });
         this._loadExitData();
       } else {
+        this.locations.set([]);
+        this.zones.set([]);
         this.stockSummary.set(null);
         this.fefoLotes.set([]);
       }
     });
 
-    // Producto → cargar presentaciones + FEFO si es EXIT
+    // Zona → filtrar ubicaciones
+    this.form.get('zone_id')!.valueChanges.subscribe(zId => {
+      this.singleLocCapacity.set(null);
+      this.form.patchValue({ location_id: null }, { emitEvent: false });
+      const wId = this.form.get('warehouse_id')?.value;
+      if (!wId) return;
+      if (zId) {
+        this.wSvc.getLocations({ zone_id: Number(zId) }).subscribe({ next: r => this.locations.set(r.data), error: () => {} });
+      } else {
+        this.wSvc.getWarehouseLocations(Number(wId)).subscribe({ next: r => this.locations.set(r.data), error: () => {} });
+      }
+    });
+
+    // Producto → presentaciones + detalle completo + FEFO
     this.form.get('product_id')!.valueChanges.subscribe(pId => {
       this.singleLocCapacity.set(null);
       this.destLocCapacity.set(null);
+      this.productDetail.set(null);
       if (pId) {
-        this.cSvc.getPresentations(Number(pId)).subscribe({ next: r => this.presentations.set(r.data), error: () => {} });
+        this.cSvc.getPresentations(Number(pId)).subscribe({
+          next: r => {
+            this.presentations.set(r.data);
+            const poPresId = this._linkedPoItem?.product_presentation_id;
+            if (poPresId && r.data.some(pr => pr.id === poPresId)) {
+              this.usePresentationMode.set(true);
+              this.form.patchValue({ product_presentation_id: poPresId }, { emitEvent: false });
+            }
+          },
+          error: () => {},
+        });
+        if (this.isEntry) {
+          this.loadingProductDetail.set(true);
+          this.cSvc.getProduct(Number(pId)).subscribe({
+            next: r => { this.productDetail.set(r.data); this.loadingProductDetail.set(false); },
+            error: () => { this.productDetail.set(null); this.loadingProductDetail.set(false); },
+          });
+        }
         this._loadExitData();
       } else {
+        this.presentations.set([]);
         this.stockSummary.set(null);
         this.fefoLotes.set([]);
       }
     });
 
-    // Ubicación de entrada (modo única) → cargar capacidad
+    // Ubicación de entrada → capacidad
     this.form.get('location_id')!.valueChanges.subscribe(locId => {
       this.singleLocCapacity.set(null);
       this.errors.set([]);
       if (locId) this._loadLocCap(Number(locId), 'single');
     });
 
-    // Ubicación destino (transferencia) → cargar capacidad
+    // Ubicación destino (transferencia) → capacidad
     this.form.get('location_to_id')!.valueChanges.subscribe(locId => {
       this.destLocCapacity.set(null);
       this.errors.set([]);
       if (locId) this._loadLocCap(Number(locId), 'dest');
     });
 
-    // Inicializar filas de distribución
     this._addEntryRow();
     this._addTransferRow();
+
+    // Pre-rellenar desde contexto de OC
+    if (this.data.purchaseOrder && this.data.purchaseOrderItem) {
+      const order = this.data.purchaseOrder;
+      const item  = this.data.purchaseOrderItem;
+      const pendingQty = item.quantity_requested - (item.quantity_received ?? 0);
+      const qty = pendingQty > 0 ? pendingQty : item.quantity_requested;
+
+      this.form.patchValue({ warehouse_id: order.warehouse_id });
+      this.form.patchValue({ product_id: item.product_id });
+
+      if (item.product_presentation_id) {
+        this.form.patchValue({ quantity_in_presentation: qty });
+      } else {
+        this.form.patchValue({ quantity_base: qty });
+      }
+    }
   }
 
-  // ── FEFO helpers ─────────────────────────────────────────────
+  // ── Selector de OC (entrada manual) ──────────────────────────
 
-  /**
-   * Carga Paso 2 (stock summary) y Paso 3 (lotes FEFO) con llamadas independientes.
-   * Si una falla, la otra sigue mostrándose correctamente.
-   * Solo actúa si el tipo es EXIT y ambos campos están seleccionados.
-   */
+  togglePoLink(): void {
+    const next = !this.showPoLink();
+    this.showPoLink.set(next);
+    if (next && !this.pendingOrders().length && !this.loadingPendingOrders()) {
+      this._loadPendingOrders();
+    }
+    if (!next) {
+      this._clearPoSelection();
+    }
+  }
+
+  private _clearPoSelection(): void {
+    this._selectedPoId.set(null);
+    this._selectedPoItemId.set(null);
+    this._selectedPoItems.set([]);
+  }
+
+  private _loadPendingOrders(): void {
+    this.loadingPendingOrders.set(true);
+    forkJoin([
+      this.purchasingSvc.getOrders({ status: 'sent', per_page: 100 }),
+      this.purchasingSvc.getOrders({ status: 'partially_received', per_page: 100 }),
+    ]).subscribe({
+      next: ([r1, r2]) => {
+        this.pendingOrders.set([...r1.data, ...r2.data]);
+        this.loadingPendingOrders.set(false);
+      },
+      error: () => this.loadingPendingOrders.set(false),
+    });
+  }
+
+  onPoSelected(poId: number | null): void {
+    this._selectedPoId.set(poId);
+    this._selectedPoItemId.set(null);
+    this._selectedPoItems.set([]);
+
+    if (!poId) return;
+
+    const cached = this.pendingOrders().find(o => o.id === poId);
+    if (cached?.items?.length) {
+      this._selectedPoItems.set(cached.items);
+    } else {
+      this.purchasingSvc.getOrder(poId).subscribe({
+        next: r => {
+          this._selectedPoItems.set(r.data.items ?? []);
+          // Actualizar el caché en la lista
+          this.pendingOrders.update(list =>
+            list.map(o => o.id === poId ? { ...o, items: r.data.items } : o)
+          );
+        },
+        error: () => {},
+      });
+    }
+
+    // Pre-rellenar almacén de la OC
+    const order = this.pendingOrders().find(o => o.id === poId);
+    if (order?.warehouse_id) {
+      this.form.patchValue({ warehouse_id: order.warehouse_id });
+    }
+  }
+
+  onPoItemSelected(itemId: number | null): void {
+    this._selectedPoItemId.set(itemId);
+    if (!itemId) return;
+
+    const item = this._selectedPoItems().find(i => i.id === itemId);
+    if (!item) return;
+
+    const pendingQty = item.quantity_requested - (item.quantity_received ?? 0);
+    const qty = pendingQty > 0 ? pendingQty : item.quantity_requested;
+
+    this.form.patchValue({ product_id: item.product_id });
+
+    if (item.product_presentation_id) {
+      this.form.patchValue({ quantity_in_presentation: qty });
+    } else {
+      this.form.patchValue({ quantity_base: qty });
+    }
+  }
+
+  // ── FEFO ─────────────────────────────────────────────────────
+
   private _loadExitData(): void {
     if (!this.isExit) return;
     const pId = this.form.get('product_id')?.value;
@@ -262,24 +423,18 @@ export class MovementFormDialogComponent implements OnInit {
     this.loadingStock.set(true);
     this.loadingFefo.set(true);
 
-    // Paso 2 — stock summary (independiente de los lotes)
     this.data.inventorySvc.getStockSummary(Number(wId), Number(pId))
       .pipe(finalize(() => this.loadingStock.set(false)))
-      .subscribe({
-        next: r  => this.stockSummary.set(r.data),
-        error: () => this.stockSummary.set(null),
-      });
+      .subscribe({ next: r => this.stockSummary.set(r.data), error: () => this.stockSummary.set(null) });
 
-    // Paso 3 — lotes FEFO (independiente del stock summary)
     this.data.inventorySvc.getProductBatches(Number(pId))
       .pipe(finalize(() => this.loadingFefo.set(false)))
       .subscribe({
-        next: r  => this.fefoLotes.set(r.data.filter(b => b.status === 'active' && b.quantity_available > 0)),
+        next: r => this.fefoLotes.set(r.data.filter(b => b.status === 'active' && b.quantity_available > 0)),
         error: () => this.fefoLotes.set([]),
       });
   }
 
-  /** Etiqueta descriptiva de la ubicación del primer lote FEFO */
   get fefoFirstLocation(): string {
     const first = this.fefoLotes()[0];
     if (!first || !first.locations?.length) return '';
@@ -291,20 +446,14 @@ export class MovementFormDialogComponent implements OnInit {
 
   // ── Distribución — filas de entrada ──────────────────────────
 
-  addEntryRow(): void {
-    this._addEntryRow();
-  }
+  addEntryRow(): void { this._addEntryRow(); }
 
   private _addEntryRow(): void {
     this.entryRows.push(this.fb.group({
       location_id:   [null as number | null, Validators.required],
       quantity_base: [null as number | null, [Validators.required, Validators.min(1)]],
     }));
-    // Mantener array de capacidades sincronizado con las filas
-    this.entryRowCaps.update(arr => {
-      while (arr.length < this.entryRows.length) arr = [...arr, null];
-      return arr;
-    });
+    this.entryRowCaps.update(arr => { while (arr.length < this.entryRows.length) arr = [...arr, null]; return arr; });
   }
 
   removeEntryRow(i: number): void {
@@ -314,18 +463,10 @@ export class MovementFormDialogComponent implements OnInit {
   }
 
   onEntryRowLocChange(i: number, locId: number | null): void {
-    this.entryRowCaps.update(arr => {
-      const a = [...arr];
-      a[i] = null;
-      return a;
-    });
+    this.entryRowCaps.update(arr => { const a = [...arr]; a[i] = null; return a; });
     if (locId) {
       this.wSvc.getLocationCapacity(locId).subscribe({
-        next: r => this.entryRowCaps.update(arr => {
-          const a = [...arr];
-          if (i < a.length) a[i] = r.data;
-          return a;
-        }),
+        next: r => this.entryRowCaps.update(arr => { const a = [...arr]; if (i < a.length) a[i] = r.data; return a; }),
         error: () => {},
       });
     }
@@ -333,19 +474,14 @@ export class MovementFormDialogComponent implements OnInit {
 
   // ── Distribución — filas de transferencia ────────────────────
 
-  addTransferRow(): void {
-    this._addTransferRow();
-  }
+  addTransferRow(): void { this._addTransferRow(); }
 
   private _addTransferRow(): void {
     this.transferRows.push(this.fb.group({
       location_to_id: [null as number | null, Validators.required],
       quantity:       [null as number | null, [Validators.required, Validators.min(1)]],
     }));
-    this.transferRowCaps.update(arr => {
-      while (arr.length < this.transferRows.length) arr = [...arr, null];
-      return arr;
-    });
+    this.transferRowCaps.update(arr => { while (arr.length < this.transferRows.length) arr = [...arr, null]; return arr; });
   }
 
   removeTransferRow(i: number): void {
@@ -355,18 +491,10 @@ export class MovementFormDialogComponent implements OnInit {
   }
 
   onTransferRowLocChange(i: number, locId: number | null): void {
-    this.transferRowCaps.update(arr => {
-      const a = [...arr];
-      a[i] = null;
-      return a;
-    });
+    this.transferRowCaps.update(arr => { const a = [...arr]; a[i] = null; return a; });
     if (locId) {
       this.wSvc.getLocationCapacity(locId).subscribe({
-        next: r => this.transferRowCaps.update(arr => {
-          const a = [...arr];
-          if (i < a.length) a[i] = r.data;
-          return a;
-        }),
+        next: r => this.transferRowCaps.update(arr => { const a = [...arr]; if (i < a.length) a[i] = r.data; return a; }),
         error: () => {},
       });
     }
@@ -379,7 +507,6 @@ export class MovementFormDialogComponent implements OnInit {
     this.useDistribution.set(next);
     this.errors.set([]);
     if (next) {
-      // Limpiar la ubicación única al activar distribución
       this.form.get('location_id')!.setValue(null);
       this.form.get('location_to_id')!.setValue(null);
       this.singleLocCapacity.set(null);
@@ -396,11 +523,11 @@ export class MovementFormDialogComponent implements OnInit {
     this._addTransferRow();
   }
 
-  // ── Capacidad — helpers ──────────────────────────────────────
+  // ── Capacidad ────────────────────────────────────────────────
 
   private _loadLocCap(locId: number, target: 'single' | 'dest'): void {
-    if (target === 'single') { this.loadingSingleCap.set(true); }
-    else { this.loadingDestCap.set(true); }
+    if (target === 'single') this.loadingSingleCap.set(true);
+    else this.loadingDestCap.set(true);
 
     this.wSvc.getLocationCapacity(locId).subscribe({
       next: r => {
@@ -414,71 +541,70 @@ export class MovementFormDialogComponent implements OnInit {
     });
   }
 
-  /**
-   * Valida si `qty` unidades del producto seleccionado caben en la ubicación.
-   * Retorna lista de mensajes de error (vacía = sin problemas).
-   */
   private _capErrors(cap: LocationCapacity | null, qty: number): string[] {
     const errs: string[] = [];
     if (!cap || qty <= 0) return errs;
     const prod = this.selectedProduct;
     if (!prod) return errs;
-
     if (cap.capacity_volume.max_cm3 !== null && prod.volume_cm3 != null) {
-      const need  = qty * prod.volume_cm3;
-      const avail = cap.capacity_volume.available_cm3 ?? 0;
-      if (need > avail) {
-        errs.push(`Volumen insuficiente en "${cap.name}": necesita ${this._fmtVol(need)}, disponible ${this._fmtVol(avail)}.`);
-      }
+      const need = qty * prod.volume_cm3, avail = cap.capacity_volume.available_cm3 ?? 0;
+      if (need > avail) errs.push(`Volumen insuficiente en "${cap.name}": necesita ${this._fmtVol(need)}, disponible ${this._fmtVol(avail)}.`);
     }
-
     if (cap.capacity_weight.max_kg !== null && prod.weight_kg != null) {
-      const need  = qty * prod.weight_kg;
-      const avail = cap.capacity_weight.available_kg ?? 0;
-      if (need > avail) {
-        errs.push(`Peso insuficiente en "${cap.name}": necesita ${this._fmtKg(need)}, disponible ${this._fmtKg(avail)}.`);
-      }
+      const need = qty * prod.weight_kg, avail = cap.capacity_weight.available_kg ?? 0;
+      if (need > avail) errs.push(`Peso insuficiente en "${cap.name}": necesita ${this._fmtKg(need)}, disponible ${this._fmtKg(avail)}.`);
     }
-
     return errs;
   }
 
-  /** Estado proyectado de la ubicación tras el movimiento */
   projStatus(cap: LocationCapacity | null, qty: number): 'ok' | 'warn' | 'danger' | 'nodata' | 'nodims' {
     if (!cap) return 'nodata';
     const prod = this.selectedProduct;
     if (!prod) return 'nodata';
-
     const hasVolLim = cap.capacity_volume.max_cm3 !== null;
     const hasWgtLim = cap.capacity_weight.max_kg  !== null;
     if (!hasVolLim && !hasWgtLim) return 'nodata';
     if (!prod.volume_cm3 && !prod.weight_kg) return 'nodims';
 
     const grades: ('ok' | 'warn' | 'danger')[] = [];
-
     if (hasVolLim && prod.volume_cm3 != null && qty > 0) {
-      const need  = qty * prod.volume_cm3;
-      const avail = cap.capacity_volume.available_cm3 ?? 0;
+      const need = qty * prod.volume_cm3, avail = cap.capacity_volume.available_cm3 ?? 0;
       grades.push(need > avail ? 'danger' : need > avail * 0.8 ? 'warn' : 'ok');
     }
-
     if (hasWgtLim && prod.weight_kg != null && qty > 0) {
-      const need  = qty * prod.weight_kg;
-      const avail = cap.capacity_weight.available_kg ?? 0;
+      const need = qty * prod.weight_kg, avail = cap.capacity_weight.available_kg ?? 0;
       grades.push(need > avail ? 'danger' : need > avail * 0.8 ? 'warn' : 'ok');
     }
-
     if (grades.length === 0) return 'ok';
     if (grades.includes('danger')) return 'danger';
     if (grades.includes('warn')) return 'warn';
     return 'ok';
   }
 
+  // ── Helpers de clasificación ──────────────────────────────────
+
+  classIcon(cls: ProductClassification): string {
+    const m: Record<string, string> = { MED: 'medication', DM: 'medical_services' };
+    return m[cls.code] || 'inventory_2';
+  }
+
+  zoneTypeIcon(type: string): string {
+    const m: Record<string, string> = { ambient: 'thermostat', cold: 'ac_unit', frozen: 'severe_cold', controlled: 'security' };
+    return m[type] || 'place';
+  }
+
+  poStatusLabel(status: string): string {
+    const m: Record<string, string> = {
+      sent: 'Enviada', partially_received: 'Rec. Parcial',
+    };
+    return m[status] || status;
+  }
+
+  // ── Format helpers ────────────────────────────────────────────
+
   _fmtVol(val: number | null): string {
     if (val === null) return '—';
-    return val >= 1_000_000
-      ? `${(val / 1_000_000).toFixed(2)} m³`
-      : `${val.toLocaleString(undefined, { maximumFractionDigits: 0 })} cm³`;
+    return val >= 1_000_000 ? `${(val / 1_000_000).toFixed(2)} m³` : `${val.toLocaleString(undefined, { maximumFractionDigits: 0 })} cm³`;
   }
 
   _fmtKg(val: number | null): string {
@@ -486,9 +612,7 @@ export class MovementFormDialogComponent implements OnInit {
     return val >= 1000 ? `${(val / 1000).toFixed(2)} t` : `${val.toFixed(2)} kg`;
   }
 
-  fmtPct(val: number | null): string {
-    return val !== null ? `${val.toFixed(1)} %` : '—';
-  }
+  fmtPct(val: number | null): string { return val !== null ? `${val.toFixed(1)} %` : '—'; }
 
   neededVol(qty: number): number | null {
     const v = this.selectedProduct?.volume_cm3;
@@ -500,87 +624,104 @@ export class MovementFormDialogComponent implements OnInit {
     return w != null && qty > 0 ? qty * w : null;
   }
 
-  /** Helper de template para castear AbstractControl a FormGroup */
   asGroup(ctrl: AbstractControl): FormGroup { return ctrl as FormGroup; }
+
+  // ── Actualizar OC tras ingreso ────────────────────────────────
+
+  /**
+   * Llama a /purchase-orders/{id}/receive después de un ingreso exitoso.
+   * Si falla (lotNumber vacío, etc.), el inventario ya fue guardado → cierra igual.
+   */
+  private _notifyPoReceive(formValue: any, onDone: () => void): void {
+    const po   = this._linkedPo;
+    const item = this._linkedPoItem;
+    if (!po || !item?.id) { onDone(); return; }
+
+    const qtyReceived = this.usePresentationMode()
+      ? (Number(formValue.quantity_in_presentation) || 0)
+      : (this.useDistribution() ? this.entryDistTotal : (Number(formValue.quantity_base) || 0));
+
+    this.purchasingSvc.receive(po.id, [{
+      item_id:           item.id,
+      quantity_received: qtyReceived,
+      lot_number:        formValue.lot_number || '',
+      expiration_date:   formValue.expiration_date || '',
+      location_id:       formValue.location_id || undefined,
+    }]).subscribe({
+      next:  () => onDone(),
+      error: () => onDone(), // El inventario ya fue guardado → cerrar igual
+    });
+  }
 
   // ── Guardar ──────────────────────────────────────────────────
 
   save(): void {
     if (this.form.invalid || this.saving()) return;
-
     this.errors.set([]);
 
-    // ── Validación de capacidad en modo distribución de entrada ──
     if (this.isEntry && this.useDistribution()) {
-      if (this.entryRows.invalid) {
-        this.errors.set(['Completa todas las filas de distribución (ubicación y cantidad ≥ 1).']);
-        return;
-      }
+      if (this.entryRows.invalid) { this.errors.set(['Completa todas las filas de distribución.']); return; }
       const capErrors: string[] = [];
-      (this.entryRows.value as any[]).forEach((row: any, i: number) => {
-        const cap = this.entryRowCaps()[i];
-        capErrors.push(...this._capErrors(cap, Number(row.quantity_base) || 0));
-      });
-      if (capErrors.length > 0) { this.errors.set(capErrors); return; }
+      (this.entryRows.value as any[]).forEach((row: any, i: number) =>
+        capErrors.push(...this._capErrors(this.entryRowCaps()[i], Number(row.quantity_base) || 0))
+      );
+      if (capErrors.length) { this.errors.set(capErrors); return; }
     }
 
-    // ── Validación de capacidad en modo distribución de transferencia ─
     if (this.isTransfer && this.useDistribution()) {
-      if (this.transferRows.invalid) {
-        this.errors.set(['Completa todas las filas de distribución (ubicación destino y cantidad ≥ 1).']);
-        return;
-      }
+      if (this.transferRows.invalid) { this.errors.set(['Completa todas las filas de distribución.']); return; }
       const capErrors: string[] = [];
-      (this.transferRows.value as any[]).forEach((row: any, i: number) => {
-        const cap = this.transferRowCaps()[i];
-        capErrors.push(...this._capErrors(cap, Number(row.quantity) || 0));
-      });
-      if (capErrors.length > 0) { this.errors.set(capErrors); return; }
+      (this.transferRows.value as any[]).forEach((row: any, i: number) =>
+        capErrors.push(...this._capErrors(this.transferRowCaps()[i], Number(row.quantity) || 0))
+      );
+      if (capErrors.length) { this.errors.set(capErrors); return; }
     }
 
-    // ── Validación de capacidad en modo ubicación única ──────────
     if (this.isEntry && !this.useDistribution()) {
       const errs = this._capErrors(this.singleLocCapacity(), this.effectiveBaseQty);
-      if (errs.length > 0) { this.errors.set(errs); return; }
+      if (errs.length) { this.errors.set(errs); return; }
     }
 
     if (this.isTransfer && !this.useDistribution()) {
-      const qty = Number(this.form.value.quantity) || 0;
-      const errs = this._capErrors(this.destLocCapacity(), qty);
-      if (errs.length > 0) { this.errors.set(errs); return; }
+      const errs = this._capErrors(this.destLocCapacity(), Number(this.form.value.quantity) || 0);
+      if (errs.length) { this.errors.set(errs); return; }
     }
 
-    // ── Dispatch ────────────────────────────────────────────────
     this.saving.set(true);
     const v = this.form.value;
+
     const basePayload: Record<string, unknown> = {
       product_id:   v.product_id,
       warehouse_id: v.warehouse_id,
       reason:       v.reason || undefined,
     };
 
-    // ENTRADA
+    // Adjuntar referencia OC si hay una vinculada
+    const linkedPo   = this._linkedPo;
+    const linkedItem = this._linkedPoItem;
+    if (linkedPo)       basePayload['purchase_order_id']      = linkedPo.id;
+    if (linkedItem?.id) basePayload['purchase_order_item_id'] = linkedItem.id;
+
+    // ── ENTRADA ─────────────────────────────────────────────────
     if (this.isEntry) {
       const lotInfo = {
-        lot_number:           v.lot_number           || undefined,
-        expiration_date:      v.expiration_date       || undefined,
-        manufacturing_date:   v.manufacturing_date    || undefined,
-        notes:                v.notes                 || undefined,
+        lot_number:         v.lot_number         || undefined,
+        expiration_date:    v.expiration_date     || undefined,
+        manufacturing_date: v.manufacturing_date  || undefined,
+        notes:              v.notes               || undefined,
       };
 
-      // Distribución multi-ubicación
       if (this.useDistribution()) {
         const calls = (this.entryRows.value as any[]).map((row: any) =>
           this.data.inventorySvc.entry({ ...basePayload, ...lotInfo, location_id: row.location_id, quantity_base: Number(row.quantity_base) })
         );
         forkJoin(calls).subscribe({
-          next: () => this.ref.close(true),
+          next: () => this._notifyPoReceive(v, () => this.ref.close(true)),
           error: err => this._handleError(err),
         });
         return;
       }
 
-      // Ubicación única
       const entryPayload: Record<string, unknown> = { ...basePayload, ...lotInfo, location_id: v.location_id || undefined };
       if (this.usePresentationMode() && v.product_presentation_id) {
         entryPayload['product_presentation_id'] = v.product_presentation_id as any;
@@ -589,55 +730,42 @@ export class MovementFormDialogComponent implements OnInit {
         entryPayload['quantity_base'] = (v.quantity_base || v.quantity) as any;
       }
       this.data.inventorySvc.entry(entryPayload).subscribe({
-        next: () => this.ref.close(true),
+        next: () => this._notifyPoReceive(v, () => this.ref.close(true)),
         error: err => this._handleError(err),
       });
       return;
     }
 
-    // TRANSFERENCIA
+    // ── TRANSFERENCIA ────────────────────────────────────────────
     if (this.isTransfer) {
       if (this.useDistribution()) {
         const calls = (this.transferRows.value as any[]).map((row: any) =>
           this.data.inventorySvc.transfer({ ...basePayload, location_from_id: v.location_from_id, location_to_id: row.location_to_id, quantity: Number(row.quantity) })
         );
-        forkJoin(calls).subscribe({
-          next: () => this.ref.close(true),
-          error: err => this._handleError(err),
-        });
+        forkJoin(calls).subscribe({ next: () => this.ref.close(true), error: err => this._handleError(err) });
         return;
       }
-      this.data.inventorySvc.transfer({ ...basePayload, location_from_id: v.location_from_id, location_to_id: v.location_to_id, quantity: v.quantity }).subscribe({
-        next: () => this.ref.close(true),
-        error: err => this._handleError(err),
-      });
+      this.data.inventorySvc.transfer({ ...basePayload, location_from_id: v.location_from_id, location_to_id: v.location_to_id, quantity: v.quantity })
+        .subscribe({ next: () => this.ref.close(true), error: err => this._handleError(err) });
       return;
     }
 
-    // AJUSTE
+    // ── AJUSTE ───────────────────────────────────────────────────
     if (this.isAdjustment) {
-      this.data.inventorySvc.adjustment({ ...basePayload, location_id: v.location_id || undefined, quantity: v.quantity, reason: v.reason }).subscribe({
-        next: () => this.ref.close(true),
-        error: err => this._handleError(err),
-      });
+      this.data.inventorySvc.adjustment({ ...basePayload, location_id: v.location_id || undefined, quantity: v.quantity, reason: v.reason })
+        .subscribe({ next: () => this.ref.close(true), error: err => this._handleError(err) });
       return;
     }
 
-    // SALIDA — Paso 4: POST /movements/exit
+    // ── SALIDA ───────────────────────────────────────────────────
     if (this.isExit) {
-      const exitPayload = {
-        ...basePayload,
-        location_id: v.location_id || undefined,
-        quantity:    v.quantity,
-      };
-      this.data.inventorySvc.exit(exitPayload).subscribe({
+      this.data.inventorySvc.exit({ ...basePayload, location_id: v.location_id || undefined, quantity: v.quantity }).subscribe({
         next: res => {
-          // Paso 5: si el backend retorna batch_id, cargamos el lote actualizado para mostrar confirmación
           const batchId = res?.data?.batch_id;
           if (batchId) {
             this.data.inventorySvc.getBatchById(batchId).subscribe({
               next: b => this.ref.close({ ok: true, batch: b.data }),
-              error: ()  => this.ref.close({ ok: true, batch: null }),
+              error: () => this.ref.close({ ok: true, batch: null }),
             });
           } else {
             this.ref.close({ ok: true, batch: null });
@@ -648,12 +776,9 @@ export class MovementFormDialogComponent implements OnInit {
       return;
     }
 
-    // DEVOLUCIÓN
-    const simplePayload = { ...basePayload, location_id: v.location_id || undefined, quantity: v.quantity };
-    this.data.inventorySvc.return_(simplePayload).subscribe({
-      next: () => this.ref.close(true),
-      error: err => this._handleError(err),
-    });
+    // ── DEVOLUCIÓN ───────────────────────────────────────────────
+    this.data.inventorySvc.return_({ ...basePayload, location_id: v.location_id || undefined, quantity: v.quantity })
+      .subscribe({ next: () => this.ref.close(true), error: err => this._handleError(err) });
   }
 
   private _handleError(err: any): void {

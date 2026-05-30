@@ -11,7 +11,8 @@ export interface TaxBreakdownLine {
 
 export interface PurchaseOrderItem {
   id?: number; product_id: number; product_presentation_id: number;
-  quantity: number; unit_price: number | string;
+  quantity_requested: number; quantity_received?: number;
+  unit_price: number | string;
   tax_rate?: number | string;
   tax_amount?: number | string;
   total_price?: number | string;

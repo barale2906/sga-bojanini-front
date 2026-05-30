@@ -102,7 +102,7 @@ export class PurchasingPageComponent implements OnInit {
   openDetail(order: PurchaseOrder): void {
     this.dialog.open(PurchaseOrderDetailDialogComponent, {
       data: { order, purchasingSvc: this.svc, warehouses: this.warehouses() },
-      width: '900px', maxWidth: '95vw', maxHeight: '90vh',
+      width: '1000px', maxWidth: '96vw', maxHeight: '92vh',
     }).afterClosed().subscribe(() => this.loadOrders(this.meta().current_page));
   }
 

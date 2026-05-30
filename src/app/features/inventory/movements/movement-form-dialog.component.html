@@ -8,6 +8,88 @@
 
   <form [formGroup]="form" class="form-grid">
 
+    <!-- ── Contexto de Orden de Compra (desde flujo OC) ── -->
+    @if (isEntry && _linkedPo) {
+      <div class="span2 po-info-panel">
+        <div class="po-info-header">
+          <mat-icon>receipt_long</mat-icon>
+          <strong>Orden de Compra: {{ _linkedPo.code }}</strong>
+          @if (data.itemIndex !== undefined) {
+            <span class="po-item-count">Ítem {{ data.itemIndex! + 1 }} de {{ data.itemTotal }}</span>
+          }
+          <span class="po-supplier">Proveedor: {{ _linkedPo.supplier?.name || '—' }}</span>
+        </div>
+        @if (_linkedPoItem) {
+          <div class="po-item-detail">
+            <span><strong>Producto:</strong> {{ _linkedPoItem.product?.name || '—' }}</span>
+            <span><strong>Solicitado:</strong> {{ _linkedPoItem.quantity_requested }} uds.</span>
+            @if ((_linkedPoItem.quantity_received ?? 0) > 0) {
+              <span><strong>Recibido prev.:</strong> {{ _linkedPoItem.quantity_received }} uds.</span>
+            }
+            <span class="po-pending"><strong>Pendiente:</strong> {{ poPendingQty }} uds.</span>
+          </div>
+        }
+      </div>
+    }
+
+    <!-- ── Selector de OC pendiente (desde /inventory sin contexto) ── -->
+    @if (isEntry && !data.purchaseOrder) {
+      <div class="span2 po-link-section">
+        <button mat-stroked-button type="button" class="po-link-toggle" (click)="togglePoLink()">
+          <mat-icon>receipt_long</mat-icon>
+          Vincular a Orden de Compra (opcional)
+          <mat-icon class="po-link-chevron">{{ showPoLink() ? 'expand_less' : 'expand_more' }}</mat-icon>
+        </button>
+
+        @if (showPoLink()) {
+          @if (loadingPendingOrders()) {
+            <div class="cap-loading" style="margin-top:0.5rem">
+              <mat-spinner diameter="14"></mat-spinner>
+              <span>Cargando órdenes pendientes...</span>
+            </div>
+          } @else if (!pendingOrders().length) {
+            <div class="po-link-empty">No hay órdenes de compra pendientes de recepción.</div>
+          } @else {
+
+            <!-- Selector de orden -->
+            <mat-form-field appearance="outline" class="span2" style="margin-top:0.5rem">
+              <mat-label>Orden de Compra</mat-label>
+              <mat-select [value]="_selectedPoId()" (selectionChange)="onPoSelected($event.value)">
+                <mat-option [value]="null">Sin vincular</mat-option>
+                @for (po of pendingOrders(); track po.id) {
+                  <mat-option [value]="po.id">
+                    {{ po.code }}
+                    @if (po.supplier?.name) { — {{ po.supplier!.name }} }
+                    <span class="po-status-badge po-status-badge--{{ po.status }}"> [{{ poStatusLabel(po.status) }}]</span>
+                  </mat-option>
+                }
+              </mat-select>
+            </mat-form-field>
+
+            <!-- Selector de ítem de la orden -->
+            @if (_selectedPoId() && _selectedPoItems().length > 0) {
+              <mat-form-field appearance="outline" class="span2">
+                <mat-label>Ítem a recibir</mat-label>
+                <mat-select [value]="_selectedPoItemId()" (selectionChange)="onPoItemSelected($event.value)">
+                  <mat-option [value]="null">Seleccionar ítem...</mat-option>
+                  @for (item of _selectedPoItems(); track item.id) {
+                    @if ((item.quantity_received ?? 0) < item.quantity_requested) {
+                      <mat-option [value]="item.id">
+                        {{ item.product?.name || 'Ítem' }}
+                        — Pedido: {{ item.quantity_requested }}
+                        @if ((item.quantity_received ?? 0) > 0) { | Recibido: {{ item.quantity_received }} }
+                        <span class="po-item-pending"> (pendiente: {{ item.quantity_requested - (item.quantity_received ?? 0) }})</span>
+                      </mat-option>
+                    }
+                  }
+                </mat-select>
+              </mat-form-field>
+            }
+          }
+        }
+      </div>
+    }
+
     <!-- ── Producto ── -->
     <mat-form-field appearance="outline" class="span2">
       <mat-label>Producto *</mat-label>
@@ -17,6 +99,83 @@
         }
       </mat-select>
     </mat-form-field>
+
+    <!-- ── Panel de clasificación + INVIMA (solo entrada) ── -->
+    @if (isEntry) {
+      @if (loadingProductDetail()) {
+        <div class="span2 cap-loading">
+          <mat-spinner diameter="14"></mat-spinner>
+          <span>Cargando información del producto...</span>
+        </div>
+      }
+      @if (!loadingProductDetail() && productDetail(); as pd) {
+        @if (pd.classification) {
+          <div class="span2 class-panel">
+            <div class="class-header">
+              <mat-icon>{{ classIcon(pd.classification) }}</mat-icon>
+              <span class="class-badge class-badge--{{ pd.classification.code.toLowerCase() }}">
+                {{ pd.classification.code }} — {{ pd.classification.name }}
+              </span>
+              @if (pd.lab_brand) {
+                <span class="class-field"><strong>Lab./Marca:</strong> {{ pd.lab_brand }}</span>
+              }
+            </div>
+            <div class="class-fields-row">
+              @if (pd.classification.has_concentration && pd.concentration) {
+                <span class="class-field"><strong>Concentración:</strong> {{ pd.concentration }}</span>
+              }
+              @if (pd.classification.has_pharma_fields && pd.pharmaceutical_form) {
+                <span class="class-field"><strong>Forma farm.:</strong> {{ pd.pharmaceutical_form }}</span>
+              }
+              @if (pd.classification.has_pharma_fields && pd.commercial_presentation) {
+                <span class="class-field"><strong>Pres. comercial:</strong> {{ pd.commercial_presentation }}</span>
+              }
+              @if (pd.classification.has_device_fields && pd.serie_reference) {
+                <span class="class-field"><strong>Serie/Ref.:</strong> {{ pd.serie_reference }}</span>
+              }
+              @if (pd.classification.has_device_fields && pd.useful_life) {
+                <span class="class-field"><strong>Vida útil:</strong> {{ pd.useful_life }}</span>
+              }
+              @if (pd.classification.has_risk_level && pd.risk_level) {
+                <span class="class-field"><strong>Nivel de riesgo:</strong> {{ pd.risk_level }}</span>
+              }
+            </div>
+          </div>
+        }
+
+        @if (pd.classification?.has_sanitary_registration) {
+          <div class="span2 invima-panel" [class.invima-panel--ok]="hasActiveReg" [class.invima-panel--warn]="!hasActiveReg">
+            <div class="invima-header">
+              <mat-icon>verified_user</mat-icon>
+              <span>Registros Sanitarios (INVIMA)</span>
+              @if (hasActiveReg) {
+                <span class="invima-badge invima-badge--ok">✓ Activo vigente</span>
+              } @else {
+                <span class="invima-badge invima-badge--warn">⚠ Sin registro activo</span>
+              }
+            </div>
+            @if (pd.sanitary_registrations?.length) {
+              @for (reg of pd.sanitary_registrations; track reg.id) {
+                <div class="invima-reg" [class.invima-reg--expired]="reg.is_expired">
+                  <mat-icon class="invima-reg-icon">{{ reg.is_expired ? 'warning' : 'verified' }}</mat-icon>
+                  <span class="invima-reg-num">{{ reg.registration_number }}</span>
+                  <span class="invima-reg-exp">Vence: {{ reg.expiry_date | date:'dd/MM/yyyy' }}</span>
+                  @if (reg.is_expired) {
+                    <span class="invima-tag invima-tag--expired">Vencido</span>
+                  } @else if (!reg.is_active) {
+                    <span class="invima-tag invima-tag--inactive">Inactivo</span>
+                  } @else {
+                    <span class="invima-tag invima-tag--ok">Activo</span>
+                  }
+                </div>
+              }
+            } @else {
+              <div class="invima-empty">Sin registros sanitarios configurados para este producto.</div>
+            }
+          </div>
+        }
+      }
+    }
 
     <!-- ── Almacén ── -->
     <mat-form-field appearance="outline" class="span2">
@@ -64,6 +223,24 @@
 
       <!-- ── Modo ÚNICA ubicación ── -->
       @if (!useDistribution()) {
+
+        <!-- Zona (filtro de ubicaciones) -->
+        @if (zones().length > 0) {
+          <mat-form-field appearance="outline" class="span2">
+            <mat-label>Zona</mat-label>
+            <mat-select formControlName="zone_id">
+              <mat-option [value]="null">Todas las zonas</mat-option>
+              @for (z of zones(); track z.id) {
+                <mat-option [value]="z.id">
+                  <mat-icon style="font-size:1rem;vertical-align:middle;margin-right:4px">{{ zoneTypeIcon(z.type) }}</mat-icon>
+                  {{ z.name }}
+                  <span style="color:#718096;font-size:0.82em"> — {{ z.type }}</span>
+                </mat-option>
+              }
+            </mat-select>
+            <mat-hint>Filtra las ubicaciones disponibles</mat-hint>
+          </mat-form-field>
+        }
 
         <mat-form-field appearance="outline" class="span2">
           <mat-label>Ubicación</mat-label>

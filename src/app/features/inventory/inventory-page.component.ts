@@ -1,6 +1,7 @@
 import { Component, inject, signal, computed, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormBuilder, ReactiveFormsModule } from '@angular/forms';
+import { forkJoin } from 'rxjs';
 import { MatTabsModule } from '@angular/material/tabs';
 import { MatTableModule } from '@angular/material/table';
 import { MatSortModule, Sort } from '@angular/material/sort';
@@ -26,6 +27,8 @@ import { PermissionDirective } from '../../shared/directives/permission.directiv
 import { DateFormatPipe } from '../../shared/pipes/date-format.pipe';
 import { MovementFormDialogComponent } from './movements/movement-form-dialog.component';
 import { ConfirmDialogComponent } from '../../shared/components/confirm-dialog/confirm-dialog.component';
+import { PurchaseReceiveContextService } from '../purchasing/purchase-receive-context.service';
+import { PurchaseOrder } from '../purchasing/purchasing.service';
 import { EsDateAdapter, ES_DATE_FORMATS } from '../../shared/adapters/es-date.adapter';
 
 interface MovementRow {
@@ -76,12 +79,13 @@ const MOV_TYPE_ICONS: Record<string, string> = {
   styleUrl: './inventory-page.component.scss',
 })
 export class InventoryPageComponent implements OnInit {
-  private svc = inject(InventoryService);
-  private wSvc = inject(WarehouseService);
-  private cSvc = inject(CatalogService);
-  private dialog = inject(MatDialog);
-  private snack = inject(MatSnackBar);
-  private fb = inject(FormBuilder);
+  private svc        = inject(InventoryService);
+  private wSvc       = inject(WarehouseService);
+  private cSvc       = inject(CatalogService);
+  private dialog     = inject(MatDialog);
+  private snack      = inject(MatSnackBar);
+  private fb         = inject(FormBuilder);
+  private poReceiveCtx = inject(PurchaseReceiveContextService);
 
   // Batches
   batches = signal<Batch[]>([]);
@@ -145,12 +149,66 @@ export class InventoryPageComponent implements OnInit {
   ];
 
   ngOnInit(): void {
-    this.wSvc.getWarehouses().subscribe({ next: r => this.warehouses.set(r.data), error: () => {} });
-    this.cSvc.getProducts({ per_page: 200 }).subscribe({ next: r => this.products.set(r.data), error: () => {} });
+    const pendingOrder = this.poReceiveCtx.consumeOrder();
+
+    // Carga inicial de almacenes y productos; si hay OC pendiente, esperar antes de abrir diálogos
+    forkJoin([
+      this.wSvc.getWarehouses(),
+      this.cSvc.getProducts({ per_page: 200 }),
+    ]).subscribe({
+      next: ([wRes, pRes]) => {
+        this.warehouses.set(wRes.data);
+        this.products.set(pRes.data);
+        if (pendingOrder) {
+          this._openPoReceiveSequentially(pendingOrder);
+        }
+      },
+      error: () => {},
+    });
+
     this.loadBatches(); this.loadExpiringBatches(); this.loadStock(); this.loadLowStock(); this.loadMovements();
     this.batchFilters.valueChanges.subscribe(() => this.loadBatches(1));
     this.stockFilters.valueChanges.subscribe(() => this.loadStock(1));
     this.moveFilters.valueChanges.subscribe(() => this.loadMovements(1));
+  }
+
+  private _openPoReceiveSequentially(order: PurchaseOrder): void {
+    const items = order.items ?? [];
+    if (!items.length) return;
+
+    const openItem = (idx: number): void => {
+      if (idx >= items.length) return;
+      const item = items[idx];
+      const pending = item.quantity_requested - (item.quantity_received ?? 0);
+      // Saltar ítems ya completamente recibidos
+      if (pending <= 0) { openItem(idx + 1); return; }
+
+      this.dialog.open(MovementFormDialogComponent, {
+        data: {
+          type: 'entry',
+          warehouses: this.warehouses(),
+          products: this.products(),
+          inventorySvc: this.svc,
+          purchaseOrder: order,
+          purchaseOrderItem: item,
+          itemIndex: idx,
+          itemTotal: items.length,
+        },
+        width: '820px', maxWidth: '96vw', maxHeight: '94vh',
+      }).afterClosed().subscribe(result => {
+        const ok = result === true || result?.ok;
+        if (ok) {
+          this.loadStock(); this.loadMovements(); this.loadBatches();
+          this.snack.open(
+            items.length > 1 ? `Entrada ítem ${idx + 1}/${items.length} registrada` : 'Entrada registrada',
+            'OK', { duration: 3000 },
+          );
+        }
+        openItem(idx + 1);
+      });
+    };
+
+    openItem(0);
   }
 
   loadBatches(page = 1): void {
