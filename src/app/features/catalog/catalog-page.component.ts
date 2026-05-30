@@ -126,13 +126,13 @@ export class CatalogPageComponent implements OnInit {
   loadCategories(): void {
     const { search, is_active } = this.catFilters.value;
     this.svc.getCategories({ search: search || undefined, is_active: is_active || undefined })
-      .subscribe({ next: r => this.categories.set(r.data), error: () => {} });
+      .subscribe({ next: r => this.categories.set(r.data ?? []), error: () => {} });
   }
 
   loadUnits(): void {
     const { search, is_active, is_base } = this.uomFilters.value;
     this.svc.getUnits({ search: search || undefined, is_active: is_active || undefined, is_base: is_base || undefined })
-      .subscribe({ next: r => this.units.set(r.data), error: () => {} });
+      .subscribe({ next: r => this.units.set(r.data ?? []), error: () => {} });
   }
 
   loadProducts(): void {
@@ -144,7 +144,7 @@ export class CatalogPageComponent implements OnInit {
       product_type: product_type || undefined,
       is_active: is_active || undefined,
     }).subscribe({
-      next: r => { this.products.set(r.data); this.loading.set(false); },
+      next: r => { this.products.set(r.data ?? []); this.loading.set(false); },
       error: () => this.loading.set(false),
     });
   }
@@ -152,7 +152,7 @@ export class CatalogPageComponent implements OnInit {
   loadSuppliers(): void {
     const { search, is_active } = this.suppFilters.value;
     this.svc.getSuppliers({ search: search || undefined, is_active: is_active || undefined })
-      .subscribe({ next: r => this.suppliers.set(r.data), error: () => {} });
+      .subscribe({ next: r => this.suppliers.set(r.data ?? []), error: () => {} });
   }
 
   // ── Helpers ────────────────────────────────────────────────
@@ -324,7 +324,7 @@ export class CatalogPageComponent implements OnInit {
     // 1) Catálogo global (fuente principal de la tabla)
     this.svc.getCatalogPresentations().subscribe({
       next: r => {
-        this.catalogPresentations.set(r.data);
+        this.catalogPresentations.set(r.data ?? []);
         this.filterCatalogPresentations();
         this.loadingPresentations.set(false);
         this.presTabLoaded.set(true);
@@ -346,13 +346,13 @@ export class CatalogPageComponent implements OnInit {
   private _loadPresProductsMap(): void {
     this.svc.getProducts({ product_type: 'simple', is_active: '1', per_page: 9999 }).subscribe({
       next: r => {
-        const simples = r.data;
+        const simples = r.data ?? [];
         if (simples.length === 0) { this.presProductsMapLoaded.set(true); return; }
 
         forkJoin(
           simples.map(p =>
             this.svc.getPresentations(p.id).pipe(
-              map(res => ({ product: p, presIds: res.data.map((pr: ProductPresentation) => pr.id) })),
+              map(res => ({ product: p, presIds: (res.data ?? []).map((pr: ProductPresentation) => pr.id) })),
               catchError(() => of({ product: p, presIds: [] as number[] }))
             )
           )

@@ -48,7 +48,7 @@ export class RoleListComponent implements OnInit {
     this.loading.set(true);
     this.roleService.getAll().subscribe({
       next: (res) => {
-        this.roles.set(res.data);
+        this.roles.set(res.data ?? []);
         this.loading.set(false);
       },
       error: () => this.loading.set(false),

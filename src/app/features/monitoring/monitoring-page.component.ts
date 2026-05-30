@@ -57,7 +57,7 @@ export class MonitoringPageComponent implements OnInit {
   });
 
   ngOnInit(): void {
-    this.wSvc.getZones().subscribe({ next: r => this.zones.set(r.data), error: () => {} });
+    this.wSvc.getZones().subscribe({ next: r => this.zones.set(r.data ?? []), error: () => {} });
     this.loadSensors();
     this.sensorFilters.valueChanges.subscribe(() => this.loadSensors());
   }
@@ -65,7 +65,7 @@ export class MonitoringPageComponent implements OnInit {
   loadSensors(): void {
     const { zone_id, type } = this.sensorFilters.value;
     this.svc.getSensors({ zone_id: zone_id ? Number(zone_id) : undefined, type: type || undefined }).subscribe({
-      next: r => this.sensors.set(r.data), error: () => {},
+      next: r => this.sensors.set(r.data ?? []), error: () => {},
     });
   }
 

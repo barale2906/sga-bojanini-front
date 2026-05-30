@@ -72,7 +72,7 @@ export class AuditPageComponent implements OnInit {
     if (date_from) p = p.set('date_from', date_from);
     if (date_to) p = p.set('date_to', date_to);
     this.http.get<any>(`${this.api}/audit-logs`, { params: p }).subscribe({
-      next: r => { this.logs.set(r.data); this.meta.set(r.meta); this.loading.set(false); },
+      next: r => { this.logs.set(r.data ?? []); this.meta.set(r.meta); this.loading.set(false); },
       error: () => this.loading.set(false),
     });
   }

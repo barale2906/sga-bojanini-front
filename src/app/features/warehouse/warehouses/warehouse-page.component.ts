@@ -84,7 +84,7 @@ export class WarehousePageComponent implements OnInit {
     this.loading.set(true);
     const { search, is_active } = this.whFilters.value;
     this.svc.getWarehouses({ search: search || undefined, is_active: is_active || undefined }).subscribe({
-      next: r => { this.warehouses.set(r.data); this.loading.set(false); },
+      next: r => { this.warehouses.set(r.data ?? []); this.loading.set(false); },
       error: () => this.loading.set(false),
     });
   }
@@ -95,13 +95,13 @@ export class WarehousePageComponent implements OnInit {
       warehouse_id: warehouse_id ? Number(warehouse_id) : undefined,
       type: type || undefined,
       search: search || undefined,
-    }).subscribe({ next: r => this.zones.set(r.data), error: () => {} });
+    }).subscribe({ next: r => this.zones.set(r.data ?? []), error: () => {} });
   }
 
   loadLocations(): void {
     const { zone_id } = this.locFilters.value;
     this.svc.getLocations({ zone_id: zone_id ? Number(zone_id) : undefined }).subscribe({
-      next: r => this.locations.set(r.data), error: () => {},
+      next: r => this.locations.set(r.data ?? []), error: () => {},
     });
   }
 

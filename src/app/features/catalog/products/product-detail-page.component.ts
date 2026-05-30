@@ -105,11 +105,11 @@ export class ProductDetailPageComponent implements OnInit {
   }
 
   loadPresentations(productId: number): void {
-    this.svc.getPresentations(productId).subscribe({ next: r => this.presentations.set(r.data) });
+    this.svc.getPresentations(productId).subscribe({ next: r => this.presentations.set(r.data ?? []) });
   }
 
   loadSanitaryRegistrations(productId: number): void {
-    this.svc.getSanitaryRegistrations(productId).subscribe({ next: r => this.sanitaryRegistrations.set(r.data) });
+    this.svc.getSanitaryRegistrations(productId).subscribe({ next: r => this.sanitaryRegistrations.set(r.data ?? []) });
   }
 
   /**

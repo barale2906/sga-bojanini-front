@@ -214,26 +214,26 @@ export class InventoryPageComponent implements OnInit {
   loadBatches(page = 1): void {
     const { status, warehouse_id } = this.batchFilters.value;
     this.svc.getBatches({ status: status || undefined, warehouse_id: warehouse_id ? Number(warehouse_id) : undefined, page, per_page: this.batchMeta().per_page }).subscribe({
-      next: r => { this.batches.set(r.data); this.batchMeta.set(r.meta); },
+      next: r => { this.batches.set(r.data ?? []); this.batchMeta.set(r.meta); },
       error: () => {},
     });
   }
 
   loadExpiringBatches(): void {
-    this.svc.getExpiringBatches().subscribe({ next: r => this.expiringBatches.set(r.data), error: () => {} });
+    this.svc.getExpiringBatches().subscribe({ next: r => this.expiringBatches.set(r.data ?? []), error: () => {} });
   }
 
   loadStock(page = 1): void {
     const { warehouse_id, product_id } = this.stockFilters.value;
     this.loading.set(true);
     this.svc.getStock({ warehouse_id: warehouse_id ? Number(warehouse_id) : undefined, product_id: product_id ? Number(product_id) : undefined, page, per_page: this.stockMeta().per_page }).subscribe({
-      next: r => { this.stock.set(r.data); this.stockMeta.set(r.meta); this.loading.set(false); },
+      next: r => { this.stock.set(r.data ?? []); this.stockMeta.set(r.meta); this.loading.set(false); },
       error: () => this.loading.set(false),
     });
   }
 
   loadLowStock(): void {
-    this.svc.getLowStock().subscribe({ next: r => this.lowStock.set(r.data), error: () => {} });
+    this.svc.getLowStock().subscribe({ next: r => this.lowStock.set(r.data ?? []), error: () => {} });
   }
 
   loadMovements(page = 1): void {
@@ -248,7 +248,7 @@ export class InventoryPageComponent implements OnInit {
       per_page: this.moveMeta().per_page,
     }).subscribe({
       next: r => {
-        const rows: MovementRow[] = r.data.map(m => ({
+        const rows: MovementRow[] = (r.data ?? []).map(m => ({
           id: m.id,
           movement_type: m.movement_type,
           product_name: m.product_name || m.product?.name || '—',

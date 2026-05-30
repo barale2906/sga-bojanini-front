@@ -14,56 +14,18 @@
   <!-- Navigation -->
   <nav class="sidebar__nav">
     @for (item of menuService.menu(); track item.key) {
-      @if (item.children.length === 0) {
-        <!-- Ítem hoja (sin hijos) -->
-        <a
-          class="sidebar__item"
-          [class.sidebar__item--active]="isLeafActive(item)"
-          [routerLink]="resolveRoute(item.route)"
-          [matTooltip]="collapsed ? item.label : ''"
-          matTooltipPosition="right"
-        >
-          <mat-icon class="sidebar__item-icon">{{ resolveIcon(item.icon) }}</mat-icon>
-          @if (!collapsed) {
-            <span class="sidebar__item-label">{{ item.label }}</span>
-          }
-        </a>
-      } @else {
-        <!-- Sección con hijos -->
-        <div class="sidebar__group">
-          <button
-            class="sidebar__group-header"
-            [class.sidebar__group-header--active]="isGroupActive(item)"
-            [matTooltip]="collapsed ? item.label : ''"
-            matTooltipPosition="right"
-            (click)="onGroupClick(item)"
-          >
-            <mat-icon class="sidebar__item-icon">{{ resolveIcon(item.icon) }}</mat-icon>
-            @if (!collapsed) {
-              <span class="sidebar__item-label">{{ item.label }}</span>
-              <mat-icon class="sidebar__group-arrow">
-                {{ isExpanded(item.key) ? 'expand_less' : 'expand_more' }}
-              </mat-icon>
-            }
-          </button>
-          @if (!collapsed && isExpanded(item.key)) {
-            <div class="sidebar__children">
-              @for (child of item.children; track child.key) {
-                <a
-                  class="sidebar__item sidebar__item--child"
-                  [class.sidebar__item--active]="isLeafActive(child)"
-                  [routerLink]="resolveRoute(child.route)"
-                  [matTooltip]="collapsed ? child.label : ''"
-                  matTooltipPosition="right"
-                >
-                  <mat-icon class="sidebar__item-icon">{{ resolveIcon(child.icon) }}</mat-icon>
-                  <span class="sidebar__item-label">{{ child.label }}</span>
-                </a>
-              }
-            </div>
-          }
-        </div>
-      }
+      <a
+        class="sidebar__item"
+        [class.sidebar__item--active]="item.children.length === 0 ? isLeafActive(item) : isGroupActive(item)"
+        [routerLink]="item.children.length === 0 ? resolveRoute(item.route) : getFirstChildRoute(item)"
+        [matTooltip]="collapsed ? item.label : ''"
+        matTooltipPosition="right"
+      >
+        <mat-icon class="sidebar__item-icon">{{ resolveIcon(item.icon) }}</mat-icon>
+        @if (!collapsed) {
+          <span class="sidebar__item-label">{{ item.label }}</span>
+        }
+      </a>
     }
   </nav>
 

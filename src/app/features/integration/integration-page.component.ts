@@ -79,12 +79,12 @@ export class IntegrationPageComponent implements OnInit {
 
   ngOnInit(): void {
     this.loadIntegrations(); this.loadAppointments(); this.loadDemand(); this.loadConsumptions();
-    this.wSvc.getWarehouses().subscribe({ next: r => this.warehouses.set(r.data), error: () => {} });
-    this.cSvc.getProducts({ per_page: 200 }).subscribe({ next: r => this.products.set(r.data), error: () => {} });
+    this.wSvc.getWarehouses().subscribe({ next: r => this.warehouses.set(r.data ?? []), error: () => {} });
+    this.cSvc.getProducts({ per_page: 200 }).subscribe({ next: r => this.products.set(r.data ?? []), error: () => {} });
   }
 
   loadIntegrations(): void {
-    this.http.get<any>(`${this.api}/integrations`).subscribe({ next: r => this.integrations.set(r.data || []), error: () => {} });
+    this.http.get<any>(`${this.api}/integrations`).subscribe({ next: r => this.integrations.set(Array.isArray(r.data) ? r.data : []), error: () => {} });
   }
 
   saveIntegration(): void {
@@ -107,7 +107,7 @@ export class IntegrationPageComponent implements OnInit {
 
   loadAppointments(): void {
     const p = new HttpParams().set('date_from', this.dateFrom()).set('date_to', this.dateTo());
-    this.http.get<any>(`${this.api}/scheduling/appointments`, { params: p }).subscribe({ next: r => this.appointments.set(r.data || []), error: () => {} });
+    this.http.get<any>(`${this.api}/scheduling/appointments`, { params: p }).subscribe({ next: r => this.appointments.set(Array.isArray(r.data) ? r.data : []), error: () => {} });
   }
 
   loadDemand(): void {
@@ -118,7 +118,7 @@ export class IntegrationPageComponent implements OnInit {
   loadConsumptions(page = 1): void {
     const p = new HttpParams().set('per_page', '25').set('page', String(page));
     this.http.get<any>(`${this.api}/consumptions`, { params: p }).subscribe({
-      next: r => { this.consumptions.set(r.data || []); this.consumptionMeta.set(r.meta || this.consumptionMeta()); },
+      next: r => { this.consumptions.set(Array.isArray(r.data) ? r.data : []); this.consumptionMeta.set(r.meta || this.consumptionMeta()); },
       error: () => {},
     });
   }

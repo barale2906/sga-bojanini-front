@@ -64,9 +64,9 @@ export class PurchasingPageComponent implements OnInit {
   ngOnInit(): void {
     this.loadOrders();
     this.loadSuggestions();
-    this.cSvc.getSuppliers({ per_page: 200 }).subscribe({ next: r => this.suppliers.set(r.data), error: () => {} });
-    this.wSvc.getWarehouses().subscribe({ next: r => this.warehouses.set(r.data), error: () => {} });
-    this.cSvc.getProducts({ per_page: 200, product_type: 'simple' }).subscribe({ next: r => this.products.set(r.data), error: () => {} });
+    this.cSvc.getSuppliers({ per_page: 200 }).subscribe({ next: r => this.suppliers.set(r.data ?? []), error: () => {} });
+    this.wSvc.getWarehouses().subscribe({ next: r => this.warehouses.set(r.data ?? []), error: () => {} });
+    this.cSvc.getProducts({ per_page: 200, product_type: 'simple' }).subscribe({ next: r => this.products.set(r.data ?? []), error: () => {} });
     this.filters.get('status')!.valueChanges.subscribe(() => this.loadOrders(1));
   }
 
@@ -74,14 +74,14 @@ export class PurchasingPageComponent implements OnInit {
     this.loading.set(true);
     const { status } = this.filters.value;
     this.svc.getOrders({ status: status || undefined, per_page: this.meta().per_page, page }).subscribe({
-      next: r => { this.orders.set(r.data); this.meta.set(r.meta); this.loading.set(false); },
+      next: r => { this.orders.set(r.data ?? []); this.meta.set(r.meta); this.loading.set(false); },
       error: () => this.loading.set(false),
     });
   }
 
   loadSuggestions(): void {
     this.svc.getSuggestions().subscribe({
-      next: r => { this.suggestions.set(r.data); this.selectedSugg.clear(); },
+      next: r => { this.suggestions.set(r.data ?? []); this.selectedSugg.clear(); },
       error: () => {},
     });
   }

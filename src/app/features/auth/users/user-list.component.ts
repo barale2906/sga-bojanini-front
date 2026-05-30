@@ -86,7 +86,7 @@ export class UserListComponent implements OnInit {
       page,
     }).subscribe({
       next: (res) => {
-        this.users.set(res.data);
+        this.users.set(res.data ?? []);
         this.meta.set(res.meta);
         this.loading.set(false);
       },
