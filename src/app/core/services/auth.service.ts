@@ -1,16 +1,18 @@
-import { Injectable, signal, computed } from '@angular/core';
+import { Injectable, signal, computed, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Router } from '@angular/router';
 import { Observable, tap } from 'rxjs';
 import { environment } from '../../../environments/environment';
 import { ApiResponse } from '../models/api-response.model';
 import { User, LoginResponse } from '../models/user.model';
+import { MenuService } from './menu.service';
 
 @Injectable({ providedIn: 'root' })
 export class AuthService {
   private api = environment.apiUrl;
   private currentUser = signal<User | null>(null);
   private refreshInterval: ReturnType<typeof setInterval> | null = null;
+  private menuService = inject(MenuService);
 
   // Signals públicos (solo lectura)
   user = this.currentUser.asReadonly();
@@ -23,6 +25,7 @@ export class AuthService {
       try {
         this.currentUser.set(JSON.parse(saved));
         this.startTokenRefresh();
+        this.menuService.loadMenu().subscribe();
       } catch {
         this.clearSession();
       }
@@ -42,6 +45,7 @@ export class AuthService {
           localStorage.setItem('sga_user', JSON.stringify(res.data.user));
           this.currentUser.set(res.data.user);
           this.startTokenRefresh();
+          this.menuService.loadMenu().subscribe();
         })
       );
   }
@@ -55,6 +59,7 @@ export class AuthService {
     localStorage.removeItem('sga_token');
     localStorage.removeItem('sga_user');
     this.currentUser.set(null);
+    this.menuService.clearMenu();
     this.stopTokenRefresh();
     this.router.navigate(['/login']);
   }
@@ -74,6 +79,7 @@ export class AuthService {
       .pipe(
         tap((res) => {
           localStorage.setItem('sga_token', res.data.token);
+          this.menuService.loadMenu().subscribe();
         })
       );
   }

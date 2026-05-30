@@ -749,6 +749,73 @@
           }
         }
 
+        <!-- ── Centro de Costo (solo EXIT) ── -->
+        @if (isExit) {
+          @if (loadingCostCenters()) {
+            <div class="span2 cap-loading">
+              <mat-spinner diameter="14"></mat-spinner>
+              <span>Cargando centros de costo...</span>
+            </div>
+          }
+
+          <mat-form-field appearance="outline" class="span2">
+            <mat-label>Centro de Costo *</mat-label>
+            <mat-select formControlName="cost_center_id">
+              @for (cc of costCenters(); track cc.id) {
+                <mat-option [value]="cc.id">
+                  {{ cc.name }}
+                  <span style="color:#718096;font-size:0.84em"> — {{ cc.type_label }}</span>
+                </mat-option>
+              }
+            </mat-select>
+            @if (selectedCostCenter) {
+              <mat-hint>
+                {{ selectedCostCenter.type_label }}
+                @if (selectedCostCenter.description) { · {{ selectedCostCenter.description }} }
+              </mat-hint>
+            }
+          </mat-form-field>
+
+          <!-- Bloque paciente — solo centros externos -->
+          @if (isExternalCenter) {
+            <div class="span2 patient-panel">
+              <div class="patient-panel-header">
+                <mat-icon>person</mat-icon>
+                <span>Datos del Paciente</span>
+                <span class="patient-panel-badge">Centro externo</span>
+              </div>
+
+              @if (loadingMedicalServices()) {
+                <div class="cap-loading">
+                  <mat-spinner diameter="14"></mat-spinner>
+                  <span>Cargando servicios médicos...</span>
+                </div>
+              }
+
+              <mat-form-field appearance="outline" class="span2">
+                <mat-label>Servicio Médico *</mat-label>
+                <mat-select formControlName="service_id">
+                  @for (svc of medicalServices(); track svc.id) {
+                    <mat-option [value]="svc.id">{{ svc.code }} — {{ svc.name }}</mat-option>
+                  }
+                </mat-select>
+              </mat-form-field>
+
+              <mat-form-field appearance="outline">
+                <mat-label>N° Documento del Paciente *</mat-label>
+                <input matInput formControlName="patient_document" maxlength="50" placeholder="1012345678" />
+                <mat-hint>Cédula o documento de identidad</mat-hint>
+              </mat-form-field>
+
+              <mat-form-field appearance="outline">
+                <mat-label>ID en Sistema Clínico *</mat-label>
+                <input matInput formControlName="patient_external_id" maxlength="100" placeholder="EXT-00892" />
+                <mat-hint>ID del paciente en el HIS/EMR</mat-hint>
+              </mat-form-field>
+            </div>
+          }
+        }
+
         <!-- Cantidad -->
         <mat-form-field appearance="outline" class="span2">
           <mat-label>Cantidad *</mat-label>

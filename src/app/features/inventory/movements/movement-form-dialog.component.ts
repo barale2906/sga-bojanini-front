@@ -11,7 +11,7 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { MatDividerModule } from '@angular/material/divider';
 import { forkJoin, finalize } from 'rxjs';
-import { InventoryService, StockSummary, BatchDetail } from '../inventory.service';
+import { InventoryService, StockSummary, BatchDetail, CostCenter, MedicalService } from '../inventory.service';
 import { WarehouseService, Warehouse, Location, LocationCapacity, Zone } from '../../warehouse/warehouse.service';
 import { CatalogService, Product, ProductPresentation, ProductClassification } from '../../catalog/catalog.service';
 import { PurchasingService, PurchaseOrder, PurchaseOrderItem } from '../../purchasing/purchasing.service';
@@ -90,6 +90,12 @@ export class MovementFormDialogComponent implements OnInit {
   entryRowCaps    = signal<(LocationCapacity | null)[]>([]);
   transferRowCaps = signal<(LocationCapacity | null)[]>([]);
 
+  // ── Centros de costo y servicios médicos ─────────────────────
+  costCenters            = signal<CostCenter[]>([]);
+  loadingCostCenters     = signal(false);
+  medicalServices        = signal<MedicalService[]>([]);
+  loadingMedicalServices = signal(false);
+
   // ── FEFO / Stock ─────────────────────────────────────────────
   stockSummary     = signal<StockSummary | null>(null);
   loadingStock     = signal(false);
@@ -112,6 +118,15 @@ export class MovementFormDialogComponent implements OnInit {
   }
 
   // ── Getters generales ─────────────────────────────────────────
+
+  get selectedCostCenter(): CostCenter | null {
+    const id = this.form.get('cost_center_id')?.value;
+    return this.costCenters().find(c => c.id === id) ?? null;
+  }
+
+  get isExternalCenter(): boolean {
+    return this.selectedCostCenter?.is_external === true;
+  }
 
   get selectedProduct(): Product | null {
     const id = this.form.get('product_id')?.value;
@@ -200,6 +215,10 @@ export class MovementFormDialogComponent implements OnInit {
     if (this.isExit) {
       const s = this.stockSummary();
       if (s !== null && s.available_quantity === 0) return false;
+      if (!v.cost_center_id) return false;
+      if (this.isExternalCenter) {
+        if (!v.service_id || !v.patient_document?.trim() || !v.patient_external_id?.trim()) return false;
+      }
     }
     return true;
   }
@@ -227,6 +246,10 @@ export class MovementFormDialogComponent implements OnInit {
     manufacturing_date:       [''],
     reason:                   [''],
     notes:                    [''],
+    cost_center_id:           [null as number | null],
+    service_id:               [null as number | null],
+    patient_document:         [null as string | null],
+    patient_external_id:      [null as string | null],
   });
 
   ngOnInit(): void {
@@ -309,6 +332,31 @@ export class MovementFormDialogComponent implements OnInit {
 
     this._addEntryRow();
     this._addTransferRow();
+
+    // Centros de costo — solo para salidas
+    if (this.isExit) {
+      this.loadingCostCenters.set(true);
+      this.data.inventorySvc.getCostCenters({ is_active: true })
+        .pipe(finalize(() => this.loadingCostCenters.set(false)))
+        .subscribe({ next: r => this.costCenters.set(r.data), error: () => {} });
+    }
+
+    // Centro de costo → servicios médicos si es externo
+    this.form.get('cost_center_id')!.valueChanges.subscribe(ccId => {
+      this.medicalServices.set([]);
+      this.form.patchValue(
+        { service_id: null, patient_document: null, patient_external_id: null },
+        { emitEvent: false },
+      );
+      if (!ccId) return;
+      const center = this.costCenters().find(c => c.id === Number(ccId));
+      if (center?.is_external) {
+        this.loadingMedicalServices.set(true);
+        this.data.inventorySvc.getMedicalServices({ is_active: true })
+          .pipe(finalize(() => this.loadingMedicalServices.set(false)))
+          .subscribe({ next: r => this.medicalServices.set(r.data), error: () => {} });
+      }
+    });
 
     // Pre-rellenar desde contexto de OC
     if (this.data.purchaseOrder && this.data.purchaseOrderItem) {
@@ -759,7 +807,20 @@ export class MovementFormDialogComponent implements OnInit {
 
     // ── SALIDA ───────────────────────────────────────────────────
     if (this.isExit) {
-      this.data.inventorySvc.exit({ ...basePayload, location_id: v.location_id || undefined, quantity: v.quantity }).subscribe({
+      const exitPayload: Record<string, unknown> = {
+        ...basePayload,
+        location_id:    v.location_id    || undefined,
+        quantity:       v.quantity,
+        cost_center_id: v.cost_center_id,
+      };
+
+      if (this.isExternalCenter) {
+        exitPayload['service_id']          = v.service_id;
+        exitPayload['patient_document']    = v.patient_document    || undefined;
+        exitPayload['patient_external_id'] = v.patient_external_id || undefined;
+      }
+
+      this.data.inventorySvc.exit(exitPayload).subscribe({
         next: res => {
           const batchId = res?.data?.batch_id;
           if (batchId) {

@@ -54,6 +54,24 @@ export interface StockItem {
   last_movement_at: string | null;
 }
 
+export interface CostCenter {
+  id: number;
+  code: string;
+  name: string;
+  type: 'internal' | 'external';
+  type_label: string;
+  is_external: boolean;
+  description: string | null;
+  is_active: boolean;
+}
+
+export interface MedicalService {
+  id: number;
+  code: string;
+  name: string;
+  is_active: boolean;
+}
+
 export interface Movement {
   id: number;
   product_id: number;
@@ -67,6 +85,12 @@ export interface Movement {
   product_name: string;
   batch_lot_number: string | null;
   user_name: string;
+  cost_center_id?: number | null;
+  service_id?: number | null;
+  patient_document?: string | null;
+  patient_external_id?: string | null;
+  cost_center?: { id: number; code: string; name: string; type: string };
+  medical_service?: { id: number; code: string; name: string };
   // Nested objects (algunos endpoints los incluyen)
   product?: { id: number; code: string; name: string };
   warehouse?: { id: number; name: string };
@@ -150,19 +174,23 @@ export class InventoryService {
     warehouse_id?: number;
     product_id?: number;
     movement_type?: string;
+    cost_center_id?: number;
+    cost_center_type?: 'internal' | 'external';
     date_from?: string;
     date_to?: string;
     per_page?: number;
     page?: number;
   } = {}): Observable<PaginatedResponse<Movement>> {
     let p = new HttpParams();
-    if (f.warehouse_id)  p = p.set('warehouse_id',  String(f.warehouse_id));
-    if (f.product_id)    p = p.set('product_id',    String(f.product_id));
-    if (f.movement_type) p = p.set('movement_type', f.movement_type);
-    if (f.date_from)     p = p.set('date_from',     f.date_from);
-    if (f.date_to)       p = p.set('date_to',       f.date_to);
-    if (f.per_page)      p = p.set('per_page',      String(f.per_page));
-    if (f.page)          p = p.set('page',          String(f.page));
+    if (f.warehouse_id)     p = p.set('warehouse_id',     String(f.warehouse_id));
+    if (f.product_id)       p = p.set('product_id',       String(f.product_id));
+    if (f.movement_type)    p = p.set('movement_type',    f.movement_type);
+    if (f.cost_center_id)   p = p.set('cost_center_id',   String(f.cost_center_id));
+    if (f.cost_center_type) p = p.set('cost_center_type', f.cost_center_type);
+    if (f.date_from)        p = p.set('date_from',        f.date_from);
+    if (f.date_to)          p = p.set('date_to',          f.date_to);
+    if (f.per_page)         p = p.set('per_page',         String(f.per_page));
+    if (f.page)             p = p.set('page',             String(f.page));
     return this.http.get<PaginatedResponse<Movement>>(`${this.api}/movements`, { params: p });
   }
 
@@ -191,5 +219,17 @@ export class InventoryService {
   }
   writeOff(batchId: number): Observable<ApiResponse<any>> {
     return this.http.post<ApiResponse<any>>(`${this.api}/movements/write-off`, { batch_id: batchId });
+  }
+
+  getCostCenters(f: { is_active?: boolean } = {}): Observable<ApiResponse<CostCenter[]>> {
+    let p = new HttpParams();
+    if (f.is_active !== undefined) p = p.set('is_active', String(f.is_active));
+    return this.http.get<ApiResponse<CostCenter[]>>(`${this.api}/cost-centers`, { params: p });
+  }
+
+  getMedicalServices(f: { is_active?: boolean } = {}): Observable<ApiResponse<MedicalService[]>> {
+    let p = new HttpParams();
+    if (f.is_active !== undefined) p = p.set('is_active', String(f.is_active));
+    return this.http.get<ApiResponse<MedicalService[]>>(`${this.api}/medical-services`, { params: p });
   }
 }

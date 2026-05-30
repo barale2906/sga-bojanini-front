@@ -1,24 +1,47 @@
 import { Component, Input, OnInit, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterModule, Router } from '@angular/router';
-import { MatListModule } from '@angular/material/list';
 import { MatIconModule } from '@angular/material/icon';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { AuthService } from '../../core/services/auth.service';
+import { MenuService } from '../../core/services/menu.service';
+import { MenuItem } from '../../core/models/menu.model';
 
-interface NavItem {
-  label: string;
-  icon: string;
-  route?: string;
-  permission?: string | string[];
-  children?: NavItem[];
-  expanded?: boolean;
-}
+const ICON_MAP: Record<string, string> = {
+  'layout-dashboard': 'dashboard',
+  'building-2': 'warehouse',
+  'grid-2x2': 'grid_view',
+  'map-pin': 'place',
+  'book-open': 'menu_book',
+  'package': 'inventory_2',
+  'tag': 'label',
+  'ruler': 'straighten',
+  'layers': 'layers',
+  'truck': 'local_shipping',
+  'warehouse': 'warehouse',
+  'boxes': 'inventory',
+  'calendar-range': 'date_range',
+  'arrow-left-right': 'swap_horiz',
+  'landmark': 'account_balance',
+  'stethoscope': 'medical_services',
+  'shopping-cart': 'shopping_cart',
+  'file-text': 'description',
+  'activity': 'timeline',
+  'thermometer': 'thermostat',
+  'bell': 'notifications',
+  'plug': 'power',
+  'heart-pulse': 'monitor_heart',
+  'bar-chart-2': 'bar_chart',
+  'shield-check': 'verified_user',
+  'settings': 'settings',
+  'users': 'people',
+  'shield': 'security',
+};
 
 @Component({
   selector: 'app-sidebar',
   standalone: true,
-  imports: [CommonModule, RouterModule, MatListModule, MatIconModule, MatTooltipModule],
+  imports: [CommonModule, RouterModule, MatIconModule, MatTooltipModule],
   templateUrl: './sidebar.component.html',
   styleUrl: './sidebar.component.scss',
 })
@@ -27,84 +50,65 @@ export class SidebarComponent implements OnInit {
 
   auth = inject(AuthService);
   router = inject(Router);
+  menuService = inject(MenuService);
 
-  navItems: NavItem[] = [
-    {
-      label: 'Dashboard',
-      icon: 'dashboard',
-      route: '/dashboard',
-      permission: 'tablero.ver',
-    },
-    {
-      label: 'Almacenes',
-      icon: 'warehouse',
-      route: '/warehouses',
-      permission: 'almacenes.ver',
-    },
-    {
-      label: 'Catálogo',
-      icon: 'inventory_2',
-      route: '/catalog',
-      permission: 'productos.ver',
-    },
-    {
-      label: 'Inventario',
-      icon: 'layers',
-      route: '/inventory',
-      permission: 'stock.ver',
-    },
-    {
-      label: 'Compras',
-      icon: 'shopping_cart',
-      route: '/purchasing',
-      permission: 'ordenes_compra.ver',
-    },
-    {
-      label: 'Monitoreo',
-      icon: 'thermostat',
-      route: '/monitoring',
-      permission: 'sensores.ver',
-    },
-    {
-      label: 'Integraciones',
-      icon: 'integration_instructions',
-      route: '/integrations',
-      permission: 'integraciones.ver',
-    },
-    {
-      label: 'Reportes',
-      icon: 'bar_chart',
-      route: '/reports',
-      permission: 'reportes.ver',
-    },
-    {
-      label: 'Auditoría',
-      icon: 'history',
-      route: '/audit',
-      permission: 'auditoria.ver',
-    },
-    {
-      label: 'Usuarios',
-      icon: 'people',
-      route: '/users',
-      permission: 'usuarios.ver',
-    },
-    {
-      label: 'Roles',
-      icon: 'manage_accounts',
-      route: '/roles',
-      permission: 'roles.ver',
-    },
-  ];
-
-  visibleItems: NavItem[] = [];
+  expandedGroups = new Set<string>();
 
   ngOnInit(): void {
-    this.visibleItems = this.navItems.filter((item) => {
-      if (!item.permission) return true;
-      const perms = Array.isArray(item.permission) ? item.permission : [item.permission];
-      return this.auth.hasAnyPermission(perms);
+    for (const item of this.menuService.menu()) {
+      if (item.children.length > 0 && this.isGroupActive(item)) {
+        this.expandedGroups.add(item.key);
+      }
+    }
+  }
+
+  resolveIcon(lucideIcon: string): string {
+    return ICON_MAP[lucideIcon] ?? 'circle';
+  }
+
+  resolveRoute(routeName: string | null): string | null {
+    return this.menuService.resolveRoute(routeName);
+  }
+
+  isLeafActive(item: MenuItem): boolean {
+    const path = this.resolveRoute(item.route);
+    return path ? this.isActive(path) : false;
+  }
+
+  isGroupActive(item: MenuItem): boolean {
+    return item.children.some((child) => {
+      const path = this.resolveRoute(child.route);
+      return path ? this.isActive(path) : false;
     });
+  }
+
+  getFirstChildRoute(item: MenuItem): string | null {
+    for (const child of item.children) {
+      const path = this.resolveRoute(child.route);
+      if (path) return path;
+    }
+    return null;
+  }
+
+  onGroupClick(item: MenuItem): void {
+    if (this.collapsed) {
+      const route = this.getFirstChildRoute(item);
+      if (route) this.router.navigate([route]);
+    } else {
+      this.toggleGroup(item.key);
+    }
+  }
+
+  toggleGroup(key: string): void {
+    if (this.expandedGroups.has(key)) {
+      this.expandedGroups.delete(key);
+    } else {
+      this.expandedGroups.add(key);
+    }
+  }
+
+  isExpanded(key: string): boolean {
+    return this.expandedGroups.has(key);
   }
 
   isActive(route: string): boolean {
