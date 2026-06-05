@@ -1,0 +1,377 @@
+<h2 mat-dialog-title class="wizard-title">
+  <mat-icon>output</mat-icon>
+  Salida de Stock
+  <span class="step-indicator">Paso {{ step() }} de 2</span>
+</h2>
+
+<mat-dialog-content class="wizard-content">
+  <app-form-errors [errors]="errors()"></app-form-errors>
+
+  <!-- ── Stepper visual ───────────────────────────────────────── -->
+  <div class="wizard-steps">
+    <div class="wizard-step" [class.wizard-step--active]="step() === 1" [class.wizard-step--done]="step() > 1">
+      <div class="wizard-step__num">{{ step() > 1 ? '✓' : '1' }}</div>
+      <span class="wizard-step__label">Productos</span>
+    </div>
+    <div class="wizard-step__divider"></div>
+    <div class="wizard-step" [class.wizard-step--active]="step() === 2">
+      <div class="wizard-step__num">2</div>
+      <span class="wizard-step__label">Centro de Costos</span>
+    </div>
+  </div>
+
+  <!-- ═══════════════════ PASO 1: PRODUCTOS ════════════════════ -->
+  @if (step() === 1) {
+
+    <!-- Almacén (global para todas las filas) -->
+    <div class="section-title">
+      <mat-icon>warehouse</mat-icon>
+      <span>Almacén de despacho</span>
+    </div>
+
+    <mat-form-field appearance="outline" class="full-width">
+      <mat-label>Almacén *</mat-label>
+      <mat-select [formControl]="warehouseControl">
+        @for (w of data.warehouses; track w.id) {
+          <mat-option [value]="w.id">{{ w.name }}</mat-option>
+        }
+      </mat-select>
+    </mat-form-field>
+
+    <!-- Filas de productos -->
+    <div class="section-title" style="margin-top:0.5rem">
+      <mat-icon>inventory_2</mat-icon>
+      <span>Productos a despachar</span>
+    </div>
+
+    @for (row of productRows.controls; track $index; let i = $index) {
+      <div class="product-row-card" [formGroup]="asGroup(row)">
+
+        <div class="product-row-header">
+          <span class="product-row-num">Producto {{ i + 1 }}</span>
+          @if (productRows.length > 1) {
+            <button mat-icon-button type="button" color="warn"
+                    (click)="removeProductRow(i)"
+                    matTooltip="Quitar producto">
+              <mat-icon>remove_circle_outline</mat-icon>
+            </button>
+          }
+        </div>
+
+        <div class="product-row-fields">
+          <mat-form-field appearance="outline" class="field-product">
+            <mat-label>Producto *</mat-label>
+            <mat-select formControlName="product_id">
+              @for (p of data.products; track p.id) {
+                <mat-option [value]="p.id">{{ p.code }} — {{ p.name }}</mat-option>
+              }
+            </mat-select>
+          </mat-form-field>
+
+          <mat-form-field appearance="outline" class="field-qty">
+            <mat-label>Cantidad *</mat-label>
+            <input matInput type="number" formControlName="quantity" min="1" />
+            @if (rowStocks()[i]?.summary) {
+              <mat-hint>
+                Disponible: {{ rowStocks()[i].summary!.available_quantity }}
+                {{ getProduct(asGroup(row).get('product_id')?.value)?.base_unit?.abbreviation || 'uds' }}
+              </mat-hint>
+            }
+          </mat-form-field>
+
+          @if (warehouseControl.value && locations().length > 0) {
+            <mat-form-field appearance="outline" class="field-location">
+              <mat-label>Ubicación (opcional)</mat-label>
+              <mat-select formControlName="location_id">
+                <mat-option [value]="null">
+                  FEFO automático
+                  @if (fefoFirstLocation(i)) { ({{ fefoFirstLocation(i) }}) }
+                </mat-option>
+                @for (l of locations(); track l.id) {
+                  <mat-option [value]="l.id">{{ l.name }}</mat-option>
+                }
+              </mat-select>
+            </mat-form-field>
+          }
+        </div>
+
+        <!-- Stock / FEFO del producto -->
+        @if (rowStocks()[i]?.loadingStock) {
+          <div class="row-loading">
+            <mat-spinner diameter="14"></mat-spinner>
+            <span>Verificando stock...</span>
+          </div>
+        }
+
+        @if (!rowStocks()[i]?.loadingStock && rowStocks()[i]?.summary; as s) {
+          <div class="row-stock-panel row-stock-panel--{{ rowStockStatus(i) }}">
+            <mat-icon class="row-stock-icon">
+              {{ s.available_quantity === 0 ? 'remove_shopping_cart' : rowStockStatus(i) === 'warn' ? 'warning' : 'check_circle' }}
+            </mat-icon>
+            <span class="row-stock-qty" [class.row-stock-qty--zero]="s.available_quantity === 0">
+              {{ s.available_quantity }}
+              {{ getProduct(asGroup(row).get('product_id')?.value)?.base_unit?.abbreviation || 'uds' }}
+            </span>
+            <span class="row-stock-label">disponibles en {{ selectedWarehouseName }}</span>
+          </div>
+
+          @if (s.available_quantity === 0) {
+            <div class="zero-stock-warn">
+              <mat-icon>block</mat-icon>
+              <span>Sin stock disponible para este producto en el almacén seleccionado.</span>
+            </div>
+          }
+        }
+
+        @if (!rowStocks()[i]?.loadingFefo && (rowStocks()[i]?.fefo?.length ?? 0) > 0) {
+          <div class="fefo-mini-panel">
+            <mat-icon class="fefo-mini-icon">fact_check</mat-icon>
+            <span class="fefo-mini-label">Lotes FEFO:</span>
+            @for (lote of rowStocks()[i].fefo; track lote.id; let first = $first) {
+              <span class="fefo-mini-chip" [class.fefo-mini-chip--first]="first">
+                {{ first ? '★' : '' }} {{ lote.lot_number }}
+                ({{ lote.quantity_available }} uds
+                @if (lote.expiration_date) { · vence {{ lote.expiration_date | date:'dd/MM/yy' }} }
+                )
+              </span>
+            }
+          </div>
+        }
+
+      </div>
+    }
+
+    <button mat-stroked-button type="button" class="add-row-btn" (click)="addProductRow()">
+      <mat-icon>add</mat-icon>
+      Agregar otro producto
+    </button>
+
+  } <!-- /paso 1 -->
+
+  <!-- ═══════════════════ PASO 2: CENTRO DE COSTOS ═════════════ -->
+  @if (step() === 2) {
+
+    <!-- Resumen de productos (readonly) -->
+    <div class="step2-summary">
+      <div class="step2-summary-header">
+        <mat-icon>inventory_2</mat-icon>
+        <span>{{ productRows.length }} producto{{ productRows.length !== 1 ? 's' : '' }} · Almacén: {{ selectedWarehouseName }}</span>
+      </div>
+      <div class="step2-summary-rows">
+        @for (row of productRows.controls; track $index; let i = $index) {
+          @if (getProduct(asGroup(row).get('product_id')?.value); as prod) {
+            <span class="step2-summary-chip">{{ prod.code }} × {{ asGroup(row).get('quantity')?.value }}</span>
+          }
+        }
+      </div>
+    </div>
+
+    <!-- Centro de costo -->
+    <div class="section-title">
+      <mat-icon>account_balance</mat-icon>
+      <span>Centro de Costos</span>
+    </div>
+
+    <form [formGroup]="centerForm">
+
+      @if (loadingCostCenters()) {
+        <div class="row-loading">
+          <mat-spinner diameter="14"></mat-spinner>
+          <span>Cargando centros de costo...</span>
+        </div>
+      }
+
+      <mat-form-field appearance="outline" class="full-width">
+        <mat-label>Centro de Costo *</mat-label>
+        <mat-select formControlName="cost_center_id">
+          @for (cc of costCenters(); track cc.id) {
+            <mat-option [value]="cc.id">
+              {{ cc.name }}
+              <span class="cc-type"> — {{ cc.type_label }}</span>
+            </mat-option>
+          }
+        </mat-select>
+        @if (selectedCostCenter?.description) {
+          <mat-hint>{{ selectedCostCenter!.description }}</mat-hint>
+        }
+      </mat-form-field>
+
+      <mat-form-field appearance="outline" class="full-width">
+        <mat-label>Motivo</mat-label>
+        <input matInput formControlName="reason" placeholder="Despacho de medicamentos..." />
+      </mat-form-field>
+
+      <!-- ── Bloque de paciente externo ─────────────────────── -->
+      @if (isExternalCenter) {
+        <div class="patient-block">
+          <div class="patient-block-header">
+            <mat-icon>person</mat-icon>
+            <span>Datos del Paciente</span>
+            <span class="patient-block-badge">Centro externo</span>
+          </div>
+
+          <div class="patient-fields">
+            <mat-form-field appearance="outline">
+              <mat-label>N° Documento *</mat-label>
+              <input matInput formControlName="patient_document" maxlength="50" placeholder="1012345678" />
+              <mat-hint>Cédula o documento</mat-hint>
+            </mat-form-field>
+
+            <mat-form-field appearance="outline">
+              <mat-label>ID en Sistema Clínico *</mat-label>
+              <input matInput formControlName="patient_external_id" maxlength="100" placeholder="EXT-00892" />
+              <mat-hint>ID en el HIS/EMR</mat-hint>
+            </mat-form-field>
+
+            <mat-form-field appearance="outline">
+              <mat-label>Fecha de Atención *</mat-label>
+              <input matInput [matDatepicker]="serviceDatePicker" formControlName="service_date" />
+              <mat-datepicker-toggle matIconSuffix [for]="serviceDatePicker"></mat-datepicker-toggle>
+              <mat-datepicker #serviceDatePicker></mat-datepicker>
+            </mat-form-field>
+          </div>
+
+          <!-- Selector de servicio para filtrar procedimientos -->
+          <div class="section-title" style="margin-top:0.75rem">
+            <mat-icon>medical_services</mat-icon>
+            <span>Procedimientos aplicados</span>
+          </div>
+
+          @if (loadingTree()) {
+            <div class="row-loading">
+              <mat-spinner diameter="14"></mat-spinner>
+              <span>Cargando servicios médicos...</span>
+            </div>
+          }
+
+          @if (!loadingTree() && servicesTree().length > 0) {
+            <mat-form-field appearance="outline" class="full-width">
+              <mat-label>Servicio médico</mat-label>
+              <mat-select formControlName="filter_service_id">
+                <mat-option [value]="null">Seleccionar servicio...</mat-option>
+                @for (svc of servicesTree(); track svc.id) {
+                  <mat-option [value]="svc.id">{{ svc.code }} — {{ svc.name }}</mat-option>
+                }
+              </mat-select>
+              <mat-hint>Filtra los procedimientos disponibles</mat-hint>
+            </mat-form-field>
+          }
+
+          <!-- Filas de procedimientos -->
+          @if (centerForm.get('filter_service_id')?.value && selectedProcedures().length > 0) {
+            @for (row of procedureRows.controls; track $index; let i = $index) {
+              <div class="procedure-row-card" [formGroup]="asGroup(row)">
+
+                <div class="procedure-row-header">
+                  <span class="procedure-row-num">Procedimiento {{ i + 1 }}</span>
+                  @if (procedureRows.length > 1) {
+                    <button mat-icon-button type="button" color="warn"
+                            (click)="removeProcedureRow(i)"
+                            matTooltip="Quitar procedimiento">
+                      <mat-icon>remove_circle_outline</mat-icon>
+                    </button>
+                  }
+                </div>
+
+                <div class="procedure-row-fields">
+                  <mat-form-field appearance="outline" class="field-procedure">
+                    <mat-label>Procedimiento *</mat-label>
+                    <mat-select formControlName="procedure_id">
+                      @for (proc of selectedProcedures(); track proc.id) {
+                        <mat-option [value]="proc.id">{{ proc.code }} — {{ proc.name }}</mat-option>
+                      }
+                    </mat-select>
+                  </mat-form-field>
+
+                  <mat-form-field appearance="outline" class="field-qty-sm">
+                    <mat-label>Cantidad *</mat-label>
+                    <input matInput type="number" formControlName="quantity" min="1" />
+                  </mat-form-field>
+
+                  <mat-form-field appearance="outline" class="field-price">
+                    <mat-label>Valor unitario *</mat-label>
+                    <input matInput type="number" formControlName="unit_price" min="0" step="100" />
+                    <span matTextPrefix>$&nbsp;</span>
+                    @if (rowPricesLoading()[i]) {
+                      <mat-hint>Cargando tarifa vigente...</mat-hint>
+                    } @else if (rowPrices()[i]?.is_currently_valid) {
+                      <mat-hint class="price-hint--ok">Tarifa vigente cargada</mat-hint>
+                    }
+                  </mat-form-field>
+                </div>
+
+                <div class="procedure-row-total">
+                  Total: <strong>{{ rowProcedureTotal(i) | currency:'COP':'symbol':'1.0-0' }}</strong>
+                </div>
+
+                <mat-form-field appearance="outline" class="full-width">
+                  <mat-label>Evolución Clínica</mat-label>
+                  <input matInput formControlName="notes" maxlength="500" />
+                  @if (procedureRows.at(i)?.get('notes')?.invalid && procedureRows.at(i)?.get('notes')?.touched) {
+                    <mat-error>La evolución clínica es obligatoria</mat-error>
+                  }
+                </mat-form-field>
+
+              </div>
+            }
+
+            <button mat-stroked-button type="button" class="add-row-btn" (click)="addProcedureRow()">
+              <mat-icon>add</mat-icon>
+              Agregar procedimiento
+            </button>
+
+            @if (procedureRows.length > 0) {
+              <div class="procedures-total-bar">
+                <span>Total procedimientos:</span>
+                <strong>{{ proceduresGrandTotal | currency:'COP':'symbol':'1.0-0' }}</strong>
+              </div>
+            }
+          } @else if (centerForm.get('filter_service_id')?.value) {
+            <div class="empty-procedures">
+              <mat-icon>info</mat-icon>
+              <span>El servicio seleccionado no tiene procedimientos activos.</span>
+            </div>
+          }
+
+          @if (!centerForm.get('filter_service_id')?.value && !loadingTree()) {
+            <div class="select-service-hint">
+              <mat-icon>arrow_upward</mat-icon>
+              <span>Selecciona un servicio médico para ver los procedimientos disponibles.</span>
+            </div>
+          }
+
+        </div>
+      } <!-- /isExternalCenter -->
+
+    </form>
+
+  } <!-- /paso 2 -->
+
+</mat-dialog-content>
+
+<mat-dialog-actions align="end">
+  <button mat-button [mat-dialog-close]="false" [disabled]="saving()">Cancelar</button>
+
+  @if (step() === 2) {
+    <button mat-stroked-button type="button" (click)="prevStep()" [disabled]="saving()">
+      <mat-icon>chevron_left</mat-icon>
+      Atrás
+    </button>
+  }
+
+  @if (step() === 1) {
+    <button mat-raised-button color="primary" [disabled]="!isStep1Valid" (click)="nextStep()">
+      Siguiente
+      <mat-icon>chevron_right</mat-icon>
+    </button>
+  }
+
+  @if (step() === 2) {
+    <button mat-raised-button color="primary"
+            [disabled]="!isStep2Valid || saving()"
+            (click)="save()">
+      @if (saving()) { <mat-spinner diameter="18"></mat-spinner> }
+      Registrar Salida
+    </button>
+  }
+</mat-dialog-actions>

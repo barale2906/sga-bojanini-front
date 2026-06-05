@@ -4,7 +4,8 @@
   mat-icon { color: #d69e2e; }
   &--warn { background: #fff5f5; border-color: #fc8181; color: #c53030; mat-icon { color: #e53e3e; } }
 }
-.action-bar { display: flex; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 1.5rem; }
+.action-bar { display: flex; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 1.5rem; align-items: center; }
+.action-bar-sep { flex: 1; }
 .tab-body { padding: 1.5rem 0; }
 .tab-toolbar {
   display: flex; gap: 0.75rem; align-items: flex-end; flex-wrap: wrap; margin-bottom: 1rem;

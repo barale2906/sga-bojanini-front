@@ -1,0 +1,205 @@
+<app-page-header
+  title="Registros de Procedimientos"
+  subtitle="Consulta por paciente para facturación y caja"
+  icon="receipt_long">
+  <button mat-stroked-button (click)="goBack()">
+    <mat-icon>arrow_back</mat-icon>
+    Volver a Inventario
+  </button>
+</app-page-header>
+
+<!-- ── Filtros ───────────────────────────────────────────── -->
+<div class="filters-card" [formGroup]="filters">
+
+  <div class="filters-row">
+    <mat-form-field appearance="outline" class="filter-field">
+      <mat-label>N° Documento del Paciente</mat-label>
+      <mat-icon matPrefix>badge</mat-icon>
+      <input matInput formControlName="patient_document" placeholder="Buscar por documento..." />
+      @if (filters.get('patient_document')?.value) {
+        <button matSuffix mat-icon-button (click)="filters.get('patient_document')?.setValue('')">
+          <mat-icon>close</mat-icon>
+        </button>
+      }
+    </mat-form-field>
+
+    <mat-form-field appearance="outline" class="filter-field">
+      <mat-label>ID en Sistema Clínico</mat-label>
+      <mat-icon matPrefix>person_search</mat-icon>
+      <input matInput formControlName="patient_external_id" placeholder="EXT-00892..." />
+      @if (filters.get('patient_external_id')?.value) {
+        <button matSuffix mat-icon-button (click)="filters.get('patient_external_id')?.setValue('')">
+          <mat-icon>close</mat-icon>
+        </button>
+      }
+    </mat-form-field>
+
+    <mat-form-field appearance="outline" class="filter-field">
+      <mat-label>Procedimiento</mat-label>
+      <mat-select formControlName="medical_service_id">
+        <mat-option [value]="null">Todos</mat-option>
+        @for (proc of procedures(); track proc.id) {
+          <mat-option [value]="proc.id">{{ proc.code }} — {{ proc.name }}</mat-option>
+        }
+      </mat-select>
+    </mat-form-field>
+  </div>
+
+  <div class="filters-row filters-row--dates">
+    <mat-form-field appearance="outline" class="filter-field">
+      <mat-label>Fecha de atención desde</mat-label>
+      <mat-icon matPrefix>calendar_today</mat-icon>
+      <input matInput [matDatepicker]="fromPicker" formControlName="service_date_from" />
+      <mat-datepicker-toggle matIconSuffix [for]="fromPicker"></mat-datepicker-toggle>
+      <mat-datepicker #fromPicker></mat-datepicker>
+    </mat-form-field>
+
+    <mat-form-field appearance="outline" class="filter-field">
+      <mat-label>Fecha de atención hasta</mat-label>
+      <mat-icon matPrefix>event</mat-icon>
+      <input matInput [matDatepicker]="toPicker" formControlName="service_date_to" />
+      <mat-datepicker-toggle matIconSuffix [for]="toPicker"></mat-datepicker-toggle>
+      <mat-datepicker #toPicker></mat-datepicker>
+    </mat-form-field>
+
+    <div class="filters-actions">
+      <button mat-stroked-button (click)="clearFilters()" matTooltip="Limpiar filtros">
+        <mat-icon>filter_alt_off</mat-icon>
+        Limpiar
+      </button>
+      <button mat-raised-button color="primary" (click)="loadRecords(1)">
+        <mat-icon>search</mat-icon>
+        Buscar
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Tabla ─────────────────────────────────────────────── -->
+<div class="table-container">
+  <app-loading-spinner [loading]="loading()" [inline]="true"></app-loading-spinner>
+
+  @if (!loading() && records().length === 0) {
+    <div class="empty-state">
+      <mat-icon>search_off</mat-icon>
+      <p>No se encontraron registros con los filtros aplicados.</p>
+    </div>
+  }
+
+  @if (records().length > 0) {
+    <div class="table-wrap mat-elevation-z1">
+      <table mat-table [dataSource]="records()">
+
+        <!-- Procedimiento -->
+        <ng-container matColumnDef="procedure">
+          <th mat-header-cell *matHeaderCellDef>Procedimiento</th>
+          <td mat-cell *matCellDef="let r">
+            <div class="proc-cell">
+              <code class="code-tag">{{ r.procedure_code || r.medical_service?.code }}</code>
+              <span class="proc-name">{{ r.procedure_name || r.medical_service?.name }}</span>
+            </div>
+          </td>
+        </ng-container>
+
+        <!-- Paciente -->
+        <ng-container matColumnDef="patient">
+          <th mat-header-cell *matHeaderCellDef>Paciente</th>
+          <td mat-cell *matCellDef="let r">
+            <div class="patient-cell">
+              <span class="patient-doc">
+                <mat-icon class="patient-icon">badge</mat-icon>
+                {{ r.patient_document }}
+              </span>
+              @if (r.patient_external_id) {
+                <span class="patient-ext" [matTooltip]="'ID Clínico: ' + r.patient_external_id">
+                  {{ r.patient_external_id }}
+                </span>
+              }
+            </div>
+          </td>
+        </ng-container>
+
+        <!-- Cantidad -->
+        <ng-container matColumnDef="quantity">
+          <th mat-header-cell *matHeaderCellDef>Cant.</th>
+          <td mat-cell *matCellDef="let r">
+            <span class="qty-badge">{{ r.quantity }}</span>
+          </td>
+        </ng-container>
+
+        <!-- Valor unitario -->
+        <ng-container matColumnDef="unit_price">
+          <th mat-header-cell *matHeaderCellDef>Valor Unitario</th>
+          <td mat-cell *matCellDef="let r">
+            <span class="price-cell">{{ r.unit_price | currency:'COP':'symbol':'1.0-0' }}</span>
+          </td>
+        </ng-container>
+
+        <!-- Total -->
+        <ng-container matColumnDef="total">
+          <th mat-header-cell *matHeaderCellDef>Total</th>
+          <td mat-cell *matCellDef="let r">
+            <strong class="total-cell">{{ r.total | currency:'COP':'symbol':'1.0-0' }}</strong>
+          </td>
+        </ng-container>
+
+        <!-- Fecha de atención -->
+        <ng-container matColumnDef="service_date">
+          <th mat-header-cell *matHeaderCellDef>Fecha Atención</th>
+          <td mat-cell *matCellDef="let r">
+            {{ r.service_date | date:'dd/MM/yyyy' }}
+          </td>
+        </ng-container>
+
+        <!-- Acciones -->
+        <ng-container matColumnDef="actions">
+          <th mat-header-cell *matHeaderCellDef></th>
+          <td mat-cell *matCellDef="let r">
+            <div class="actions-cell">
+              @if (r.notes) {
+                <button mat-icon-button [matTooltip]="r.notes" color="primary">
+                  <mat-icon>info</mat-icon>
+                </button>
+              }
+              <span [class.badge--on]="r.is_active" [class.badge--gray]="!r.is_active"
+                    class="badge status-badge">
+                {{ r.is_active ? 'Activo' : 'Inactivo' }}
+              </span>
+              <span *sgaPermission="'registros_procedimientos.eliminar'">
+                <button mat-icon-button color="warn"
+                        matTooltip="Eliminar registro"
+                        (click)="delete(r)">
+                  <mat-icon>delete_outline</mat-icon>
+                </button>
+              </span>
+            </div>
+          </td>
+        </ng-container>
+
+        <tr mat-header-row *matHeaderRowDef="cols"></tr>
+        <tr mat-row *matRowDef="let r; columns: cols;" class="data-row"></tr>
+        <tr class="mat-row" *matNoDataRow>
+          <td class="no-data" [attr.colspan]="cols.length">Sin registros</td>
+        </tr>
+      </table>
+
+      <mat-paginator
+        [length]="meta().total"
+        [pageSize]="meta().per_page"
+        [pageIndex]="meta().current_page - 1"
+        [pageSizeOptions]="[10, 25, 50]"
+        (page)="onPage($event)"
+        showFirstLastButtons>
+      </mat-paginator>
+    </div>
+
+    <!-- Resumen totales de la página -->
+    @if (records().length > 0) {
+      <div class="page-totals">
+        <span>{{ meta().total }} registro{{ meta().total !== 1 ? 's' : '' }} encontrado{{ meta().total !== 1 ? 's' : '' }}</span>
+        <span class="page-totals-sep">·</span>
+        <span>Total en página: <strong>{{ pageTotal | currency:'COP':'symbol':'1.0-0' }}</strong></span>
+      </div>
+    }
+  }
+</div>

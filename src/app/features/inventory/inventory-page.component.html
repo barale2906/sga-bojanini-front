@@ -21,6 +21,10 @@
   <button *sgaPermission="'movimientos.transferir'" mat-stroked-button (click)="openMovement('transfer')"><mat-icon>swap_horiz</mat-icon> Transferencia</button>
   <button *sgaPermission="'movimientos.ajuste'" mat-stroked-button (click)="openMovement('adjustment')"><mat-icon>tune</mat-icon> Ajuste</button>
   <button *sgaPermission="'movimientos.devolucion'" mat-stroked-button (click)="openMovement('return')"><mat-icon>undo</mat-icon> Devolución</button>
+  <span class="action-bar-sep"></span>
+  <button *sgaPermission="'registros_procedimientos.ver'" mat-stroked-button (click)="goToPatientRecords()">
+    <mat-icon>receipt_long</mat-icon> Registros Paciente
+  </button>
 </div>
 
 <mat-tab-group color="primary" animationDuration="200ms">

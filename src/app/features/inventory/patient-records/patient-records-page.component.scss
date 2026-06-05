@@ -1,0 +1,108 @@
+// ── Filters card ─────────────────────────────────────────────
+.filters-card {
+  background: white; border: 1px solid #e2e8f0; border-radius: 12px;
+  padding: 1rem 1.25rem; margin-bottom: 1.25rem;
+  display: flex; flex-direction: column; gap: 0.5rem;
+}
+
+.filters-row {
+  display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: flex-start;
+  &--dates { align-items: center; }
+}
+
+.filter-field {
+  flex: 1; min-width: 200px;
+}
+
+.filters-actions {
+  display: flex; gap: 0.5rem; align-items: center;
+  margin-left: auto; flex-shrink: 0; padding-top: 0.25rem;
+}
+
+// ── Table ─────────────────────────────────────────────────────
+.table-container { display: flex; flex-direction: column; gap: 0.75rem; }
+
+.table-wrap {
+  border-radius: 10px; overflow: hidden;
+  table { width: 100%; }
+}
+
+// ── Cells ─────────────────────────────────────────────────────
+.proc-cell {
+  display: flex; align-items: center; gap: 0.45rem; flex-wrap: wrap;
+}
+
+.code-tag {
+  font-size: 0.72rem; font-family: monospace;
+  background: #e2e8f0; color: #4a5568;
+  padding: 0.1rem 0.4rem; border-radius: 4px;
+  white-space: nowrap;
+}
+
+.proc-name { color: #2d3748; font-size: 0.85rem; }
+
+.patient-cell {
+  display: flex; flex-direction: column; gap: 0.15rem;
+}
+
+.patient-doc {
+  display: flex; align-items: center; gap: 0.3rem;
+  font-weight: 600; color: #2d3748; font-size: 0.85rem;
+}
+
+.patient-icon { font-size: 0.9rem; height: 0.9rem; width: 0.9rem; color: #718096; }
+
+.patient-ext {
+  font-size: 0.75rem; color: #718096; font-family: monospace;
+  cursor: default;
+}
+
+.qty-badge {
+  display: inline-flex; align-items: center; justify-content: center;
+  background: #ebf8ff; color: #2b6cb0;
+  font-weight: 700; font-size: 0.82rem;
+  min-width: 28px; padding: 0.1rem 0.4rem; border-radius: 9999px;
+}
+
+.price-cell { color: #4a5568; font-size: 0.85rem; }
+
+.total-cell { color: #276749; font-size: 0.92rem; }
+
+.actions-cell {
+  display: flex; align-items: center; gap: 0.25rem; justify-content: flex-end;
+}
+
+.status-badge {
+  font-size: 0.72rem; font-weight: 700;
+  padding: 0.15rem 0.55rem; border-radius: 9999px;
+}
+
+// ── Empty state ───────────────────────────────────────────────
+.empty-state {
+  display: flex; flex-direction: column; align-items: center; gap: 0.5rem;
+  padding: 3rem 1rem; color: #a0aec0;
+  mat-icon { font-size: 2.5rem; height: 2.5rem; width: 2.5rem; }
+  p { font-size: 0.9rem; margin: 0; }
+}
+
+// ── Page totals ───────────────────────────────────────────────
+.page-totals {
+  display: flex; align-items: center; gap: 0.5rem;
+  font-size: 0.82rem; color: #718096;
+  padding: 0.25rem 0;
+  strong { color: #276749; font-size: 0.88rem; }
+}
+
+.page-totals-sep { color: #cbd5e0; }
+
+// ── Table shared styles ───────────────────────────────────────
+.no-data {
+  padding: 2rem; text-align: center;
+  color: #a0aec0; font-size: 0.9rem;
+}
+
+.data-row:hover { background: #f7fafc; cursor: default; }
+
+// ── Badges (reutilizados del proyecto) ────────────────────────
+.badge--on   { background: #c6f6d5; color: #276749; }
+.badge--gray { background: #e2e8f0; color: #718096; }

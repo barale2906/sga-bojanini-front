@@ -1,6 +1,7 @@
 import { Component, inject, signal, computed, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormBuilder, ReactiveFormsModule } from '@angular/forms';
+import { Router } from '@angular/router';
 import { forkJoin } from 'rxjs';
 import { MatTabsModule } from '@angular/material/tabs';
 import { MatTableModule } from '@angular/material/table';
@@ -26,6 +27,7 @@ import { LoadingSpinnerComponent } from '../../shared/components/loading-spinner
 import { PermissionDirective } from '../../shared/directives/permission.directive';
 import { DateFormatPipe } from '../../shared/pipes/date-format.pipe';
 import { MovementFormDialogComponent } from './movements/movement-form-dialog.component';
+import { ExitWizardDialogComponent } from './movements/exit-wizard-dialog.component';
 import { ConfirmDialogComponent } from '../../shared/components/confirm-dialog/confirm-dialog.component';
 import { PurchaseReceiveContextService } from '../purchasing/purchase-receive-context.service';
 import { PurchaseOrder } from '../purchasing/purchasing.service';
@@ -79,12 +81,13 @@ const MOV_TYPE_ICONS: Record<string, string> = {
   styleUrl: './inventory-page.component.scss',
 })
 export class InventoryPageComponent implements OnInit {
-  private svc        = inject(InventoryService);
-  private wSvc       = inject(WarehouseService);
-  private cSvc       = inject(CatalogService);
-  private dialog     = inject(MatDialog);
-  private snack      = inject(MatSnackBar);
-  private fb         = inject(FormBuilder);
+  private svc          = inject(InventoryService);
+  private wSvc         = inject(WarehouseService);
+  private cSvc         = inject(CatalogService);
+  private dialog       = inject(MatDialog);
+  private snack        = inject(MatSnackBar);
+  private fb           = inject(FormBuilder);
+  private router       = inject(Router);
   private poReceiveCtx = inject(PurchaseReceiveContextService);
 
   // Batches
@@ -265,6 +268,11 @@ export class InventoryPageComponent implements OnInit {
   }
 
   openMovement(type: string): void {
+    if (type === 'exit') {
+      this._openExitWizard();
+      return;
+    }
+
     const needsWide = type === 'entry' || type === 'transfer';
     this.dialog.open(MovementFormDialogComponent, {
       data: { type, warehouses: this.warehouses(), products: this.products(), inventorySvc: this.svc },
@@ -272,24 +280,27 @@ export class InventoryPageComponent implements OnInit {
     }).afterClosed().subscribe(result => {
       const ok = result === true || (result && result.ok);
       if (!ok) return;
-
       this.loadStock(); this.loadMovements(); this.loadBatches();
-
-      if (type === 'exit' && result?.batch) {
-        const b = result.batch;
-        const loc = b.locations?.[0];
-        const locStr = loc
-          ? `${loc.location_name}${loc.zone ? ' · ' + loc.zone.zone_name : ''}`
-          : 'sin ubicación';
-        this.snack.open(
-          `Salida registrada — Lote: ${b.lot_number} — Ubicación: ${locStr}`,
-          'OK',
-          { duration: 6000 }
-        );
-      } else {
-        this.snack.open('Movimiento registrado', 'OK', { duration: 3000 });
-      }
+      this.snack.open('Movimiento registrado', 'OK', { duration: 3000 });
     });
+  }
+
+  private _openExitWizard(): void {
+    this.dialog.open(ExitWizardDialogComponent, {
+      data: { warehouses: this.warehouses(), products: this.products(), inventorySvc: this.svc },
+      width: '800px', maxWidth: '96vw', maxHeight: '94vh',
+    }).afterClosed().subscribe(result => {
+      if (!result?.ok) return;
+      this.loadStock(); this.loadMovements(); this.loadBatches();
+      const msg = result.withRecords
+        ? 'Salida registrada con procedimientos del paciente'
+        : 'Salida de stock registrada';
+      this.snack.open(msg, 'OK', { duration: 4000 });
+    });
+  }
+
+  goToPatientRecords(): void {
+    this.router.navigate(['/inventory/patient-records']);
   }
 
   writeOff(batch: Batch): void {
