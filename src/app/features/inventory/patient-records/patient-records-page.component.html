@@ -96,7 +96,7 @@
           <td mat-cell *matCellDef="let r">
             <div class="proc-cell">
               <code class="code-tag">{{ r.procedure_code || r.medical_service?.code }}</code>
-              <span class="proc-name">{{ r.procedure_name || r.medical_service?.name }}</span>
+              <span class="proc-name">{{ r.medical_service_name || r.procedure_name || r.medical_service?.name }}</span>
             </div>
           </td>
         </ng-container>
@@ -106,6 +106,9 @@
           <th mat-header-cell *matHeaderCellDef>Paciente</th>
           <td mat-cell *matCellDef="let r">
             <div class="patient-cell">
+              @if (r.patient_first_name || r.patient_last_name) {
+                <span class="patient-name">{{ r.patient_first_name }} {{ r.patient_last_name }}</span>
+              }
               <span class="patient-doc">
                 <mat-icon class="patient-icon">badge</mat-icon>
                 {{ r.patient_document }}
@@ -156,11 +159,6 @@
           <th mat-header-cell *matHeaderCellDef></th>
           <td mat-cell *matCellDef="let r">
             <div class="actions-cell">
-              @if (r.notes) {
-                <button mat-icon-button [matTooltip]="r.notes" color="primary">
-                  <mat-icon>info</mat-icon>
-                </button>
-              }
               <span [class.badge--on]="r.is_active" [class.badge--gray]="!r.is_active"
                     class="badge status-badge">
                 {{ r.is_active ? 'Activo' : 'Inactivo' }}

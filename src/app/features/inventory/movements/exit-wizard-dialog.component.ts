@@ -76,6 +76,8 @@ export class ExitWizardDialogComponent implements OnInit {
     reason:              [''],
     patient_document:    [null as string | null],
     patient_external_id: [null as string | null],
+    patient_first_name:  [null as string | null],
+    patient_last_name:   [null as string | null],
     service_date:        [new Date() as Date | null],
     filter_service_id:   [null as number | null],
   });
@@ -128,6 +130,7 @@ export class ExitWizardDialogComponent implements OnInit {
     if (this.isExternalCenter) {
       const v = this.centerForm.value;
       if (!v.patient_document?.trim() || !v.patient_external_id?.trim()) return false;
+      if (!v.patient_first_name?.trim() || !v.patient_last_name?.trim()) return false;
       if (!v.service_date) return false;
       if (this.procedureRows.length === 0) return false;
       return this.procedureRows.controls.every(row => {
@@ -165,7 +168,7 @@ export class ExitWizardDialogComponent implements OnInit {
       this.rowPrices.set([]);
       this.rowPricesLoading.set([]);
       this.centerForm.patchValue(
-        { patient_document: null, patient_external_id: null, filter_service_id: null },
+        { patient_document: null, patient_external_id: null, patient_first_name: null, patient_last_name: null, filter_service_id: null },
         { emitEvent: false },
       );
       if (this.isExternalCenter && !this.servicesTree().length) {
@@ -395,6 +398,8 @@ export class ExitWizardDialogComponent implements OnInit {
             medical_service_id:  rv.procedure_id,
             patient_external_id: cv.patient_external_id!,
             patient_document:    cv.patient_document!,
+            patient_first_name:  cv.patient_first_name!,
+            patient_last_name:   cv.patient_last_name!,
             quantity:            rv.quantity,
             unit_price:          rv.unit_price,
             service_date:        serviceDate,

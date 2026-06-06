@@ -30,11 +30,14 @@ export interface ProcedurePrice {
 export interface PatientProcedureRecord {
   id: number;
   medical_service_id: number;
+  medical_service_name?: string;
   procedure_code?: string;
   procedure_name?: string;
   medical_service?: { id: number; code: string; name: string };
   patient_external_id: string;
   patient_document: string;
+  patient_first_name?: string;
+  patient_last_name?: string;
   quantity: number;
   unit_price: number;
   total: number;
@@ -48,6 +51,8 @@ export interface PatientProcedureRecordPayload {
   medical_service_id: number;
   patient_external_id: string;
   patient_document: string;
+  patient_first_name: string;
+  patient_last_name: string;
   quantity: number;
   unit_price: number;
   service_date: string;
