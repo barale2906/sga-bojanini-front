@@ -15,10 +15,12 @@ import { MatSelectModule } from '@angular/material/select';
 import { MatChipsModule } from '@angular/material/chips';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { MatDatepickerModule } from '@angular/material/datepicker';
+import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { DateAdapter, MAT_DATE_FORMATS } from '@angular/material/core';
 import { MatDialog } from '@angular/material/dialog';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { InventoryService, Batch, StockItem, Movement } from './inventory.service';
+import { MovementPdfService } from '../../shared/services/movement-pdf.service';
 import { WarehouseService, Warehouse, Location } from '../warehouse/warehouse.service';
 import { CatalogService, Product } from '../catalog/catalog.service';
 import { PaginationMeta } from '../../core/models/api-response.model';
@@ -76,7 +78,7 @@ const MOV_TYPE_ICONS: Record<string, string> = {
     CommonModule, ReactiveFormsModule, MatTabsModule, MatTableModule, MatSortModule,
     MatPaginatorModule, MatButtonModule, MatIconModule, MatFormFieldModule,
     MatInputModule, MatSelectModule, MatChipsModule, MatTooltipModule,
-    MatDatepickerModule,
+    MatDatepickerModule, MatProgressSpinnerModule,
     PageHeaderComponent, LoadingSpinnerComponent, PermissionDirective, DateFormatPipe,
   ],
   templateUrl: './inventory-page.component.html',
@@ -91,6 +93,7 @@ export class InventoryPageComponent implements OnInit {
   private fb           = inject(FormBuilder);
   private router       = inject(Router);
   private poReceiveCtx = inject(PurchaseReceiveContextService);
+  private movPdfSvc    = inject(MovementPdfService);
 
   // Batches
   batches = signal<Batch[]>([]);
@@ -142,6 +145,9 @@ export class InventoryPageComponent implements OnInit {
   products = signal<Product[]>([]);
   locations = signal<Location[]>([]);
   loading = signal(false);
+  loadingPdf = signal<number | null>(null);
+
+  readonly PRINTABLE_TYPES = new Set(['exit', 'transfer', 'adjustment', 'return']);
 
   movTypes = [
     { value: 'entry',                label: '↓ Entrada' },
@@ -320,6 +326,32 @@ export class InventoryPageComponent implements OnInit {
 
   goToPatientRecords(): void {
     this.router.navigate(['/inventory/patient-records']);
+  }
+
+  printMovement(row: MovementRow): void {
+    if (!row.id || this.loadingPdf() !== null) return;
+    this.loadingPdf.set(row.id);
+    this.svc.getMovement(row.id).subscribe({
+      next: res => {
+        this.loadingPdf.set(null);
+        const m = res.data;
+        this.movPdfSvc.generateAndPrint({
+          movement_type:     m.movement_type,
+          doc_id:            m.id,
+          date:              m.created_at,
+          user_name:         m.user_name,
+          warehouse_name:    row.warehouse_name,
+          warehouse_to_name: row.warehouse_to_name,
+          reason:            m.reason,
+          cost_center_name:  m.cost_center?.name ?? null,
+          lines: [{ product_name: m.product_name, lot_number: m.batch_lot_number, quantity: m.quantity }],
+        });
+      },
+      error: () => {
+        this.loadingPdf.set(null);
+        this.snack.open('No se pudo cargar el movimiento para imprimir', 'OK', { duration: 3000 });
+      },
+    });
   }
 
   writeOff(batch: Batch): void {

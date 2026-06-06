@@ -22,6 +22,7 @@ import { Product } from '../../catalog/catalog.service';
 import { MedicalServicesService, MedicalServiceNode, ProcedurePrice } from '../medical-services.service';
 import { FormErrorsComponent } from '../../../shared/components/form-errors/form-errors.component';
 import { EsDateAdapter, ES_DATE_FORMATS } from '../../../shared/adapters/es-date.adapter';
+import { MovementPdfService } from '../../../shared/services/movement-pdf.service';
 
 export interface ExitWizardDialogData {
   warehouses: Warehouse[];
@@ -58,6 +59,7 @@ export class ExitWizardDialogComponent implements OnInit {
   private fb     = inject(FormBuilder);
   private wSvc   = inject(WarehouseService);
   private medSvc = inject(MedicalServicesService);
+  private pdfSvc = inject(MovementPdfService);
 
   // ── Wizard state ─────────────────────────────────────────────
   step    = signal<1 | 2>(1);
@@ -383,8 +385,26 @@ export class ExitWizardDialogComponent implements OnInit {
     });
 
     forkJoin(exitCalls).subscribe({
-      next: () => {
+      next: (results) => {
         if (!this.isExternalCenter || this.procedureRows.length === 0) {
+          if (!this.isExternalCenter && results.length > 0) {
+            const wh = this.data.warehouses.find(w => w.id === wId);
+            const cc = this.costCenters().find(c => c.id === cv.cost_center_id);
+            this.pdfSvc.generateAndPrint({
+              movement_type:    'exit',
+              doc_id:           results[0].data.id,
+              date:             results[0].data.created_at,
+              user_name:        results[0].data.user_name,
+              warehouse_name:   wh?.name ?? `Almacén ${wId}`,
+              cost_center_name: cc?.name ?? null,
+              reason:           cv.reason || null,
+              lines: results.map(r => ({
+                product_name: r.data.product_name,
+                lot_number:   r.data.batch_lot_number,
+                quantity:     r.data.quantity,
+              })),
+            });
+          }
           this.saving.set(false);
           this.ref.close({ ok: true });
           return;

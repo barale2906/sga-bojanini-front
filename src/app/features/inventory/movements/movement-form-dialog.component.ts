@@ -12,6 +12,7 @@ import { MatTooltipModule } from '@angular/material/tooltip';
 import { MatDividerModule } from '@angular/material/divider';
 import { forkJoin, finalize } from 'rxjs';
 import { InventoryService, StockSummary, BatchDetail, CostCenter, MedicalService } from '../inventory.service';
+import { MovementPdfService } from '../../../shared/services/movement-pdf.service';
 import { WarehouseService, Warehouse, Location, LocationCapacity, Zone } from '../../warehouse/warehouse.service';
 import { CatalogService, Product, ProductPresentation, ProductClassification } from '../../catalog/catalog.service';
 import { PurchasingService, PurchaseOrder, PurchaseOrderItem } from '../../purchasing/purchasing.service';
@@ -51,6 +52,7 @@ export class MovementFormDialogComponent implements OnInit {
   private wSvc         = inject(WarehouseService);
   private cSvc         = inject(CatalogService);
   private purchasingSvc = inject(PurchasingService);
+  private pdfSvc       = inject(MovementPdfService);
 
   saving = signal(false);
   errors = signal<string[]>([]);
@@ -837,7 +839,10 @@ export class MovementFormDialogComponent implements OnInit {
     // ── AJUSTE ───────────────────────────────────────────────────
     if (this.isAdjustment) {
       this.data.inventorySvc.adjustment({ ...basePayload, location_id: v.location_id || undefined, quantity: v.quantity, reason: v.reason })
-        .subscribe({ next: () => this.ref.close(true), error: err => this._handleError(err) });
+        .subscribe({
+          next: res => { this._printPdf(res.data, 'adjustment'); this.ref.close(true); },
+          error: err => this._handleError(err),
+        });
       return;
     }
 
@@ -875,7 +880,28 @@ export class MovementFormDialogComponent implements OnInit {
 
     // ── DEVOLUCIÓN ───────────────────────────────────────────────
     this.data.inventorySvc.return_({ ...basePayload, location_id: v.location_id || undefined, quantity: v.quantity })
-      .subscribe({ next: () => this.ref.close(true), error: err => this._handleError(err) });
+      .subscribe({
+        next: res => { this._printPdf(res.data, 'return'); this.ref.close(true); },
+        error: err => this._handleError(err),
+      });
+  }
+
+  private _printPdf(movement: any, type: string): void {
+    const wh = this.data.warehouses.find(w => w.id === movement.warehouse_id);
+    const whTo = movement.warehouse_to_id
+      ? this.data.warehouses.find(w => w.id === movement.warehouse_to_id)
+      : null;
+    this.pdfSvc.generateAndPrint({
+      movement_type:     type,
+      doc_id:            movement.id,
+      date:              movement.created_at,
+      user_name:         movement.user_name,
+      warehouse_name:    wh?.name ?? `Almacén ${movement.warehouse_id}`,
+      warehouse_to_name: whTo?.name ?? null,
+      reason:            movement.reason,
+      cost_center_name:  movement.cost_center?.name ?? null,
+      lines: [{ product_name: movement.product_name, lot_number: movement.batch_lot_number, quantity: movement.quantity }],
+    });
   }
 
   private _handleError(err: any): void {

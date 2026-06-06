@@ -174,6 +174,10 @@ export class InventoryService {
   }
 
   // Movements
+  getMovement(id: number): Observable<ApiResponse<Movement>> {
+    return this.http.get<ApiResponse<Movement>>(`${this.api}/movements/${id}`);
+  }
+
   getMovements(f: {
     warehouse_id?: number;
     warehouse_to_id?: number;

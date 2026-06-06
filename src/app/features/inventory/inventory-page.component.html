@@ -159,10 +159,24 @@
           <ng-container matColumnDef="type">
             <th mat-header-cell *matHeaderCellDef mat-sort-header>Tipo</th>
             <td mat-cell *matCellDef="let m">
-              <span class="type-chip">
-                <mat-icon>{{ getMovIcon(m.movement_type) }}</mat-icon>
-                {{ getMovTypeLabel(m.movement_type) }}
-              </span>
+              <div class="type-cell">
+                <span class="type-chip">
+                  <mat-icon>{{ getMovIcon(m.movement_type) }}</mat-icon>
+                  {{ getMovTypeLabel(m.movement_type) }}
+                </span>
+                @if (PRINTABLE_TYPES.has(m.movement_type) && m.id) {
+                  <button mat-icon-button class="pdf-btn"
+                          (click)="printMovement(m); $event.stopPropagation()"
+                          matTooltip="Imprimir comprobante"
+                          [disabled]="loadingPdf() !== null">
+                    @if (loadingPdf() === m.id) {
+                      <mat-spinner diameter="16"></mat-spinner>
+                    } @else {
+                      <mat-icon>picture_as_pdf</mat-icon>
+                    }
+                  </button>
+                }
+              </div>
             </td>
           </ng-container>
           <ng-container matColumnDef="product">
