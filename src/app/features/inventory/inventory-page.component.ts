@@ -28,6 +28,7 @@ import { PermissionDirective } from '../../shared/directives/permission.directiv
 import { DateFormatPipe } from '../../shared/pipes/date-format.pipe';
 import { MovementFormDialogComponent } from './movements/movement-form-dialog.component';
 import { ExitWizardDialogComponent } from './movements/exit-wizard-dialog.component';
+import { WarehouseTransferDialogComponent } from './movements/warehouse-transfer-dialog.component';
 import { ConfirmDialogComponent } from '../../shared/components/confirm-dialog/confirm-dialog.component';
 import { PurchaseReceiveContextService } from '../purchasing/purchase-receive-context.service';
 import { PurchaseOrder } from '../purchasing/purchasing.service';
@@ -38,6 +39,7 @@ interface MovementRow {
   movement_type: string;
   product_name: string;
   warehouse_name: string;
+  warehouse_to_name: string | null;
   quantity: number;
   user_name: string;
   date: string;
@@ -256,6 +258,7 @@ export class InventoryPageComponent implements OnInit {
           movement_type: m.movement_type,
           product_name: m.product_name || m.product?.name || '—',
           warehouse_name: this.getWarehouseName(m.warehouse_id),
+          warehouse_to_name: m.warehouse_to_name ?? (m.warehouse_to_id ? this.getWarehouseName(m.warehouse_to_id) : null),
           quantity: m.quantity,
           user_name: m.user_name || '—',
           date: m.created_at,
@@ -273,7 +276,12 @@ export class InventoryPageComponent implements OnInit {
       return;
     }
 
-    const needsWide = type === 'entry' || type === 'transfer';
+    if (type === 'transfer') {
+      this._openTransferDialog();
+      return;
+    }
+
+    const needsWide = type === 'entry';
     this.dialog.open(MovementFormDialogComponent, {
       data: { type, warehouses: this.warehouses(), products: this.products(), inventorySvc: this.svc },
       width: needsWide ? '760px' : '620px', maxWidth: '95vw', maxHeight: '94vh',
@@ -282,6 +290,17 @@ export class InventoryPageComponent implements OnInit {
       if (!ok) return;
       this.loadStock(); this.loadMovements(); this.loadBatches();
       this.snack.open('Movimiento registrado', 'OK', { duration: 3000 });
+    });
+  }
+
+  private _openTransferDialog(): void {
+    this.dialog.open(WarehouseTransferDialogComponent, {
+      data: { warehouses: this.warehouses(), products: this.products(), inventorySvc: this.svc },
+      width: '720px', maxWidth: '96vw', maxHeight: '94vh',
+    }).afterClosed().subscribe(result => {
+      if (!result) return;
+      this.loadStock(); this.loadMovements(); this.loadBatches();
+      this.snack.open('Traslado registrado exitosamente', 'OK', { duration: 3500 });
     });
   }
 

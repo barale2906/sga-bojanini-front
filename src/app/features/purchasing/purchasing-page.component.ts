@@ -25,6 +25,7 @@ import { DateFormatPipe } from '../../shared/pipes/date-format.pipe';
 import { ConfirmDialogComponent } from '../../shared/components/confirm-dialog/confirm-dialog.component';
 import { PurchaseOrderFormDialogComponent } from './order-form/purchase-order-form-dialog.component';
 import { PurchaseOrderDetailDialogComponent } from './order-detail/purchase-order-detail-dialog.component';
+import { PurchaseOrderPdfService } from './services/purchase-order-pdf.service';
 
 @Component({
   selector: 'app-purchasing-page',
@@ -44,11 +45,13 @@ export class PurchasingPageComponent implements OnInit {
   private dialog = inject(MatDialog);
   private snack = inject(MatSnackBar);
   private fb = inject(FormBuilder);
+  private pdfSvc = inject(PurchaseOrderPdfService);
 
   orders = signal<PurchaseOrder[]>([]);
   meta = signal<PaginationMeta>({ current_page: 1, last_page: 1, per_page: 25, total: 0 });
   suggestions = signal<ReorderSuggestion[]>([]);
   loading = signal(false);
+  pdfLoadingId = signal<number | null>(null);
 
   cols = ['actions', 'code', 'supplier', 'warehouse', 'status', 'total', 'created_at'];
   suggCols = ['select', 'product', 'current_stock', 'reorder_point', 'suggested_qty', 'supplier', 'actions'];
@@ -107,6 +110,21 @@ export class PurchasingPageComponent implements OnInit {
   }
 
   onPage(e: PageEvent): void { this.meta.update(m => ({ ...m, per_page: e.pageSize })); this.loadOrders(e.pageIndex + 1); }
+
+  downloadPdf(order: PurchaseOrder): void {
+    if (this.pdfLoadingId() !== null) return;
+    this.pdfLoadingId.set(order.id);
+    this.svc.getOrder(order.id).subscribe({
+      next: r => {
+        this.pdfLoadingId.set(null);
+        this.pdfSvc.generate(r.data);
+      },
+      error: () => {
+        this.pdfLoadingId.set(null);
+        this.snack.open('No se pudo generar el PDF', 'OK', { duration: 3000 });
+      },
+    });
+  }
 
   getStatusClass(status: string): string {
     const m: Record<string, string> = {

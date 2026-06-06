@@ -18,3 +18,5 @@
 .sugg-toolbar { justify-content: space-between; align-items: center; margin-bottom: 1rem; }
 .sugg-row { cursor: pointer; transition: background 0.15s; &:hover { background: #f7fafc; } }
 .selected-row { background: #ebf8ff !important; }
+.spin-icon { animation: spin 1s linear infinite; display: inline-block; }
+@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }

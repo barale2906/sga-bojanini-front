@@ -76,7 +76,11 @@ export interface Movement {
   id: number;
   product_id: number;
   warehouse_id: number;
+  warehouse_to_id?: number | null;
+  warehouse_to_name?: string | null;
   batch_id: number | null;
+  location_from_id?: number | null;
+  location_to_id?: number | null;
   movement_type: string;
   quantity: number;
   reason: string | null;
@@ -172,6 +176,7 @@ export class InventoryService {
   // Movements
   getMovements(f: {
     warehouse_id?: number;
+    warehouse_to_id?: number;
     product_id?: number;
     movement_type?: string;
     cost_center_id?: number;
@@ -183,6 +188,7 @@ export class InventoryService {
   } = {}): Observable<PaginatedResponse<Movement>> {
     let p = new HttpParams();
     if (f.warehouse_id)     p = p.set('warehouse_id',     String(f.warehouse_id));
+    if (f.warehouse_to_id)  p = p.set('warehouse_to_id',  String(f.warehouse_to_id));
     if (f.product_id)       p = p.set('product_id',       String(f.product_id));
     if (f.movement_type)    p = p.set('movement_type',    f.movement_type);
     if (f.cost_center_id)   p = p.set('cost_center_id',   String(f.cost_center_id));

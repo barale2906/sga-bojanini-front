@@ -1,0 +1,175 @@
+.dlg-title {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  mat-icon { color: #C02F86; }
+}
+
+.section-header {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: #4a5568;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin: 0.25rem 0 0.75rem;
+}
+
+.section-num {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #1E2A3B;
+  color: #FFCF01;
+  font-size: 0.75rem;
+  font-weight: 800;
+  flex-shrink: 0;
+}
+
+.section-divider {
+  margin: 1rem 0 !important;
+}
+
+.two-col {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem;
+  margin-bottom: 0.25rem;
+}
+
+.full-width {
+  width: 100%;
+  margin-bottom: 0.25rem;
+}
+
+.opt-code {
+  font-family: monospace;
+  font-size: 0.78rem;
+  background: #EDF2F7;
+  padding: 1px 4px;
+  border-radius: 3px;
+}
+
+.loc-code {
+  color: #718096;
+  font-size: 0.8rem;
+}
+
+// ── Stock card ────────────────────────────────────────────
+.stock-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  padding: 0.75rem 1rem;
+  border-radius: 8px;
+  border: 1px solid #e2e8f0;
+  background: #f7fafc;
+  margin-bottom: 0.5rem;
+  font-size: 0.85rem;
+
+  &--loading {
+    align-items: center;
+    color: #718096;
+    gap: 0.5rem;
+    padding: 0.5rem 1rem;
+  }
+
+  &--ok {
+    border-color: #c6f6d5;
+    background: #f0fff4;
+    .stock-icon { color: #276749; }
+  }
+
+  &--warn {
+    border-color: #fef3c7;
+    background: #fffbeb;
+    .stock-icon { color: #92400e; }
+  }
+
+  &--danger {
+    border-color: #fed7d7;
+    background: #fff5f5;
+    .stock-icon { color: #c53030; }
+  }
+}
+
+.stock-icon {
+  margin-top: 2px;
+  flex-shrink: 0;
+}
+
+.stock-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.stock-row {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.stock-label {
+  color: #718096;
+  min-width: 120px;
+}
+
+.stock-val {
+  font-weight: 600;
+  &.val--ok     { color: #276749; }
+  &.val--warn   { color: #92400e; }
+  &.val--danger { color: #c53030; }
+}
+
+.stock-warn-msg {
+  font-size: 0.8rem;
+  color: #c53030;
+  font-weight: 600;
+  margin-top: 0.25rem;
+  grid-column: 1 / -1;
+}
+
+// ── FEFO note ─────────────────────────────────────────────
+.fefo-note {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.4rem;
+  font-size: 0.8rem;
+  color: #718096;
+  background: #EDF2F7;
+  border-radius: 6px;
+  padding: 0.5rem 0.75rem;
+  margin: 0.5rem 0;
+
+  mat-icon {
+    font-size: 16px;
+    width: 16px;
+    height: 16px;
+    color: #4a5568;
+    flex-shrink: 0;
+    margin-top: 1px;
+  }
+}
+
+// ── Actions ───────────────────────────────────────────────
+.btn-spinner {
+  display: inline-block;
+  margin-right: 6px;
+  vertical-align: middle;
+}
+
+mat-dialog-actions {
+  gap: 0.5rem;
+  padding: 0.75rem 0 0;
+}
+
+// ── Responsive ────────────────────────────────────────────
+@media (max-width: 560px) {
+  .two-col { grid-template-columns: 1fr; }
+}

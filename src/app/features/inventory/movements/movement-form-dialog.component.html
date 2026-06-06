@@ -649,58 +649,129 @@
 
     <!-- ══════════════════════ AJUSTE ════════════════════════════ -->
     @if (isAdjustment) {
+
+      <!-- Stock disponible actual -->
+      @if (loadingStock()) {
+        <div class="span2 fefo-loading">
+          <mat-spinner diameter="14"></mat-spinner>
+          <span>Verificando stock disponible...</span>
+        </div>
+      }
+      @if (!loadingStock() && stockSummary(); as s) {
+        <div class="span2 stock-summary-panel stock-summary-panel--{{ stockStatusClass }}">
+          <mat-icon class="stock-summary-icon">inventory_2</mat-icon>
+          <div class="stock-summary-info">
+            <span class="stock-summary-label">
+              Stock disponible en <strong>{{ selectedWarehouseName }}</strong>
+            </span>
+            <span class="stock-summary-qty" [class.stock-qty--zero]="s.available_quantity === 0">
+              {{ s.available_quantity }} {{ selectedProduct?.base_unit?.abbreviation || 'uds' }}
+            </span>
+            @if (s.available_quantity === 0) {
+              <span class="stock-summary-alert">⚠ Sin stock activo — los ajustes positivos requieren un lote existente</span>
+            }
+          </div>
+        </div>
+      }
+
+      <!-- Bloqueo ajuste negativo con stock = 0 -->
+      @if (hasZeroStock) {
+        <div class="span2 zero-stock-block">
+          <mat-icon>block</mat-icon>
+          <div class="zero-stock-text">
+            <strong>Sin unidades para descontar</strong>
+            <span>No hay stock disponible en {{ selectedWarehouseName }}. No es posible realizar un ajuste negativo.</span>
+          </div>
+        </div>
+      }
+
+      <!-- Ubicación (requerida) -->
+      <mat-form-field appearance="outline" class="span2">
+        <mat-label>Ubicación *</mat-label>
+        <mat-select formControlName="location_id">
+          @for (l of locations(); track l.id) {
+            <mat-option [value]="l.id">{{ l.name }}</mat-option>
+          }
+        </mat-select>
+        <mat-hint>El backend ajusta el lote correspondiente a esta ubicación</mat-hint>
+      </mat-form-field>
+
+      <!-- Indicador de signo -->
+      <div class="span2 adj-hint">
+        <mat-icon>info</mat-icon>
+        Cantidad <strong>positiva</strong> suma al inventario &nbsp;·&nbsp; Cantidad <strong>negativa</strong> descuenta del inventario
+      </div>
+
+      <!-- Cantidad y Motivo -->
       <mat-form-field appearance="outline">
         <mat-label>Cantidad (+ agregar / − quitar) *</mat-label>
         <input matInput type="number" formControlName="quantity" />
+        @if (stockSummary(); as s) {
+          <mat-hint>Disponible: {{ s.available_quantity }} {{ selectedProduct?.base_unit?.abbreviation || 'uds' }}</mat-hint>
+        }
       </mat-form-field>
       <mat-form-field appearance="outline">
         <mat-label>Motivo *</mat-label>
         <input matInput formControlName="reason" placeholder="Ajuste por conteo físico" />
       </mat-form-field>
+
+      <!-- Advertencia: ajuste negativo excede stock -->
+      @if (adjNegativeExceedsStock) {
+        <div class="span2 zero-stock-block">
+          <mat-icon>warning</mat-icon>
+          <div class="zero-stock-text">
+            <strong>Stock insuficiente para el descuento</strong>
+            <span>La cantidad negativa excede el stock disponible ({{ stockSummary()?.available_quantity }} uds). Reduzca la cantidad o verifique el almacén.</span>
+          </div>
+        </div>
+      }
+
     }
 
     <!-- ══════════════════════ SALIDA / DEVOLUCIÓN ═══════════════ -->
     @if (isExit || isReturn) {
 
-      <!-- ── Paso 2: Stock disponible (solo EXIT) ── -->
-      @if (isExit) {
+      <!-- ── Stock disponible (EXIT y RETURN) ── -->
 
-        <!-- Spinner mientras carga -->
-        @if (loadingStock()) {
-          <div class="span2 fefo-loading">
-            <mat-spinner diameter="14"></mat-spinner>
-            <span>Verificando stock disponible...</span>
+      <!-- Spinner mientras carga -->
+      @if (loadingStock()) {
+        <div class="span2 fefo-loading">
+          <mat-spinner diameter="14"></mat-spinner>
+          <span>Verificando stock disponible...</span>
+        </div>
+      }
+
+      <!-- Panel de resultado -->
+      @if (!loadingStock() && stockSummary(); as s) {
+        <div class="span2 stock-summary-panel stock-summary-panel--{{ stockStatusClass }}">
+          <mat-icon class="stock-summary-icon">
+            {{ s.available_quantity === 0 ? 'remove_shopping_cart' : stockStatusClass === 'warn' ? 'warning' : 'inventory_2' }}
+          </mat-icon>
+          <div class="stock-summary-info">
+            <span class="stock-summary-label">
+              Stock disponible en <strong>{{ selectedWarehouseName }}</strong>
+            </span>
+            <span class="stock-summary-qty" [class.stock-qty--zero]="s.available_quantity === 0">
+              {{ s.available_quantity }} {{ selectedProduct?.base_unit?.abbreviation || 'uds' }}
+            </span>
           </div>
-        }
+        </div>
+      }
 
-        <!-- Panel de resultado -->
-        @if (!loadingStock() && stockSummary(); as s) {
-          <div class="span2 stock-summary-panel stock-summary-panel--{{ stockStatusClass }}">
-            <mat-icon class="stock-summary-icon">
-              {{ s.available_quantity === 0 ? 'remove_shopping_cart' : stockStatusClass === 'warn' ? 'warning' : 'inventory_2' }}
-            </mat-icon>
-            <div class="stock-summary-info">
-              <span class="stock-summary-label">
-                Stock disponible en <strong>{{ selectedWarehouseName }}</strong>
-              </span>
-              <span class="stock-summary-qty" [class.stock-qty--zero]="s.available_quantity === 0">
-                {{ s.available_quantity }} {{ selectedProduct?.base_unit?.abbreviation || 'uds' }}
-              </span>
-            </div>
-          </div>
-        }
-
-        <!-- Bloqueo total cuando no hay stock -->
-        @if (hasZeroStock) {
-          <div class="span2 zero-stock-block">
-            <mat-icon>block</mat-icon>
-            <div class="zero-stock-text">
+      <!-- Bloqueo total cuando no hay stock -->
+      @if (hasZeroStock) {
+        <div class="span2 zero-stock-block">
+          <mat-icon>block</mat-icon>
+          <div class="zero-stock-text">
+            @if (isExit) {
               <strong>Sin unidades disponibles para despachar</strong>
               <span>No hay stock de este producto en {{ selectedWarehouseName }}. Selecciona otro almacén o verifica las entradas registradas.</span>
-            </div>
+            } @else {
+              <strong>Sin unidades disponibles para devolver</strong>
+              <span>No hay stock de este producto en {{ selectedWarehouseName }}. No es posible registrar una devolución.</span>
+            }
           </div>
-        }
-
+        </div>
       }
 
       <!-- ── Campos operativos: solo visibles si hay stock (o si es Devolución) ── -->
@@ -820,22 +891,24 @@
         <mat-form-field appearance="outline" class="span2">
           <mat-label>Cantidad *</mat-label>
           <input matInput type="number" formControlName="quantity" min="1" />
-          @if (isExit && stockSummary()) {
+          @if (stockSummary(); as s) {
             <mat-hint>
-              Disponible: {{ stockSummary()!.available_quantity }}
+              Disponible: {{ s.available_quantity }}
               {{ selectedProduct?.base_unit?.abbreviation || 'uds' }}
             </mat-hint>
           }
         </mat-form-field>
 
-        <!-- Ubicación de retiro (opcional, solo EXIT con almacén seleccionado) -->
-        @if (isExit && form.get('warehouse_id')?.value) {
+        <!-- Ubicación (opcional) -->
+        @if ((isExit || isReturn) && form.get('warehouse_id')?.value) {
           <mat-form-field appearance="outline" class="span2">
-            <mat-label>Ubicación de retiro físico (opcional)</mat-label>
+            <mat-label>
+              {{ isExit ? 'Ubicación de retiro físico (opcional)' : 'Ubicación del producto a devolver (opcional)' }}
+            </mat-label>
             <mat-select formControlName="location_id">
               <mat-option [value]="null">
                 Sin especificar — FEFO automático
-                @if (fefoFirstLocation) { (se usará: {{ fefoFirstLocation }}) }
+                @if (isExit && fefoFirstLocation) { (se usará: {{ fefoFirstLocation }}) }
               </mat-option>
               @for (l of locations(); track l.id) {
                 <mat-option [value]="l.id">{{ l.name }}</mat-option>

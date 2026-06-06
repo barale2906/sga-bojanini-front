@@ -32,6 +32,17 @@
           <ng-container matColumnDef="actions"><th mat-header-cell *matHeaderCellDef class="act">Acciones</th>
             <td mat-cell *matCellDef="let o" class="act">
               <button mat-icon-button color="primary" (click)="openDetail(o)" matTooltip="Ver detalle y gestionar"><mat-icon>visibility</mat-icon></button>
+              <button mat-icon-button
+                      color="accent"
+                      (click)="downloadPdf(o)"
+                      [disabled]="pdfLoadingId() === o.id"
+                      matTooltip="Descargar PDF">
+                @if (pdfLoadingId() === o.id) {
+                  <mat-icon class="spin-icon">sync</mat-icon>
+                } @else {
+                  <mat-icon>picture_as_pdf</mat-icon>
+                }
+              </button>
             </td>
           </ng-container>
           <tr mat-header-row *matHeaderRowDef="cols"></tr>

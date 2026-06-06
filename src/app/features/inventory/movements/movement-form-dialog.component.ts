@@ -166,13 +166,35 @@ export class MovementFormDialogComponent implements OnInit {
 
   get hasZeroStock(): boolean {
     const s = this.stockSummary();
-    return this.isExit && s !== null && s.available_quantity === 0;
+    if (!s) return false;
+    if (this.isExit || this.isReturn) return s.available_quantity === 0;
+    if (this.isAdjustment) {
+      const qty = Number(this.form.get('quantity')?.value) || 0;
+      return qty < 0 && s.available_quantity === 0;
+    }
+    return false;
+  }
+
+  get adjNegativeExceedsStock(): boolean {
+    if (!this.isAdjustment) return false;
+    const qty = Number(this.form.get('quantity')?.value) || 0;
+    if (qty >= 0) return false;
+    const s = this.stockSummary();
+    return s !== null && Math.abs(qty) > s.available_quantity;
   }
 
   get stockStatusClass(): 'ok' | 'warn' | 'danger' | 'loading' | 'none' {
     if (this.loadingStock()) return 'loading';
     const s = this.stockSummary();
     if (!s) return 'none';
+    if (this.isAdjustment) {
+      const qty = Number(this.form.get('quantity')?.value) || 0;
+      if (qty >= 0) return s.available_quantity === 0 ? 'warn' : 'ok';
+      const needed = Math.abs(qty);
+      if (needed > s.available_quantity) return 'danger';
+      if (needed > s.available_quantity * 0.8) return 'warn';
+      return 'ok';
+    }
     if (s.available_quantity === 0) return 'danger';
     const requested = Number(this.form.get('quantity')?.value) || 0;
     if (requested > 0 && requested > s.available_quantity) return 'danger';
@@ -209,7 +231,19 @@ export class MovementFormDialogComponent implements OnInit {
       return !!v.location_to_id && !!(v.quantity) && (v.quantity ?? 0) >= 1;
     }
 
-    if (this.isAdjustment) return !!(v.quantity) && !!v.reason;
+    if (this.isAdjustment) {
+      if (!v.location_id || !v.quantity || !v.reason?.trim()) return false;
+      if (Number(v.quantity) === 0) return false;
+      return !this.adjNegativeExceedsStock;
+    }
+
+    if (this.isReturn) {
+      if (!v.quantity || (v.quantity ?? 0) < 1) return false;
+      const s = this.stockSummary();
+      if (s !== null && s.available_quantity === 0) return false;
+      if (s !== null && (v.quantity ?? 0) > s.available_quantity) return false;
+      return true;
+    }
 
     if (!v.quantity || (v.quantity ?? 0) < 1) return false;
     if (this.isExit) {
@@ -237,7 +271,7 @@ export class MovementFormDialogComponent implements OnInit {
     location_id:              [null as number | null],
     location_from_id:         [null as number | null],
     location_to_id:           [null as number | null],
-    quantity:                 [null as number | null, [Validators.min(1)]],
+    quantity:                 [null as number | null],
     quantity_base:            [null as number | null],
     product_presentation_id:  [null as number | null],
     quantity_in_presentation: [null as number | null],
@@ -262,7 +296,7 @@ export class MovementFormDialogComponent implements OnInit {
       if (wId) {
         this.wSvc.getWarehouseLocations(Number(wId)).subscribe({ next: r => this.locations.set(r.data), error: () => {} });
         this.wSvc.getWarehouseZones(Number(wId)).subscribe({ next: r => this.zones.set(r.data), error: () => {} });
-        this._loadExitData();
+        this._loadStockData();
       } else {
         this.locations.set([]);
         this.zones.set([]);
@@ -308,7 +342,7 @@ export class MovementFormDialogComponent implements OnInit {
             error: () => { this.productDetail.set(null); this.loadingProductDetail.set(false); },
           });
         }
-        this._loadExitData();
+        this._loadStockData();
       } else {
         this.presentations.set([]);
         this.stockSummary.set(null);
@@ -460,8 +494,8 @@ export class MovementFormDialogComponent implements OnInit {
 
   // ── FEFO ─────────────────────────────────────────────────────
 
-  private _loadExitData(): void {
-    if (!this.isExit) return;
+  private _loadStockData(): void {
+    if (!this.isExit && !this.isAdjustment && !this.isReturn) return;
     const pId = this.form.get('product_id')?.value;
     const wId = this.form.get('warehouse_id')?.value;
     if (!pId || !wId) return;
@@ -469,18 +503,20 @@ export class MovementFormDialogComponent implements OnInit {
     this.stockSummary.set(null);
     this.fefoLotes.set([]);
     this.loadingStock.set(true);
-    this.loadingFefo.set(true);
 
     this.data.inventorySvc.getStockSummary(Number(wId), Number(pId))
       .pipe(finalize(() => this.loadingStock.set(false)))
       .subscribe({ next: r => this.stockSummary.set(r.data), error: () => this.stockSummary.set(null) });
 
-    this.data.inventorySvc.getProductBatches(Number(pId))
-      .pipe(finalize(() => this.loadingFefo.set(false)))
-      .subscribe({
-        next: r => this.fefoLotes.set(r.data.filter(b => b.status === 'active' && b.quantity_available > 0)),
-        error: () => this.fefoLotes.set([]),
-      });
+    if (this.isExit) {
+      this.loadingFefo.set(true);
+      this.data.inventorySvc.getProductBatches(Number(pId))
+        .pipe(finalize(() => this.loadingFefo.set(false)))
+        .subscribe({
+          next: r => this.fefoLotes.set(r.data.filter(b => b.status === 'active' && b.quantity_available > 0)),
+          error: () => this.fefoLotes.set([]),
+        });
+    }
   }
 
   get fefoFirstLocation(): string {
