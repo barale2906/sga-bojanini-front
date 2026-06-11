@@ -36,7 +36,14 @@ const ICON_MAP: Record<string, string> = {
   'settings': 'settings',
   'users': 'people',
   'shield': 'security',
+  'sliders-horizontal': 'tune',
+  'clipboard-list': 'assignment',
+  'clipboard-check': 'fact_check',
 };
+
+// Grupos que el backend modela con hijos pero que en el frontend no tienen
+// pantallas propias para esos hijos: se enlazan directo a su ruta, sin dropdown.
+const FORCE_DIRECT_LINK_KEYS = new Set(['monitoring', 'purchasing']);
 
 @Component({
   selector: 'app-sidebar',
@@ -56,7 +63,7 @@ export class SidebarComponent implements OnInit {
 
   ngOnInit(): void {
     for (const item of this.menuService.menu()) {
-      if (item.children.length > 0 && this.isGroupActive(item)) {
+      if ((item.children?.length ?? 0) > 0 && this.isItemActive(item)) {
         this.expandedGroups.add(item.key);
       }
     }
@@ -66,33 +73,26 @@ export class SidebarComponent implements OnInit {
     return ICON_MAP[lucideIcon] ?? 'circle';
   }
 
-  resolveRoute(routeName: string | null): string | null {
-    return this.menuService.resolveRoute(routeName);
+  /** True si el ítem debe renderizarse como enlace directo (sin dropdown). */
+  isDirectLink(item: MenuItem): boolean {
+    return !item.children?.length || FORCE_DIRECT_LINK_KEYS.has(item.key);
   }
 
-  isLeafActive(item: MenuItem): boolean {
-    const path = this.resolveRoute(item.route);
-    return path ? this.isActive(path) : false;
+  /** Ruta de navegación de un ítem: la suya propia, o la del primer hijo resoluble. */
+  resolveItemRoute(item: MenuItem): string | null {
+    return this.menuService.resolveItemRoute(item);
   }
 
-  isGroupActive(item: MenuItem): boolean {
-    return item.children.some((child) => {
-      const path = this.resolveRoute(child.route);
-      return path ? this.isActive(path) : false;
-    });
-  }
-
-  getFirstChildRoute(item: MenuItem): string | null {
-    for (const child of item.children) {
-      const path = this.resolveRoute(child.route);
-      if (path) return path;
-    }
-    return null;
+  /** Activo si su propia ruta o la de algún descendiente coincide con la ruta actual. */
+  isItemActive(item: MenuItem): boolean {
+    const own = this.menuService.resolveRoute(item.route);
+    if (own && this.isActive(own)) return true;
+    return (item.children ?? []).some((child) => this.isItemActive(child));
   }
 
   onGroupClick(item: MenuItem): void {
     if (this.collapsed) {
-      const route = this.getFirstChildRoute(item);
+      const route = this.resolveItemRoute(item);
       if (route) this.router.navigate([route]);
     } else {
       this.toggleGroup(item.key);

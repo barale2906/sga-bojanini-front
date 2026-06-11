@@ -15,7 +15,8 @@ import { MatTooltipModule } from '@angular/material/tooltip';
 import { MatDividerModule } from '@angular/material/divider';
 import { MatDatepickerModule } from '@angular/material/datepicker';
 import { DateAdapter, MAT_DATE_FORMATS } from '@angular/material/core';
-import { forkJoin, finalize } from 'rxjs';
+import { forkJoin, finalize, of } from 'rxjs';
+import { map, catchError } from 'rxjs/operators';
 import { InventoryService, StockSummary, BatchDetail, CostCenter } from '../inventory.service';
 import { WarehouseService, Warehouse, Location } from '../../warehouse/warehouse.service';
 import { Product } from '../../catalog/catalog.service';
@@ -390,20 +391,29 @@ export class ExitWizardDialogComponent implements OnInit {
           if (!this.isExternalCenter && results.length > 0) {
             const wh = this.data.warehouses.find(w => w.id === wId);
             const cc = this.costCenters().find(c => c.id === cv.cost_center_id);
-            this.pdfSvc.generateAndPrint({
-              movement_type:    'exit',
-              doc_id:           results[0].data.id,
-              date:             results[0].data.created_at,
-              user_name:        results[0].data.user_name,
-              warehouse_name:   wh?.name ?? `Almacén ${wId}`,
-              cost_center_name: cc?.name ?? null,
-              reason:           cv.reason || null,
-              lines: results.map(r => ({
-                product_name: r.data.product_name,
-                lot_number:   r.data.batch_lot_number,
-                quantity:     r.data.quantity,
-              })),
+            const expiry$ = forkJoin(results.map(r => r.data.batch_id
+              ? this.data.inventorySvc.getBatchById(r.data.batch_id).pipe(map(b => b.data.expiration_date), catchError(() => of(null)))
+              : of(null)));
+            expiry$.subscribe(expirations => {
+              this.pdfSvc.generateAndPrint({
+                movement_type:    'exit',
+                doc_id:           results[0].data.id,
+                date:             results[0].data.created_at,
+                user_name:        results[0].data.user_name,
+                warehouse_name:   wh?.name ?? `Almacén ${wId}`,
+                cost_center_name: cc?.name ?? null,
+                reason:           cv.reason || null,
+                lines: results.map((r, i) => ({
+                  product_name:    r.data.product_name,
+                  lot_number:      r.data.batch_lot_number,
+                  expiration_date: expirations[i],
+                  quantity:        r.data.quantity,
+                })),
+              });
+              this.saving.set(false);
+              this.ref.close({ ok: true });
             });
+            return;
           }
           this.saving.set(false);
           this.ref.close({ ok: true });

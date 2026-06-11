@@ -1,0 +1,83 @@
+.tab-body { padding-top: 1rem; }
+
+.tab-toolbar {
+  display: flex; gap: 0.75rem; align-items: flex-end; flex-wrap: wrap; margin-bottom: 1rem;
+  .search-field { flex: 1; min-width: 200px; }
+  .select-field { width: 190px; }
+  .spacer { flex: 1 1 0; min-width: 0; }
+}
+
+.table-wrap { border-radius: 8px; overflow: hidden; background: #fff; }
+
+.code-tag {
+  background: #EDF2F7; color: #4a5568; padding: 0.15rem 0.5rem;
+  border-radius: 4px; font-size: 0.8rem; font-family: monospace;
+}
+
+.badge {
+  display: inline-flex; padding: 0.15rem 0.6rem; border-radius: 9999px;
+  font-size: 0.75rem; font-weight: 600;
+  &--on  { background: #c6f6d5; color: #276749; }
+  &--off { background: #fed7d7; color: #c53030; }
+}
+
+.type-badge {
+  display: inline-flex; padding: 0.15rem 0.6rem; border-radius: 9999px;
+  font-size: 0.75rem; font-weight: 600;
+  &--internal { background: #e2e8f0; color: #4a5568; }
+  &--external { background: #bee3f8; color: #2c5282; }
+}
+
+.act {
+  /* ancho/alineación globales en styles.scss; aquí solo compactamos los botones */
+  .mat-mdc-icon-button {
+    --mdc-icon-button-state-layer-size: 32px;
+    --mdc-icon-button-icon-size: 18px;
+    width: 32px;
+    height: 32px;
+    padding: 4px;
+  }
+
+  .mat-mdc-icon-button + .mat-mdc-icon-button {
+    margin-left: -8px;
+  }
+}
+.no-data { text-align: center; padding: 2.5rem; color: #a0aec0; }
+
+// ── Registros de procedimientos: celdas ──────────────────────
+.proc-cell {
+  display: flex; align-items: center; gap: 0.45rem; flex-wrap: wrap;
+}
+
+.proc-name { color: #2d3748; font-size: 0.85rem; }
+
+.patient-cell {
+  display: flex; flex-direction: column; gap: 0.15rem;
+}
+
+.patient-name {
+  font-weight: 600; color: #2d3748; font-size: 0.85rem;
+}
+
+.patient-doc {
+  display: flex; align-items: center; gap: 0.3rem;
+  font-weight: 500; color: #4a5568; font-size: 0.82rem;
+}
+
+.patient-icon { font-size: 0.9rem; height: 0.9rem; width: 0.9rem; color: #718096; }
+
+.patient-ext {
+  font-size: 0.75rem; color: #718096; font-family: monospace;
+  cursor: default;
+}
+
+.qty-badge {
+  display: inline-flex; align-items: center; justify-content: center;
+  background: #ebf8ff; color: #2b6cb0;
+  font-weight: 700; font-size: 0.82rem;
+  min-width: 28px; padding: 0.1rem 0.4rem; border-radius: 9999px;
+}
+
+.price-cell { color: #4a5568; font-size: 0.85rem; }
+
+.total-cell { color: #276749; font-size: 0.92rem; }

@@ -12,7 +12,7 @@ import { HeaderComponent } from '../header/header.component';
   styleUrl: './main-layout.component.scss',
 })
 export class MainLayoutComponent {
-  sidebarCollapsed = signal(false);
+  sidebarCollapsed = signal(true);
 
   toggleSidebar(): void {
     this.sidebarCollapsed.update((v) => !v);

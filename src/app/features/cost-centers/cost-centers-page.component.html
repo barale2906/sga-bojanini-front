@@ -1,0 +1,372 @@
+<app-page-header title="Centros de Costo" subtitle="Áreas internas, tarifas de procedimientos y registros de pacientes" icon="account_balance">
+</app-page-header>
+
+<mat-tab-group color="primary" animationDuration="200ms">
+
+  <!-- ── TAB 1: CENTROS DE COSTO ── -->
+  <mat-tab label="Centros de costo">
+    <div class="tab-body">
+      <div class="tab-toolbar" [formGroup]="filters">
+        <mat-form-field appearance="outline" class="search-field">
+          <mat-label>Buscar</mat-label>
+          <mat-icon matPrefix>search</mat-icon>
+          <input matInput formControlName="search" placeholder="Nombre o código..." />
+        </mat-form-field>
+
+        <mat-form-field appearance="outline" class="select-field">
+          <mat-label>Tipo</mat-label>
+          <mat-select formControlName="type">
+            <mat-option value="">Todos</mat-option>
+            <mat-option value="internal">Interno</mat-option>
+            <mat-option value="external">Externo (Pacientes)</mat-option>
+          </mat-select>
+        </mat-form-field>
+
+        <mat-form-field appearance="outline" class="select-field">
+          <mat-label>Estado</mat-label>
+          <mat-select formControlName="is_active">
+            <mat-option value="">Todos</mat-option>
+            <mat-option value="true">Activos</mat-option>
+            <mat-option value="false">Inactivos</mat-option>
+          </mat-select>
+        </mat-form-field>
+
+        <button *sgaPermission="'centros_costo.crear'" mat-raised-button color="primary" (click)="openForm()">
+          <mat-icon>add</mat-icon> Nuevo Centro de Costo
+        </button>
+      </div>
+
+      <app-loading-spinner [loading]="loading()" [inline]="true"></app-loading-spinner>
+
+      <div class="table-wrap mat-elevation-z1">
+        <table mat-table [dataSource]="costCenters()">
+
+          <ng-container matColumnDef="actions">
+            <th mat-header-cell *matHeaderCellDef class="act">Acciones</th>
+            <td mat-cell *matCellDef="let cc" class="act">
+              <button *sgaPermission="'centros_costo.editar'" mat-icon-button color="primary" (click)="openForm(cc)" matTooltip="Editar">
+                <mat-icon>edit</mat-icon>
+              </button>
+              @if (cc.is_active) {
+                <button *sgaPermission="'centros_costo.editar'" mat-icon-button (click)="toggleActive(cc, false)" matTooltip="Desactivar">
+                  <mat-icon>toggle_on</mat-icon>
+                </button>
+              } @else {
+                <button *sgaPermission="'centros_costo.editar'" mat-icon-button (click)="toggleActive(cc, true)" matTooltip="Activar">
+                  <mat-icon>toggle_off</mat-icon>
+                </button>
+              }
+              <button *sgaPermission="'centros_costo.eliminar'" mat-icon-button color="warn" (click)="delete(cc)" matTooltip="Eliminar">
+                <mat-icon>delete</mat-icon>
+              </button>
+            </td>
+          </ng-container>
+
+          <ng-container matColumnDef="code">
+            <th mat-header-cell *matHeaderCellDef>Código</th>
+            <td mat-cell *matCellDef="let cc"><code class="code-tag">{{ cc.code }}</code></td>
+          </ng-container>
+
+          <ng-container matColumnDef="name">
+            <th mat-header-cell *matHeaderCellDef>Nombre</th>
+            <td mat-cell *matCellDef="let cc">{{ cc.name }}</td>
+          </ng-container>
+
+          <ng-container matColumnDef="type">
+            <th mat-header-cell *matHeaderCellDef>Tipo</th>
+            <td mat-cell *matCellDef="let cc">
+              <span class="type-badge" [class.type-badge--external]="cc.is_external" [class.type-badge--internal]="!cc.is_external">
+                {{ cc.type_label }}
+              </span>
+            </td>
+          </ng-container>
+
+          <ng-container matColumnDef="description">
+            <th mat-header-cell *matHeaderCellDef>Descripción</th>
+            <td mat-cell *matCellDef="let cc">{{ cc.description || '—' }}</td>
+          </ng-container>
+
+          <ng-container matColumnDef="is_active">
+            <th mat-header-cell *matHeaderCellDef>Estado</th>
+            <td mat-cell *matCellDef="let cc">
+              <span class="badge" [class.badge--on]="cc.is_active" [class.badge--off]="!cc.is_active">
+                {{ cc.is_active ? 'Activo' : 'Inactivo' }}
+              </span>
+            </td>
+          </ng-container>
+
+          <tr mat-header-row *matHeaderRowDef="cols"></tr>
+          <tr mat-row *matRowDef="let row; columns: cols;"></tr>
+          <tr class="mat-row" *matNoDataRow>
+            <td class="no-data" [attr.colspan]="cols.length">Sin centros de costo registrados</td>
+          </tr>
+        </table>
+      </div>
+    </div>
+  </mat-tab>
+
+  <!-- ── TAB: SERVICIOS - PROCEDIMIENTOS MÉDICOS ── -->
+  <mat-tab label="Servicios - procedimientos médicos" *sgaPermission="['servicios_medicos.ver', 'procedimientos.ver']">
+    <div class="tab-body">
+      <div class="tab-toolbar" [formGroup]="msFilters">
+        <mat-form-field appearance="outline" class="search-field">
+          <mat-label>Buscar</mat-label>
+          <mat-icon matPrefix>search</mat-icon>
+          <input matInput formControlName="search" placeholder="Nombre o código..." />
+        </mat-form-field>
+
+        <mat-form-field appearance="outline" class="select-field">
+          <mat-label>Tipo</mat-label>
+          <mat-select formControlName="type">
+            <mat-option value="">Todos</mat-option>
+            <mat-option value="service">Servicios</mat-option>
+            <mat-option value="procedure">Procedimientos</mat-option>
+          </mat-select>
+        </mat-form-field>
+
+        <mat-form-field appearance="outline" class="select-field">
+          <mat-label>Servicio</mat-label>
+          <mat-select formControlName="parent_id">
+            <mat-option [value]="null">Todos</mat-option>
+            @for (s of services(); track s.id) {
+              <mat-option [value]="s.id">{{ s.code }} — {{ s.name }}</mat-option>
+            }
+          </mat-select>
+        </mat-form-field>
+
+        <mat-form-field appearance="outline" class="select-field">
+          <mat-label>Estado</mat-label>
+          <mat-select formControlName="is_active">
+            <mat-option value="">Todos</mat-option>
+            <mat-option value="true">Activos</mat-option>
+            <mat-option value="false">Inactivos</mat-option>
+          </mat-select>
+        </mat-form-field>
+
+        <span class="spacer"></span>
+
+        <button *sgaPermission="'servicios_medicos.crear'" mat-raised-button color="primary" (click)="openMedicalServiceForm()">
+          <mat-icon>add</mat-icon> Nuevo
+        </button>
+      </div>
+
+      <app-loading-spinner [loading]="loadingMedicalServices()" [inline]="true"></app-loading-spinner>
+
+      <div class="table-wrap mat-elevation-z1">
+        <table mat-table [dataSource]="medicalServices()">
+
+          <ng-container matColumnDef="actions">
+            <th mat-header-cell *matHeaderCellDef class="act">Acciones</th>
+            <td mat-cell *matCellDef="let m" class="act">
+              <button *sgaPermission="'servicios_medicos.editar'" mat-icon-button color="primary" (click)="openMedicalServiceForm(m)" matTooltip="Editar">
+                <mat-icon>edit</mat-icon>
+              </button>
+              @if (m.type === 'procedure') {
+                <button *sgaPermission="'procedimientos.ver'" mat-icon-button color="accent" (click)="openPrices(m)" matTooltip="Tarifas">
+                  <mat-icon>sell</mat-icon>
+                </button>
+              }
+              <button *sgaPermission="'servicios_medicos.eliminar'" mat-icon-button color="warn" (click)="deleteMedicalService(m)" matTooltip="Eliminar">
+                <mat-icon>delete</mat-icon>
+              </button>
+            </td>
+          </ng-container>
+
+          <ng-container matColumnDef="type">
+            <th mat-header-cell *matHeaderCellDef>Tipo</th>
+            <td mat-cell *matCellDef="let m">
+              <span class="type-badge" [class.type-badge--internal]="m.type === 'service'" [class.type-badge--external]="m.type === 'procedure'">
+                {{ m.type_label }}
+              </span>
+            </td>
+          </ng-container>
+
+          <ng-container matColumnDef="code">
+            <th mat-header-cell *matHeaderCellDef>Código</th>
+            <td mat-cell *matCellDef="let m"><code class="code-tag">{{ m.code }}</code></td>
+          </ng-container>
+
+          <ng-container matColumnDef="name">
+            <th mat-header-cell *matHeaderCellDef>Nombre</th>
+            <td mat-cell *matCellDef="let m">{{ m.name }}</td>
+          </ng-container>
+
+          <ng-container matColumnDef="parent">
+            <th mat-header-cell *matHeaderCellDef>Servicio</th>
+            <td mat-cell *matCellDef="let m">{{ serviceName(m.parent_id) }}</td>
+          </ng-container>
+
+          <ng-container matColumnDef="description">
+            <th mat-header-cell *matHeaderCellDef>Descripción</th>
+            <td mat-cell *matCellDef="let m">{{ m.description || '—' }}</td>
+          </ng-container>
+
+          <ng-container matColumnDef="is_active">
+            <th mat-header-cell *matHeaderCellDef>Estado</th>
+            <td mat-cell *matCellDef="let m">
+              <span class="badge" [class.badge--on]="m.is_active" [class.badge--off]="!m.is_active">
+                {{ m.is_active ? 'Activo' : 'Inactivo' }}
+              </span>
+            </td>
+          </ng-container>
+
+          <tr mat-header-row *matHeaderRowDef="msCols"></tr>
+          <tr mat-row *matRowDef="let row; columns: msCols;"></tr>
+          <tr class="mat-row" *matNoDataRow>
+            <td class="no-data" [attr.colspan]="msCols.length">Sin servicios médicos registrados</td>
+          </tr>
+        </table>
+      </div>
+    </div>
+  </mat-tab>
+
+  <!-- ── TAB 3: REGISTROS DE PROCEDIMIENTOS ── -->
+  <mat-tab label="Registros de procedimientos" *sgaPermission="'registros_procedimientos.ver'">
+    <div class="tab-body">
+      <div class="tab-toolbar" [formGroup]="recordFilters">
+        <mat-form-field appearance="outline" class="search-field">
+          <mat-label>Documento del paciente</mat-label>
+          <mat-icon matPrefix>badge</mat-icon>
+          <input matInput formControlName="patient_document" placeholder="Buscar por documento..." />
+        </mat-form-field>
+
+        <mat-form-field appearance="outline" class="select-field">
+          <mat-label>Procedimiento</mat-label>
+          <mat-select formControlName="medical_service_id">
+            <mat-option [value]="null">Todos</mat-option>
+            @for (proc of procedureOptions(); track proc.id) {
+              <mat-option [value]="proc.id">{{ proc.code }} — {{ proc.name }}</mat-option>
+            }
+          </mat-select>
+        </mat-form-field>
+
+        <mat-form-field appearance="outline" class="select-field">
+          <mat-label>Estado</mat-label>
+          <mat-select formControlName="is_active">
+            <mat-option value="">Todos</mat-option>
+            <mat-option value="true">Activos</mat-option>
+            <mat-option value="false">Inactivos</mat-option>
+          </mat-select>
+        </mat-form-field>
+
+        <mat-form-field appearance="outline" class="select-field">
+          <mat-label>Fecha desde</mat-label>
+          <input matInput [matDatepicker]="fromPicker" formControlName="service_date_from" />
+          <mat-datepicker-toggle matIconSuffix [for]="fromPicker"></mat-datepicker-toggle>
+          <mat-datepicker #fromPicker></mat-datepicker>
+        </mat-form-field>
+
+        <mat-form-field appearance="outline" class="select-field">
+          <mat-label>Fecha hasta</mat-label>
+          <input matInput [matDatepicker]="toPicker" formControlName="service_date_to" />
+          <mat-datepicker-toggle matIconSuffix [for]="toPicker"></mat-datepicker-toggle>
+          <mat-datepicker #toPicker></mat-datepicker>
+        </mat-form-field>
+
+        <button *sgaPermission="'registros_procedimientos.crear'" mat-raised-button color="primary" (click)="openRecordForm()">
+          <mat-icon>add</mat-icon> Nuevo Registro
+        </button>
+      </div>
+
+      <app-loading-spinner [loading]="loadingRecords()" [inline]="true"></app-loading-spinner>
+
+      <div class="table-wrap mat-elevation-z1">
+        <table mat-table [dataSource]="records()">
+
+          <ng-container matColumnDef="actions">
+            <th mat-header-cell *matHeaderCellDef class="act">Acciones</th>
+            <td mat-cell *matCellDef="let r" class="act">
+              <button *sgaPermission="'registros_procedimientos.editar'" mat-icon-button color="primary" (click)="openRecordForm(r)" matTooltip="Editar">
+                <mat-icon>edit</mat-icon>
+              </button>
+              <button *sgaPermission="'registros_procedimientos.eliminar'" mat-icon-button color="warn" (click)="deleteRecord(r)" matTooltip="Eliminar">
+                <mat-icon>delete</mat-icon>
+              </button>
+            </td>
+          </ng-container>
+
+          <ng-container matColumnDef="procedure">
+            <th mat-header-cell *matHeaderCellDef>Procedimiento</th>
+            <td mat-cell *matCellDef="let r">
+              <div class="proc-cell">
+                <code class="code-tag">{{ r.procedure_code || r.medical_service?.code }}</code>
+                <span class="proc-name">{{ r.medical_service_name || r.procedure_name || r.medical_service?.name }}</span>
+              </div>
+            </td>
+          </ng-container>
+
+          <ng-container matColumnDef="patient">
+            <th mat-header-cell *matHeaderCellDef>Paciente</th>
+            <td mat-cell *matCellDef="let r">
+              <div class="patient-cell">
+                @if (r.patient_first_name || r.patient_last_name) {
+                  <span class="patient-name">{{ r.patient_first_name }} {{ r.patient_last_name }}</span>
+                }
+                <span class="patient-doc">
+                  <mat-icon class="patient-icon">badge</mat-icon>
+                  {{ r.patient_document }}
+                </span>
+                @if (r.patient_external_id) {
+                  <span class="patient-ext" [matTooltip]="'ID Clínico: ' + r.patient_external_id">
+                    {{ r.patient_external_id }}
+                  </span>
+                }
+              </div>
+            </td>
+          </ng-container>
+
+          <ng-container matColumnDef="quantity">
+            <th mat-header-cell *matHeaderCellDef>Cant.</th>
+            <td mat-cell *matCellDef="let r">
+              <span class="qty-badge">{{ r.quantity }}</span>
+            </td>
+          </ng-container>
+
+          <ng-container matColumnDef="unit_price">
+            <th mat-header-cell *matHeaderCellDef>Valor Unitario</th>
+            <td mat-cell *matCellDef="let r">
+              <span class="price-cell">{{ r.unit_price | currency:'COP':'symbol':'1.0-0' }}</span>
+            </td>
+          </ng-container>
+
+          <ng-container matColumnDef="total">
+            <th mat-header-cell *matHeaderCellDef>Total</th>
+            <td mat-cell *matCellDef="let r">
+              <strong class="total-cell">{{ r.total | currency:'COP':'symbol':'1.0-0' }}</strong>
+            </td>
+          </ng-container>
+
+          <ng-container matColumnDef="service_date">
+            <th mat-header-cell *matHeaderCellDef>Fecha Atención</th>
+            <td mat-cell *matCellDef="let r">{{ r.service_date | date:'dd/MM/yyyy' }}</td>
+          </ng-container>
+
+          <ng-container matColumnDef="is_active">
+            <th mat-header-cell *matHeaderCellDef>Estado</th>
+            <td mat-cell *matCellDef="let r">
+              <span class="badge" [class.badge--on]="r.is_active" [class.badge--off]="!r.is_active">
+                {{ r.is_active ? 'Activo' : 'Inactivo' }}
+              </span>
+            </td>
+          </ng-container>
+
+          <tr mat-header-row *matHeaderRowDef="recordCols"></tr>
+          <tr mat-row *matRowDef="let row; columns: recordCols;"></tr>
+          <tr class="mat-row" *matNoDataRow>
+            <td class="no-data" [attr.colspan]="recordCols.length">Sin registros de procedimientos</td>
+          </tr>
+        </table>
+
+        <mat-paginator
+          [length]="recordsMeta().total"
+          [pageSize]="recordsMeta().per_page"
+          [pageIndex]="recordsMeta().current_page - 1"
+          [pageSizeOptions]="[10, 25, 50]"
+          (page)="onRecordsPage($event)"
+          showFirstLastButtons>
+        </mat-paginator>
+      </div>
+    </div>
+  </mat-tab>
+
+</mat-tab-group>

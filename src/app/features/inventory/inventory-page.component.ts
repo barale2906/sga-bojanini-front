@@ -2,7 +2,8 @@ import { Component, inject, signal, computed, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormBuilder, ReactiveFormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
-import { forkJoin } from 'rxjs';
+import { forkJoin, of } from 'rxjs';
+import { map, catchError } from 'rxjs/operators';
 import { MatTabsModule } from '@angular/material/tabs';
 import { MatTableModule } from '@angular/material/table';
 import { MatSortModule, Sort } from '@angular/material/sort';
@@ -333,18 +334,23 @@ export class InventoryPageComponent implements OnInit {
     this.loadingPdf.set(row.id);
     this.svc.getMovement(row.id).subscribe({
       next: res => {
-        this.loadingPdf.set(null);
         const m = res.data;
-        this.movPdfSvc.generateAndPrint({
-          movement_type:     m.movement_type,
-          doc_id:            m.id,
-          date:              m.created_at,
-          user_name:         m.user_name,
-          warehouse_name:    row.warehouse_name,
-          warehouse_to_name: row.warehouse_to_name,
-          reason:            m.reason,
-          cost_center_name:  m.cost_center?.name ?? null,
-          lines: [{ product_name: m.product_name, lot_number: m.batch_lot_number, quantity: m.quantity }],
+        const expiry$ = m.batch_id
+          ? this.svc.getBatchById(m.batch_id).pipe(map(b => b.data.expiration_date), catchError(() => of(null)))
+          : of(null);
+        expiry$.subscribe(expiration_date => {
+          this.loadingPdf.set(null);
+          this.movPdfSvc.generateAndPrint({
+            movement_type:     m.movement_type,
+            doc_id:            m.id,
+            date:              m.created_at,
+            user_name:         m.user_name,
+            warehouse_name:    row.warehouse_name,
+            warehouse_to_name: row.warehouse_to_name,
+            reason:            m.reason,
+            cost_center_name:  m.cost_center?.name ?? null,
+            lines: [{ product_name: m.product_name, lot_number: m.batch_lot_number, expiration_date, quantity: m.quantity }],
+          });
         });
       },
       error: () => {

@@ -90,6 +90,14 @@ export const routes: Routes = [
         data: { permission: 'stock.ver' },
       },
 
+      // Centros de Costo
+      {
+        path: 'cost-centers',
+        loadChildren: () =>
+          import('./features/cost-centers/cost-centers.routes').then((m) => m.costCentersRoutes),
+        data: { title: 'Centros de Costo', permission: 'centros_costo.ver' },
+      },
+
       // Compras (Fase 5)
       {
         path: 'purchasing',

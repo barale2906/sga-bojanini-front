@@ -9,7 +9,8 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatDividerModule } from '@angular/material/divider';
-import { finalize } from 'rxjs';
+import { finalize, of } from 'rxjs';
+import { map, catchError } from 'rxjs/operators';
 import { InventoryService, StockSummary } from '../inventory.service';
 import { MovementPdfService } from '../../../shared/services/movement-pdf.service';
 import { WarehouseService, Warehouse, Location } from '../../warehouse/warehouse.service';
@@ -171,17 +172,22 @@ export class WarehouseTransferDialogComponent implements OnInit {
       next: res => {
         const wFrom = this.data.warehouses.find(w => w.id === v.warehouse_from_id);
         const wTo   = this.data.warehouses.find(w => w.id === v.warehouse_to_id);
-        this.pdfSvc.generateAndPrint({
-          movement_type:     'transfer',
-          doc_id:            res.data.id,
-          date:              res.data.created_at,
-          user_name:         res.data.user_name,
-          warehouse_name:    wFrom?.name ?? `Almacén ${v.warehouse_from_id}`,
-          warehouse_to_name: wTo?.name   ?? `Almacén ${v.warehouse_to_id}`,
-          reason:            v.reason || null,
-          lines: [{ product_name: res.data.product_name, lot_number: res.data.batch_lot_number, quantity: res.data.quantity }],
+        const expiry$ = res.data.batch_id
+          ? this.data.inventorySvc.getBatchById(res.data.batch_id).pipe(map(b => b.data.expiration_date), catchError(() => of(null)))
+          : of(null);
+        expiry$.subscribe(expiration_date => {
+          this.pdfSvc.generateAndPrint({
+            movement_type:     'transfer',
+            doc_id:            res.data.id,
+            date:              res.data.created_at,
+            user_name:         res.data.user_name,
+            warehouse_name:    wFrom?.name ?? `Almacén ${v.warehouse_from_id}`,
+            warehouse_to_name: wTo?.name   ?? `Almacén ${v.warehouse_to_id}`,
+            reason:            v.reason || null,
+            lines: [{ product_name: res.data.product_name, lot_number: res.data.batch_lot_number, expiration_date, quantity: res.data.quantity }],
+          });
+          this.ref.close(true);
         });
-        this.ref.close(true);
       },
       error: err => {
         this.saving.set(false);

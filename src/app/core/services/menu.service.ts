@@ -32,6 +32,8 @@ export class MenuService {
     // Centros de Costo
     'cost-centers.index': '/cost-centers',
     'medical-services.index': '/cost-centers',
+    'procedures.index': '/cost-centers',
+    'patient-procedure-records.index': '/inventory/patient-records',
     // Compras
     'purchase-orders.index': '/purchasing',
     // Monitoreo
@@ -80,11 +82,27 @@ export class MenuService {
     return this.ROUTE_MAP[routeName] ?? null;
   }
 
+  /**
+   * Resuelve la ruta de un ítem de menú: usa su propia `route` si la tiene,
+   * o si no, busca recursivamente en sus hijos la primera ruta resoluble.
+   * Útil para ítems de nivel 1/2 sin `route` propio (grupos/secciones).
+   */
+  resolveItemRoute(item: MenuItem): string | null {
+    const own = this.resolveRoute(item.route);
+    if (own) return own;
+    for (const child of item.children ?? []) {
+      const found = this.resolveItemRoute(child);
+      if (found) return found;
+    }
+    return null;
+  }
+
   findItem(key: string, items: MenuItem[] = this.menuSignal()): MenuItem | null {
     for (const item of items) {
       if (item.key === key) return item;
-      if (item.children.length) {
-        const found = this.findItem(key, item.children);
+      const children = item.children ?? [];
+      if (children.length) {
+        const found = this.findItem(key, children);
         if (found) return found;
       }
     }

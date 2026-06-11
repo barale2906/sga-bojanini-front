@@ -2,9 +2,10 @@ import { Injectable, inject } from '@angular/core';
 import { PdfPrintService } from './pdf-print.service';
 
 export interface MovementPdfLine {
-  product_name: string;
-  lot_number:   string | null;
-  quantity:     number;
+  product_name:    string;
+  lot_number:      string | null;
+  expiration_date?: string | null;
+  quantity:        number;
 }
 
 export interface MovementPdfData {
@@ -69,6 +70,7 @@ export class MovementPdfService {
         <tr>
           <td>${this._esc(l.product_name)}</td>
           <td class="center">${l.lot_number ? this._esc(l.lot_number) : '&#8212;'}</td>
+          <td class="center">${this._fmtDate(l.expiration_date)}</td>
           <td class="center qty-val">${qtyStr}</td>
         </tr>`;
     }).join('');
@@ -143,6 +145,7 @@ export class MovementPdfService {
       <tr>
         <th>Producto</th>
         <th class="center">N&deg; de Lote</th>
+        <th class="center">Vencimiento</th>
         <th class="center">Cantidad</th>
       </tr>
     </thead>
@@ -173,6 +176,13 @@ export class MovementPdfService {
 
   <div class="footer">Documento generado automáticamente por el SGA &middot; ${date}</div>
 </div>`;
+  }
+
+  private _fmtDate(date: string | null | undefined): string {
+    if (!date) return '&#8212;';
+    const d = new Date(date);
+    if (isNaN(d.getTime())) return '&#8212;';
+    return d.toLocaleDateString('es-CO', { year: 'numeric', month: '2-digit', day: '2-digit', timeZone: 'UTC' });
   }
 
   private _esc(s: string | null | undefined): string {

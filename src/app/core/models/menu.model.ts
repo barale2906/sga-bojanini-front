@@ -5,5 +5,5 @@ export interface MenuItem {
   route: string | null;
   permission: string | null;
   actions: Record<string, boolean>;
-  children: MenuItem[];
+  children?: MenuItem[];
 }

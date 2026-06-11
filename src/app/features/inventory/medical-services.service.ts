@@ -16,6 +16,33 @@ export interface MedicalServiceNode {
   children: MedicalServiceNode[];
 }
 
+export interface MedicalService {
+  id: number;
+  type: 'service' | 'procedure';
+  type_label: string;
+  parent_id: number | null;
+  code: string;
+  name: string;
+  description: string | null;
+  is_active: boolean;
+}
+
+export interface MedicalServiceFilters {
+  type?: 'service' | 'procedure';
+  parent_id?: number;
+  is_active?: boolean;
+  search?: string;
+}
+
+export interface MedicalServicePayload {
+  type: 'service' | 'procedure';
+  parent_id?: number | null;
+  code: string;
+  name: string;
+  description?: string | null;
+  is_active?: boolean;
+}
+
 export interface ProcedurePrice {
   id: number;
   medical_service_id: number;
@@ -25,6 +52,14 @@ export interface ProcedurePrice {
   is_active: boolean;
   is_currently_valid: boolean;
   notes: string | null;
+}
+
+export interface ProcedurePricePayload {
+  unit_price: number;
+  effective_from: string;
+  effective_to?: string | null;
+  is_active?: boolean;
+  notes?: string | null;
 }
 
 export interface PatientProcedureRecord {
@@ -69,10 +104,43 @@ export class MedicalServicesService {
     return this.http.get<ApiResponse<MedicalServiceNode[]>>(`${this.api}/medical-services/tree`, { params });
   }
 
+  getMedicalServices(filters: MedicalServiceFilters = {}): Observable<ApiResponse<MedicalService[]>> {
+    let params = new HttpParams();
+    if (filters.type) params = params.set('type', filters.type);
+    if (filters.parent_id) params = params.set('parent_id', String(filters.parent_id));
+    if (filters.is_active !== undefined) params = params.set('is_active', String(filters.is_active));
+    if (filters.search) params = params.set('search', filters.search);
+    return this.http.get<ApiResponse<MedicalService[]>>(`${this.api}/medical-services`, { params });
+  }
+
+  createMedicalService(payload: MedicalServicePayload): Observable<ApiResponse<MedicalService>> {
+    return this.http.post<ApiResponse<MedicalService>>(`${this.api}/medical-services`, payload);
+  }
+
+  updateMedicalService(id: number, payload: MedicalServicePayload): Observable<ApiResponse<MedicalService>> {
+    return this.http.put<ApiResponse<MedicalService>>(`${this.api}/medical-services/${id}`, payload);
+  }
+
+  deleteMedicalService(id: number): Observable<ApiResponse<null>> {
+    return this.http.delete<ApiResponse<null>>(`${this.api}/medical-services/${id}`);
+  }
+
   getProcedurePrices(procedureId: number, filter: { is_active?: boolean } = {}): Observable<ApiResponse<ProcedurePrice[]>> {
     let params = new HttpParams();
     if (filter.is_active !== undefined) params = params.set('is_active', String(filter.is_active));
     return this.http.get<ApiResponse<ProcedurePrice[]>>(`${this.api}/procedures/${procedureId}/prices`, { params });
+  }
+
+  createProcedurePrice(procedureId: number, payload: ProcedurePricePayload): Observable<ApiResponse<ProcedurePrice>> {
+    return this.http.post<ApiResponse<ProcedurePrice>>(`${this.api}/procedures/${procedureId}/prices`, payload);
+  }
+
+  updateProcedurePrice(procedureId: number, priceId: number, payload: ProcedurePricePayload): Observable<ApiResponse<ProcedurePrice>> {
+    return this.http.put<ApiResponse<ProcedurePrice>>(`${this.api}/procedures/${procedureId}/prices/${priceId}`, payload);
+  }
+
+  deleteProcedurePrice(procedureId: number, priceId: number): Observable<ApiResponse<null>> {
+    return this.http.delete<ApiResponse<null>>(`${this.api}/procedures/${procedureId}/prices/${priceId}`);
   }
 
   getPatientProcedureRecords(filter: {
