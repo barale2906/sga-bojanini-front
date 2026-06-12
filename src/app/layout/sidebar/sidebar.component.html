@@ -19,6 +19,7 @@
           class="sidebar__item"
           [class.sidebar__item--active]="isItemActive(item)"
           [routerLink]="resolveItemRoute(item)"
+          (click)="onItemClick($event)"
           [matTooltip]="collapsed ? item.label : ''"
           matTooltipPosition="right"
         >

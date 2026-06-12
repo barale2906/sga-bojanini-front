@@ -1,5 +1,5 @@
 <div class="app-layout">
-  <app-sidebar [collapsed]="sidebarCollapsed()"></app-sidebar>
+  <app-sidebar [collapsed]="sidebarCollapsed()" (expandRequest)="expandSidebar()"></app-sidebar>
 
   <div class="app-layout__main">
     <app-header (toggleSidebar)="toggleSidebar()"></app-header>

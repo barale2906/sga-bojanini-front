@@ -1,4 +1,4 @@
-import { Component, Input, OnInit, inject } from '@angular/core';
+import { Component, EventEmitter, Input, OnInit, Output, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterModule, Router } from '@angular/router';
 import { MatIconModule } from '@angular/material/icon';
@@ -54,6 +54,7 @@ const FORCE_DIRECT_LINK_KEYS = new Set(['monitoring', 'purchasing']);
 })
 export class SidebarComponent implements OnInit {
   @Input() collapsed = false;
+  @Output() expandRequest = new EventEmitter<void>();
 
   auth = inject(AuthService);
   router = inject(Router);
@@ -92,10 +93,18 @@ export class SidebarComponent implements OnInit {
 
   onGroupClick(item: MenuItem): void {
     if (this.collapsed) {
-      const route = this.resolveItemRoute(item);
-      if (route) this.router.navigate([route]);
+      this.expandedGroups.add(item.key);
+      this.expandRequest.emit();
     } else {
       this.toggleGroup(item.key);
+    }
+  }
+
+  /** Si el sidebar está comprimido, el primer clic solo lo expande (sin navegar). */
+  onItemClick(event: MouseEvent): void {
+    if (this.collapsed) {
+      event.preventDefault();
+      this.expandRequest.emit();
     }
   }
 

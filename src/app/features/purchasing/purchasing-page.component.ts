@@ -54,7 +54,7 @@ export class PurchasingPageComponent implements OnInit {
   pdfLoadingId = signal<number | null>(null);
 
   cols = ['actions', 'code', 'supplier', 'warehouse', 'status', 'total', 'created_at'];
-  suggCols = ['select', 'product', 'current_stock', 'reorder_point', 'suggested_qty', 'supplier', 'actions'];
+  suggCols = ['actions', 'select', 'product', 'current_stock', 'reorder_point', 'suggested_qty', 'supplier'];
   filters = this.fb.group({ status: [''] });
   selectedSugg = new SelectionModel<ReorderSuggestion>(true, []);
 

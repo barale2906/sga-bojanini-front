@@ -115,6 +115,19 @@ th.actions-col, td.actions-col {
   white-space: nowrap;
   padding-left: 0.5rem !important;
   padding-right: 0.5rem !important;
+
+  // Botones de acción compactos: iconos más pequeños y poco espacio entre ellos.
+  .mat-mdc-icon-button {
+    --mdc-icon-button-state-layer-size: 32px;
+    --mdc-icon-button-icon-size: 18px;
+    width: 32px;
+    height: 32px;
+    padding: 4px;
+  }
+
+  .mat-mdc-icon-button + .mat-mdc-icon-button {
+    margin-left: -8px;
+  }
 }
 
 // ============================================================

@@ -28,20 +28,6 @@
   &--external { background: #bee3f8; color: #2c5282; }
 }
 
-.act {
-  /* ancho/alineación globales en styles.scss; aquí solo compactamos los botones */
-  .mat-mdc-icon-button {
-    --mdc-icon-button-state-layer-size: 32px;
-    --mdc-icon-button-icon-size: 18px;
-    width: 32px;
-    height: 32px;
-    padding: 4px;
-  }
-
-  .mat-mdc-icon-button + .mat-mdc-icon-button {
-    margin-left: -8px;
-  }
-}
 .no-data { text-align: center; padding: 2.5rem; color: #a0aec0; }
 
 // ── Registros de procedimientos: celdas ──────────────────────

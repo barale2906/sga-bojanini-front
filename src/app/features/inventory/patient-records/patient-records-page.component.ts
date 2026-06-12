@@ -59,7 +59,7 @@ export class PatientRecordsPageComponent implements OnInit {
   loading     = signal(false);
   procedures  = signal<MedicalServiceNode[]>([]);
 
-  cols = ['procedure', 'patient', 'quantity', 'unit_price', 'total', 'service_date', 'actions'];
+  cols = ['actions', 'procedure', 'patient', 'quantity', 'unit_price', 'total', 'service_date'];
 
   filters = this.fb.group({
     patient_document:    [''],
