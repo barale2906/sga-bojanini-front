@@ -5,7 +5,8 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatTableModule } from '@angular/material/table';
-import { CatalogService, ImportResult } from '../catalog.service';
+import { MatSnackBar } from '@angular/material/snack-bar';
+import { CatalogService, CatalogImportResult, ImportResult } from '../catalog.service';
 
 export type ImportEntity = 'products' | 'suppliers';
 
@@ -73,6 +74,26 @@ export type ImportEntity = 'products' | 'suppliers';
             }
           </div>
         }
+
+        @if (relatedCatalogs(r).length) {
+          <p style="font-weight:600;margin:1rem 0 0.5rem">Catálogos relacionados</p>
+          @for (rc of relatedCatalogs(r); track rc.label) {
+            <div class="related-row">
+              <span class="related-label">{{ rc.label }}:</span>
+              <span>{{ rc.data.created }} creados, {{ rc.data.skipped }} ya existentes@if (rc.data.failed) {, {{ rc.data.failed }} con error}</span>
+            </div>
+            @if (rc.data.errors.length) {
+              <div class="error-list">
+                @for (e of rc.data.errors; track e.row) {
+                  <div class="error-row">
+                    <span class="row-label">Fila {{ e.row }}:</span>
+                    <span>{{ formatRowErrors(e.errors) }}</span>
+                  </div>
+                }
+              </div>
+            }
+          }
+        }
       }
 
     </mat-dialog-content>
@@ -98,12 +119,14 @@ export type ImportEntity = 'products' | 'suppliers';
     .stat--total .stat-n { color:#2b6cb0; }
     .error-list { max-height:200px; overflow-y:auto; border:1px solid #fed7d7; border-radius:4px; }
     .error-row { padding:0.4rem 0.75rem; font-size:.83rem; border-bottom:1px solid #fff5f5; .row-label { font-weight:600; margin-right:0.5rem; } }
+    .related-row { font-size:.85rem; padding:0.2rem 0; .related-label { font-weight:600; margin-right:0.35rem; } }
   `],
 })
 export class ImportDialogComponent {
   data: ImportEntity = inject(MAT_DIALOG_DATA);
   private ref = inject(MatDialogRef<ImportDialogComponent>);
   private svc = inject(CatalogService);
+  private snack = inject(MatSnackBar);
 
   uploading = signal(false);
   downloading = signal(false);
@@ -151,11 +174,35 @@ export class ImportDialogComponent {
         a.click();
         URL.revokeObjectURL(url);
       },
-      error: () => { this.downloading.set(false); },
+      error: async err => {
+        this.downloading.set(false);
+        let message = 'No se pudo descargar la plantilla';
+        if (err.error instanceof Blob) {
+          try {
+            const text = await err.error.text();
+            message = JSON.parse(text)?.message || message;
+          } catch {
+            // respuesta de error sin cuerpo JSON legible
+          }
+        } else {
+          message = err.error?.message || message;
+        }
+        this.snack.open(message, 'OK', { duration: 4000 });
+      },
     });
   }
 
   formatRowErrors(errors: Record<string, string[]>): string {
     return Object.values(errors).flat().join('; ');
+  }
+
+  relatedCatalogs(result: ImportResult): { label: string; data: CatalogImportResult }[] {
+    const rc = result.related_catalogs;
+    if (!rc) return [];
+    return [
+      { label: 'Categorías', data: rc.categories },
+      { label: 'Unidades de medida', data: rc.units_of_measure },
+      { label: 'Clasificaciones', data: rc.classifications },
+    ].filter(item => item.data.total > 0);
   }
 }

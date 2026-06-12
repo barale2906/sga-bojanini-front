@@ -133,11 +133,24 @@ export interface SupplierCategoryRemoveResult {
   category: string;
 }
 
+export interface CatalogImportResult {
+  total: number;
+  created: number;
+  skipped: number;
+  failed: number;
+  errors: { row: number; errors: Record<string, string[]> }[];
+}
+
 export interface ImportResult {
   total: number;
   success: number;
   failed: number;
   errors: { row: number; errors: Record<string, string[]> }[];
+  related_catalogs?: {
+    categories: CatalogImportResult;
+    units_of_measure: CatalogImportResult;
+    classifications: CatalogImportResult;
+  };
 }
 
 export interface KitAvailability {
