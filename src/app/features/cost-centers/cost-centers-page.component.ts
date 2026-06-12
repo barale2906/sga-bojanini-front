@@ -31,6 +31,7 @@ import { CostCenterFormDialogComponent } from './cost-center-form-dialog.compone
 import { ProcedurePricesDialogComponent } from './procedures/procedure-prices-dialog.component';
 import { PatientProcedureRecordFormDialogComponent } from './patient-procedure-records/patient-procedure-record-form-dialog.component';
 import { MedicalServiceFormDialogComponent } from './medical-services/medical-service-form-dialog.component';
+import { MedicalServiceImportDialogComponent } from './medical-services/medical-service-import-dialog.component';
 import { EsDateAdapter, ES_DATE_FORMATS } from '../../shared/adapters/es-date.adapter';
 
 @Component({
@@ -327,6 +328,13 @@ export class CostCentersPageComponent implements OnInit {
         error: err => this.snack.open(err.error?.message || 'Error al eliminar', 'OK', { duration: 4000 }),
       });
     });
+  }
+
+  openMedicalServiceImport(): void {
+    this.dialog.open(MedicalServiceImportDialogComponent, { width: '560px' })
+      .afterClosed().subscribe(imported => {
+        if (imported) this._reloadMedicalServiceData();
+      });
   }
 
   private _reloadMedicalServiceData(): void {

@@ -94,6 +94,13 @@ export interface PatientProcedureRecordPayload {
   notes?: string | null;
 }
 
+export interface MedicalServiceImportResult {
+  total: number;
+  success: number;
+  failed: number;
+  errors: { row: number; errors: Record<string, string[]> }[];
+}
+
 @Injectable({ providedIn: 'root' })
 export class MedicalServicesService {
   private http = inject(HttpClient);
@@ -179,5 +186,17 @@ export class MedicalServicesService {
 
   deletePatientProcedureRecord(id: number): Observable<ApiResponse<void>> {
     return this.http.delete<ApiResponse<void>>(`${this.api}/patient-procedure-records/${id}`);
+  }
+
+  // ── Importación masiva ───────────────────────────────────────
+
+  importMedicalServices(file: File): Observable<ApiResponse<MedicalServiceImportResult>> {
+    const fd = new FormData();
+    fd.append('file', file);
+    return this.http.post<ApiResponse<MedicalServiceImportResult>>(`${this.api}/import/medical-services`, fd);
+  }
+
+  downloadMedicalServicesTemplate(): Observable<Blob> {
+    return this.http.get(`${this.api}/import/medical-services/template`, { responseType: 'blob' });
   }
 }

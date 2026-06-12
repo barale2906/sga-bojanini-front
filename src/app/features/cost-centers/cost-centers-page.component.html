@@ -145,6 +145,10 @@
 
         <span class="spacer"></span>
 
+        <button *sgaPermission="'servicios_medicos.importar'" mat-stroked-button (click)="openMedicalServiceImport()" matTooltip="Importar desde Excel">
+          <mat-icon>upload</mat-icon> Importar
+        </button>
+
         <button *sgaPermission="'servicios_medicos.crear'" mat-raised-button color="primary" (click)="openMedicalServiceForm()">
           <mat-icon>add</mat-icon> Nuevo
         </button>
