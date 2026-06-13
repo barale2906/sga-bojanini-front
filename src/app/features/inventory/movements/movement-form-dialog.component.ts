@@ -12,7 +12,7 @@ import { MatTooltipModule } from '@angular/material/tooltip';
 import { MatDividerModule } from '@angular/material/divider';
 import { forkJoin, finalize, of } from 'rxjs';
 import { map, catchError } from 'rxjs/operators';
-import { InventoryService, StockSummary, BatchDetail, CostCenter, MedicalService } from '../inventory.service';
+import { InventoryService, StockSummary, BatchDetail, BatchLocation, CostCenter, MedicalService } from '../inventory.service';
 import { MovementPdfService } from '../../../shared/services/movement-pdf.service';
 import { WarehouseService, Warehouse, Location, LocationCapacity, Zone } from '../../warehouse/warehouse.service';
 import { CatalogService, Product, ProductPresentation, ProductClassification } from '../../catalog/catalog.service';
@@ -22,7 +22,17 @@ import { FormErrorsComponent } from '../../../shared/components/form-errors/form
 const TYPE_LABELS: Record<string, string> = {
   entry: 'Entrada de Mercancía', exit: 'Salida de Stock', transfer: 'Transferencia',
   adjustment: 'Ajuste de Inventario', return: 'Devolución a Proveedor',
+  loss: 'Baja de Inventario',
 };
+
+/** Motivos predefinidos para una baja de inventario (daño, muestra, pérdida/robo, vencimiento, otro). */
+export const LOSS_REASON_OPTIONS: { value: string; label: string }[] = [
+  { value: 'damage',      label: 'Producto dañado' },
+  { value: 'expiration',   label: 'Producto vencido' },
+  { value: 'sample',       label: 'Muestra / Donación' },
+  { value: 'theft',        label: 'Pérdida / Robo' },
+  { value: 'other',        label: 'Otro' },
+];
 
 export interface MovementDialogData {
   type: string;
@@ -106,6 +116,10 @@ export class MovementFormDialogComponent implements OnInit {
   loadingFefo      = signal(false);
   exitConfirmation = signal<BatchDetail | null>(null);
 
+  // ── Selección explícita de lote — Baja de inventario ─────────
+  lossBatches        = signal<BatchDetail[]>([]);
+  loadingLossBatches = signal(false);
+
   // ── Getters — OC vinculada ────────────────────────────────────
 
   /** OC activa: la del contexto o la seleccionada manualmente */
@@ -167,13 +181,21 @@ export class MovementFormDialogComponent implements OnInit {
     return this.data.warehouses.find(w => w.id === id)?.name ?? '';
   }
 
+  /** Stock total gestionable (vigente + vencido). Las devoluciones, ajustes negativos y bajas pueden operar sobre lotes vencidos. */
+  get operableQuantity(): number {
+    const s = this.stockSummary();
+    if (!s) return 0;
+    return s.available_quantity + s.expired_quantity;
+  }
+
   get hasZeroStock(): boolean {
     const s = this.stockSummary();
     if (!s) return false;
-    if (this.isExit || this.isReturn) return s.available_quantity === 0;
+    if (this.isExit) return s.available_quantity === 0;
+    if (this.isReturn || this.isLoss) return this.operableQuantity === 0;
     if (this.isAdjustment) {
       const qty = Number(this.form.get('quantity')?.value) || 0;
-      return qty < 0 && s.available_quantity === 0;
+      return qty < 0 && this.operableQuantity === 0;
     }
     return false;
   }
@@ -183,7 +205,36 @@ export class MovementFormDialogComponent implements OnInit {
     const qty = Number(this.form.get('quantity')?.value) || 0;
     if (qty >= 0) return false;
     const s = this.stockSummary();
-    return s !== null && Math.abs(qty) > s.available_quantity;
+    return s !== null && Math.abs(qty) > this.operableQuantity;
+  }
+
+  /** Lote seleccionado para la baja (selección explícita, no FEFO). */
+  get selectedLossBatch(): BatchDetail | null {
+    const id = this.form.get('batch_id')?.value;
+    if (!id) return null;
+    return this.lossBatches().find(b => b.id === id) ?? null;
+  }
+
+  /** Ubicaciones del lote seleccionado dentro del almacén elegido, con su cantidad disponible en cada una. */
+  get lossBatchLocations(): BatchLocation[] {
+    const batch = this.selectedLossBatch;
+    const warehouseId = this.form.get('warehouse_id')?.value;
+    if (!batch || !warehouseId) return [];
+    return batch.locations.filter(l => l.zone?.warehouse_id === Number(warehouseId));
+  }
+
+  /** Cantidad disponible del lote seleccionado en la ubicación seleccionada (límite real para la baja). */
+  get selectedLossLocationQty(): number {
+    const locationId = this.form.get('location_id')?.value;
+    if (!locationId) return 0;
+    return this.lossBatchLocations.find(l => l.location_id === locationId)?.quantity ?? 0;
+  }
+
+  /** Cantidad solicitada para la baja supera la disponible en el lote/ubicación seleccionados. */
+  get lossExceedsStock(): boolean {
+    if (!this.isLoss) return false;
+    const qty = Number(this.form.get('quantity')?.value) || 0;
+    return qty > 0 && qty > this.selectedLossLocationQty;
   }
 
   get stockStatusClass(): 'ok' | 'warn' | 'danger' | 'loading' | 'none' {
@@ -194,8 +245,17 @@ export class MovementFormDialogComponent implements OnInit {
       const qty = Number(this.form.get('quantity')?.value) || 0;
       if (qty >= 0) return s.available_quantity === 0 ? 'warn' : 'ok';
       const needed = Math.abs(qty);
-      if (needed > s.available_quantity) return 'danger';
-      if (needed > s.available_quantity * 0.8) return 'warn';
+      const operable = this.operableQuantity;
+      if (needed > operable) return 'danger';
+      if (needed > operable * 0.8) return 'warn';
+      return 'ok';
+    }
+    if (this.isReturn || this.isLoss) {
+      const operable = this.operableQuantity;
+      if (operable === 0) return 'danger';
+      const requested = Number(this.form.get('quantity')?.value) || 0;
+      if (requested > 0 && requested > operable) return 'danger';
+      if (requested > 0 && requested > operable * 0.8) return 'warn';
       return 'ok';
     }
     if (s.available_quantity === 0) return 'danger';
@@ -243,9 +303,18 @@ export class MovementFormDialogComponent implements OnInit {
     if (this.isReturn) {
       if (!v.quantity || (v.quantity ?? 0) < 1) return false;
       const s = this.stockSummary();
-      if (s !== null && s.available_quantity === 0) return false;
-      if (s !== null && (v.quantity ?? 0) > s.available_quantity) return false;
+      if (s !== null && this.operableQuantity === 0) return false;
+      if (s !== null && (v.quantity ?? 0) > this.operableQuantity) return false;
       return true;
+    }
+
+    if (this.isLoss) {
+      if (!v.batch_id || !v.location_id || !v.quantity || (v.quantity ?? 0) < 1) return false;
+      if (!v.loss_reason_category) return false;
+      if (v.loss_reason_category === 'other' && !v.reason?.trim()) return false;
+      const s = this.stockSummary();
+      if (s !== null && this.operableQuantity === 0) return false;
+      return !this.lossExceedsStock;
     }
 
     if (!v.quantity || (v.quantity ?? 0) < 1) return false;
@@ -266,6 +335,10 @@ export class MovementFormDialogComponent implements OnInit {
   get isTransfer()   { return this.data.type === 'transfer'; }
   get isAdjustment() { return this.data.type === 'adjustment'; }
   get isReturn()     { return this.data.type === 'return'; }
+  get isLoss()       { return this.data.type === 'loss'; }
+
+  /** Motivos de baja disponibles para el selector del formulario. */
+  readonly lossReasonOptions = LOSS_REASON_OPTIONS;
 
   form = this.fb.group({
     product_id:               [null as number | null, Validators.required],
@@ -274,6 +347,7 @@ export class MovementFormDialogComponent implements OnInit {
     location_id:              [null as number | null],
     location_from_id:         [null as number | null],
     location_to_id:           [null as number | null],
+    batch_id:                 [null as number | null],
     quantity:                 [null as number | null],
     quantity_base:            [null as number | null],
     product_presentation_id:  [null as number | null],
@@ -282,6 +356,7 @@ export class MovementFormDialogComponent implements OnInit {
     expiration_date:          [''],
     manufacturing_date:       [''],
     reason:                   [''],
+    loss_reason_category:     [null as string | null],
     notes:                    [''],
     cost_center_id:           [null as number | null],
     service_id:               [null as number | null],
@@ -295,7 +370,8 @@ export class MovementFormDialogComponent implements OnInit {
       this.singleLocCapacity.set(null);
       this.destLocCapacity.set(null);
       this._resetDistRows();
-      this.form.patchValue({ zone_id: null, location_id: null }, { emitEvent: false });
+      this.form.patchValue({ zone_id: null, location_id: null, batch_id: null }, { emitEvent: false });
+      this.lossBatches.set([]);
       if (wId) {
         this.wSvc.getWarehouseLocations(Number(wId)).subscribe({ next: r => this.locations.set(r.data), error: () => {} });
         this.wSvc.getWarehouseZones(Number(wId)).subscribe({ next: r => this.zones.set(r.data), error: () => {} });
@@ -326,6 +402,10 @@ export class MovementFormDialogComponent implements OnInit {
       this.singleLocCapacity.set(null);
       this.destLocCapacity.set(null);
       this.productDetail.set(null);
+      if (this.isLoss) {
+        this.form.patchValue({ batch_id: null, location_id: null }, { emitEvent: false });
+        this.lossBatches.set([]);
+      }
       if (pId) {
         this.cSvc.getPresentations(Number(pId)).subscribe({
           next: r => {
@@ -358,6 +438,16 @@ export class MovementFormDialogComponent implements OnInit {
       this.singleLocCapacity.set(null);
       this.errors.set([]);
       if (locId) this._loadLocCap(Number(locId), 'single');
+    });
+
+    // Lote seleccionado (baja) → ubicación dentro del almacén
+    this.form.get('batch_id')!.valueChanges.subscribe(() => {
+      if (!this.isLoss) return;
+      const locs = this.lossBatchLocations;
+      this.form.patchValue(
+        { location_id: locs.length === 1 ? locs[0].location_id : null },
+        { emitEvent: false },
+      );
     });
 
     // Ubicación destino (transferencia) → capacidad
@@ -498,7 +588,7 @@ export class MovementFormDialogComponent implements OnInit {
   // ── FEFO ─────────────────────────────────────────────────────
 
   private _loadStockData(): void {
-    if (!this.isExit && !this.isAdjustment && !this.isReturn) return;
+    if (!this.isExit && !this.isAdjustment && !this.isReturn && !this.isLoss) return;
     const pId = this.form.get('product_id')?.value;
     const wId = this.form.get('warehouse_id')?.value;
     if (!pId || !wId) return;
@@ -513,11 +603,23 @@ export class MovementFormDialogComponent implements OnInit {
 
     if (this.isExit) {
       this.loadingFefo.set(true);
-      this.data.inventorySvc.getProductBatches(Number(pId))
+      this.data.inventorySvc.getProductBatches(Number(pId), true)
         .pipe(finalize(() => this.loadingFefo.set(false)))
         .subscribe({
           next: r => this.fefoLotes.set(r.data.filter(b => b.status === 'active' && b.quantity_available > 0)),
           error: () => this.fefoLotes.set([]),
+        });
+    } else if (this.isLoss) {
+      // La baja requiere selección explícita de lote: se listan los lotes
+      // (vigentes y vencidos) que tienen stock en el almacén seleccionado.
+      this.form.patchValue({ batch_id: null, location_id: null }, { emitEvent: false });
+      this.lossBatches.set([]);
+      this.loadingLossBatches.set(true);
+      this.data.inventorySvc.getProductBatches(Number(pId), false, Number(wId))
+        .pipe(finalize(() => this.loadingLossBatches.set(false)))
+        .subscribe({
+          next: r => this.lossBatches.set(r.data.filter(b => b.quantity_available > 0)),
+          error: () => this.lossBatches.set([]),
         });
     }
   }
@@ -879,6 +981,20 @@ export class MovementFormDialogComponent implements OnInit {
       return;
     }
 
+    // ── BAJA DE INVENTARIO ───────────────────────────────────────
+    if (this.isLoss) {
+      const categoryLabel = LOSS_REASON_OPTIONS.find(o => o.value === v.loss_reason_category)?.label ?? v.loss_reason_category;
+      const detail = v.reason?.trim();
+      const reason = detail ? `${categoryLabel}: ${detail}` : categoryLabel;
+
+      this.data.inventorySvc.loss({ ...basePayload, batch_id: v.batch_id, location_id: v.location_id, quantity: v.quantity, reason })
+        .subscribe({
+          next: res => this._printPdfAndClose(res.data, 'loss'),
+          error: err => this._handleError(err),
+        });
+      return;
+    }
+
     // ── DEVOLUCIÓN ───────────────────────────────────────────────
     this.data.inventorySvc.return_({ ...basePayload, location_id: v.location_id || undefined, quantity: v.quantity })
       .subscribe({
@@ -915,6 +1031,8 @@ export class MovementFormDialogComponent implements OnInit {
   private _handleError(err: any): void {
     this.saving.set(false);
     if (err.status === 422) this.errors.set(Object.values(err.error?.errors || {}).flat() as string[]);
+    else if (err.status === 409 && err.error?.error_code === 'EXPIRED_STOCK')
+      this.errors.set([err.error?.message || 'El producto solo tiene stock vencido en este almacén. Gestione el lote vencido mediante una devolución, un ajuste o una baja por vencimiento antes de continuar.']);
     else if (err.status === 409) this.errors.set([err.error?.message || 'Error de capacidad o negocio']);
     else this.errors.set([err.error?.message || 'Error al registrar el movimiento']);
   }

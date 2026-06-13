@@ -61,14 +61,14 @@
     </mat-form-field>
 
     <!-- Stock disponible -->
-    @if (loadingStock()) {
+    @if (loadingStock() || loadingExitable()) {
       <div class="stock-card stock-card--loading">
         <mat-spinner diameter="18"></mat-spinner>
         <span>Consultando stock disponible…</span>
       </div>
     }
 
-    @if (!loadingStock() && stockSummary()) {
+    @if (!loadingStock() && !loadingExitable() && stockSummary()) {
       <div class="stock-card" [class]="'stock-card--' + stockStatusClass">
         <mat-icon class="stock-icon">
           {{ stockStatusClass === 'danger' ? 'error' : stockStatusClass === 'warn' ? 'warning' : 'check_circle' }}
@@ -77,7 +77,7 @@
           <div class="stock-row">
             <span class="stock-label">Disponible</span>
             <strong class="stock-val" [class]="'val--' + stockStatusClass">
-              {{ formatQty(stockSummary()!.available_quantity) }}
+              {{ formatQty(exitableQty) }}
             </strong>
           </div>
           <div class="stock-row">
@@ -89,8 +89,19 @@
             <span class="stock-val">{{ formatQty(stockSummary()!.reserved_quantity) }}</span>
           </div>
         </div>
-        @if (hasNoStock) {
-          <div class="stock-warn-msg">No hay stock disponible en este almacén para transferir.</div>
+        @if (checkingExpired()) {
+          <div class="stock-warn-msg stock-warn-msg--checking">
+            <mat-spinner diameter="12"></mat-spinner>
+            Verificando lotes vencidos…
+          </div>
+        } @else if (hasNoStock) {
+          @if (expiredOnly()) {
+            <div class="stock-warn-msg stock-warn-msg--expired">
+              Este producto solo tiene stock vencido en este almacén. Gestione el lote vencido mediante una devolución, un ajuste o una baja por vencimiento antes de continuar.
+            </div>
+          } @else {
+            <div class="stock-warn-msg">No hay stock disponible en este almacén para transferir.</div>
+          }
         }
       </div>
     }
@@ -143,11 +154,11 @@
       <mat-form-field appearance="outline">
         <mat-label>Cantidad a transferir</mat-label>
         <input matInput type="number" min="1"
-               [max]="stockSummary()?.available_quantity ?? null"
+               [max]="exitableQty || null"
                formControlName="quantity"
                placeholder="0">
-        @if (stockSummary()) {
-          <mat-hint>Máx. {{ formatQty(stockSummary()!.available_quantity) }} disponibles</mat-hint>
+        @if (stockSummary() && !loadingExitable() && !checkingExpired()) {
+          <mat-hint>Máx. {{ formatQty(exitableQty) }} disponibles</mat-hint>
         }
         <mat-icon matSuffix>numbers</mat-icon>
       </mat-form-field>

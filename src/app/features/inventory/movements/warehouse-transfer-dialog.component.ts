@@ -11,7 +11,7 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatDividerModule } from '@angular/material/divider';
 import { finalize, of } from 'rxjs';
 import { map, catchError } from 'rxjs/operators';
-import { InventoryService, StockSummary } from '../inventory.service';
+import { InventoryService, StockSummary, BatchDetail } from '../inventory.service';
 import { MovementPdfService } from '../../../shared/services/movement-pdf.service';
 import { WarehouseService, Warehouse, Location } from '../../warehouse/warehouse.service';
 import { Product } from '../../catalog/catalog.service';
@@ -51,6 +51,13 @@ export class WarehouseTransferDialogComponent implements OnInit {
 
   stockSummary  = signal<StockSummary | null>(null);
   loadingStock  = signal(false);
+
+  /** Lotes vigentes (no vencidos) disponibles para transferir */
+  exitableLotes    = signal<BatchDetail[]>([]);
+  loadingExitable  = signal(false);
+  checkingExpired  = signal(false);
+  /** true si el producto no tiene stock vigente pero sí stock vencido en el almacén de origen */
+  expiredOnly   = signal(false);
 
   form = this.fb.group({
     warehouse_from_id: [null as number | null, Validators.required],
@@ -113,6 +120,8 @@ export class WarehouseTransferDialogComponent implements OnInit {
   private _loadStock(): void {
     const wId = this.form.get('warehouse_from_id')?.value;
     const pId = this.form.get('product_id')?.value;
+    this.expiredOnly.set(false);
+    this.exitableLotes.set([]);
     if (!wId || !pId) { this.stockSummary.set(null); return; }
 
     this.loadingStock.set(true);
@@ -124,20 +133,51 @@ export class WarehouseTransferDialogComponent implements OnInit {
         next: r => this.stockSummary.set(r.data),
         error: () => this.stockSummary.set(null),
       });
+
+    this.loadingExitable.set(true);
+    this.data.inventorySvc.getProductBatches(Number(pId), true)
+      .pipe(finalize(() => this.loadingExitable.set(false)))
+      .subscribe({
+        next: r => {
+          const available = r.data.filter(b => b.status === 'active' && b.quantity_available > 0);
+          this.exitableLotes.set(available);
+          // Si no hay lotes vigentes, verificar si el producto tiene stock vencido en este almacén
+          if (available.length === 0) this._checkExpiredOnly(Number(pId));
+        },
+        error: () => this.exitableLotes.set([]),
+      });
+  }
+
+  /** Verifica si un producto sin stock vigente tiene, en cambio, stock vencido en el almacén. */
+  private _checkExpiredOnly(productId: number): void {
+    this.checkingExpired.set(true);
+    this.data.inventorySvc.getProductBatches(productId)
+      .pipe(finalize(() => this.checkingExpired.set(false)))
+      .subscribe({
+        next: r => this.expiredOnly.set(r.data.some(b => b.quantity_available > 0)),
+        error: () => {},
+      });
+  }
+
+  /** Cantidad realmente disponible para transferir (lotes vigentes, no vencidos). */
+  get exitableQty(): number {
+    return this.exitableLotes().reduce((sum, b) => sum + b.quantity_available, 0);
   }
 
   get stockStatusClass(): 'ok' | 'warn' | 'danger' | 'none' {
     const s = this.stockSummary();
     if (!s) return 'none';
-    if (s.available_quantity === 0) return 'danger';
+    const exitable = this.exitableQty;
+    if (exitable === 0) return 'danger';
     const qty = Number(this.form.get('quantity')?.value) || 0;
-    if (qty > 0 && qty > s.available_quantity) return 'danger';
+    if (qty > 0 && qty > exitable) return 'danger';
     return 'ok';
   }
 
   get hasNoStock(): boolean {
-    const s = this.stockSummary();
-    return s !== null && s.available_quantity === 0;
+    if (this.stockSummary() === null) return false;
+    if (this.loadingExitable() || this.checkingExpired()) return false;
+    return this.exitableQty === 0;
   }
 
   get isReady(): boolean {
@@ -146,9 +186,9 @@ export class WarehouseTransferDialogComponent implements OnInit {
     if (!v.product_id) return false;
     if (!v.warehouse_to_id || !v.location_to_id) return false;
     if (!v.quantity || v.quantity < 1) return false;
+    if (this.loadingStock() || this.loadingExitable() || this.checkingExpired()) return false;
     if (this.hasNoStock) return false;
-    const s = this.stockSummary();
-    if (s && Number(v.quantity) > s.available_quantity) return false;
+    if (Number(v.quantity) > this.exitableQty) return false;
     return true;
   }
 
@@ -193,6 +233,8 @@ export class WarehouseTransferDialogComponent implements OnInit {
         this.saving.set(false);
         if (err.status === 422) {
           this.errors.set(Object.values(err.error?.errors || {}).flat() as string[]);
+        } else if (err.status === 409 && err.error?.error_code === 'EXPIRED_STOCK') {
+          this.errors.set([err.error?.message || 'El producto solo tiene stock vencido en este almacén. Gestione el lote vencido mediante una devolución, un ajuste o una baja por vencimiento antes de continuar.']);
         } else if (err.status === 409) {
           this.errors.set([err.error?.message || 'Stock insuficiente para realizar la transferencia.']);
         } else {

@@ -1,5 +1,5 @@
 <h2 mat-dialog-title>
-  <mat-icon>{{ isEntry ? 'add_box' : isExit ? 'output' : isTransfer ? 'swap_horiz' : isAdjustment ? 'tune' : 'undo' }}</mat-icon>
+  <mat-icon>{{ isEntry ? 'add_box' : isExit ? 'output' : isTransfer ? 'swap_horiz' : isAdjustment ? 'tune' : isLoss ? 'remove_circle' : 'undo' }}</mat-icon>
   {{ typeLabel }}
 </h2>
 
@@ -667,7 +667,13 @@
             <span class="stock-summary-qty" [class.stock-qty--zero]="s.available_quantity === 0">
               {{ s.available_quantity }} {{ selectedProduct?.base_unit?.abbreviation || 'uds' }}
             </span>
-            @if (s.available_quantity === 0) {
+            @if (s.expired_quantity > 0) {
+              <span class="stock-summary-expired">
+                + {{ s.expired_quantity }} {{ selectedProduct?.base_unit?.abbreviation || 'uds' }} en lotes vencidos
+                (gestionables mediante un ajuste negativo)
+              </span>
+            }
+            @if (s.available_quantity === 0 && s.expired_quantity === 0) {
               <span class="stock-summary-alert">⚠ Sin stock activo — los ajustes positivos requieren un lote existente</span>
             }
           </div>
@@ -721,7 +727,7 @@
           <mat-icon>warning</mat-icon>
           <div class="zero-stock-text">
             <strong>Stock insuficiente para el descuento</strong>
-            <span>La cantidad negativa excede el stock disponible ({{ stockSummary()?.available_quantity }} uds). Reduzca la cantidad o verifique el almacén.</span>
+            <span>La cantidad negativa excede el stock gestionable ({{ operableQuantity }} uds, incluyendo lotes vencidos). Reduzca la cantidad o verifique el almacén.</span>
           </div>
         </div>
       }
@@ -754,6 +760,12 @@
             <span class="stock-summary-qty" [class.stock-qty--zero]="s.available_quantity === 0">
               {{ s.available_quantity }} {{ selectedProduct?.base_unit?.abbreviation || 'uds' }}
             </span>
+            @if (isReturn && s.expired_quantity > 0) {
+              <span class="stock-summary-expired">
+                + {{ s.expired_quantity }} {{ selectedProduct?.base_unit?.abbreviation || 'uds' }} en lotes vencidos
+                (gestionables mediante esta devolución)
+              </span>
+            }
           </div>
         </div>
       }
@@ -893,8 +905,9 @@
           <input matInput type="number" formControlName="quantity" min="1" />
           @if (stockSummary(); as s) {
             <mat-hint>
-              Disponible: {{ s.available_quantity }}
+              Disponible: {{ isReturn ? operableQuantity : s.available_quantity }}
               {{ selectedProduct?.base_unit?.abbreviation || 'uds' }}
+              @if (isReturn && s.expired_quantity > 0) { (incl. {{ s.expired_quantity }} vencidos) }
             </mat-hint>
           }
         </mat-form-field>
@@ -927,6 +940,148 @@
       } <!-- /!hasZeroStock -->
 
     }
+
+    <!-- ══════════════════════ BAJA DE INVENTARIO ════════════════ -->
+    @if (isLoss) {
+
+      <!-- Stock gestionable (vigente + vencido) -->
+      @if (loadingStock()) {
+        <div class="span2 fefo-loading">
+          <mat-spinner diameter="14"></mat-spinner>
+          <span>Verificando stock disponible...</span>
+        </div>
+      }
+      @if (!loadingStock() && stockSummary(); as s) {
+        <div class="span2 stock-summary-panel stock-summary-panel--{{ stockStatusClass }}">
+          <mat-icon class="stock-summary-icon">
+            {{ operableQuantity === 0 ? 'remove_shopping_cart' : stockStatusClass === 'warn' ? 'warning' : 'inventory_2' }}
+          </mat-icon>
+          <div class="stock-summary-info">
+            <span class="stock-summary-label">
+              Stock gestionable en <strong>{{ selectedWarehouseName }}</strong>
+            </span>
+            <span class="stock-summary-qty" [class.stock-qty--zero]="operableQuantity === 0">
+              {{ operableQuantity }} {{ selectedProduct?.base_unit?.abbreviation || 'uds' }}
+            </span>
+            @if (s.expired_quantity > 0) {
+              <span class="stock-summary-expired">
+                ({{ s.available_quantity }} vigentes + {{ s.expired_quantity }} vencidos)
+              </span>
+            }
+          </div>
+        </div>
+      }
+
+      <!-- Bloqueo total cuando no hay stock -->
+      @if (hasZeroStock) {
+        <div class="span2 zero-stock-block">
+          <mat-icon>block</mat-icon>
+          <div class="zero-stock-text">
+            <strong>Sin unidades para dar de baja</strong>
+            <span>No hay stock de este producto en {{ selectedWarehouseName }}.</span>
+          </div>
+        </div>
+      }
+
+      @if (!hasZeroStock) {
+
+        <!-- Selector de lote (selección explícita, no FEFO) -->
+        @if (loadingLossBatches()) {
+          <div class="span2 fefo-loading">
+            <mat-spinner diameter="14"></mat-spinner>
+            <span>Consultando lotes del almacén...</span>
+          </div>
+        }
+        @if (!loadingLossBatches() && lossBatches().length === 0) {
+          <div class="span2 zero-stock-block">
+            <mat-icon>block</mat-icon>
+            <div class="zero-stock-text">
+              <strong>Sin lotes con stock en este almacén</strong>
+              <span>No se encontraron lotes de este producto con unidades disponibles en {{ selectedWarehouseName }}.</span>
+            </div>
+          </div>
+        }
+        @if (!loadingLossBatches() && lossBatches().length > 0) {
+          <mat-form-field appearance="outline" class="span2">
+            <mat-label>Lote a dar de baja *</mat-label>
+            <mat-select formControlName="batch_id">
+              @for (lote of lossBatches(); track lote.id) {
+                <mat-option [value]="lote.id">
+                  {{ lote.lot_number }}
+                  — vence {{ lote.expiration_date | date:'dd/MM/yyyy' }}
+                  @if (lote.status === 'expired' || (lote.days_until_expiry ?? 0) < 0) {
+                    <span class="fefo-tag fefo-tag--expired"> Vencido</span>
+                  }
+                  <span style="color:#718096;font-size:0.85em"> — disponible: {{ lote.quantity_available }} {{ selectedProduct?.base_unit?.abbreviation || 'uds' }}</span>
+                </mat-option>
+              }
+            </mat-select>
+            <mat-hint>Selecciona el lote específico del cual se descontarán las unidades</mat-hint>
+          </mat-form-field>
+
+          <!-- Ubicación del lote dentro del almacén (requerida) -->
+          @if (form.get('batch_id')?.value) {
+            <mat-form-field appearance="outline" class="span2">
+              <mat-label>Ubicación *</mat-label>
+              <mat-select formControlName="location_id">
+                @for (loc of lossBatchLocations; track loc.location_id) {
+                  <mat-option [value]="loc.location_id">
+                    {{ loc.location_name }}
+                    @if (loc.zone) { · {{ loc.zone.zone_name }} }
+                    <span style="color:#718096;font-size:0.85em"> — {{ loc.quantity }} {{ selectedProduct?.base_unit?.abbreviation || 'uds' }}</span>
+                  </mat-option>
+                }
+              </mat-select>
+              @if (lossBatchLocations.length === 0) {
+                <mat-hint>Este lote no tiene stock registrado en ninguna ubicación de {{ selectedWarehouseName }}.</mat-hint>
+              } @else {
+                <mat-hint>Disponible en esta ubicación: {{ selectedLossLocationQty }} {{ selectedProduct?.base_unit?.abbreviation || 'uds' }}</mat-hint>
+              }
+            </mat-form-field>
+          }
+        }
+
+        <!-- Cantidad -->
+        @if (form.get('location_id')?.value) {
+          <mat-form-field appearance="outline" class="span2">
+            <mat-label>Cantidad a dar de baja *</mat-label>
+            <input matInput type="number" formControlName="quantity" min="1" [max]="selectedLossLocationQty" />
+            <mat-hint>Disponible en esta ubicación: {{ selectedLossLocationQty }} {{ selectedProduct?.base_unit?.abbreviation || 'uds' }}</mat-hint>
+          </mat-form-field>
+        }
+
+        <!-- Motivo de la baja -->
+        <mat-form-field appearance="outline" class="span2">
+          <mat-label>Motivo de la baja *</mat-label>
+          <mat-select formControlName="loss_reason_category">
+            @for (opt of lossReasonOptions; track opt.value) {
+              <mat-option [value]="opt.value">{{ opt.label }}</mat-option>
+            }
+          </mat-select>
+        </mat-form-field>
+
+        <!-- Detalle adicional -->
+        <mat-form-field appearance="outline" class="span2">
+          <mat-label>
+            {{ form.get('loss_reason_category')?.value === 'other' ? 'Detalle del motivo *' : 'Detalle adicional (opcional)' }}
+          </mat-label>
+          <textarea matInput formControlName="reason" rows="2" placeholder="Describe la causa de la baja"></textarea>
+        </mat-form-field>
+
+        <!-- Advertencia: cantidad excede el stock disponible en el lote/ubicación elegidos -->
+        @if (lossExceedsStock) {
+          <div class="span2 zero-stock-block">
+            <mat-icon>warning</mat-icon>
+            <div class="zero-stock-text">
+              <strong>Cantidad superior a la disponible</strong>
+              <span>El lote seleccionado solo tiene {{ selectedLossLocationQty }} {{ selectedProduct?.base_unit?.abbreviation || 'uds' }} en esta ubicación.</span>
+            </div>
+          </div>
+        }
+
+      } <!-- /!hasZeroStock (loss) -->
+
+    } <!-- /isLoss -->
 
   </form>
 </mat-dialog-content>

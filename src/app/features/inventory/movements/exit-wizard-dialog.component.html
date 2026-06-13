@@ -96,7 +96,7 @@
         </div>
 
         <!-- Stock / FEFO del producto -->
-        @if (rowStocks()[i]?.loadingStock) {
+        @if (rowStocks()[i]?.loadingStock || rowStocks()[i]?.loadingFefo) {
           <div class="row-loading">
             <mat-spinner diameter="14"></mat-spinner>
             <span>Verificando stock...</span>
@@ -106,36 +106,50 @@
         @if (!rowStocks()[i]?.loadingStock && rowStocks()[i]?.summary; as s) {
           <div class="row-stock-panel row-stock-panel--{{ rowStockStatus(i) }}">
             <mat-icon class="row-stock-icon">
-              {{ s.available_quantity === 0 ? 'remove_shopping_cart' : rowStockStatus(i) === 'warn' ? 'warning' : 'check_circle' }}
+              {{ rowExitableQty(i) === 0 ? 'remove_shopping_cart' : rowStockStatus(i) === 'warn' ? 'warning' : 'check_circle' }}
             </mat-icon>
-            <span class="row-stock-qty" [class.row-stock-qty--zero]="s.available_quantity === 0">
-              {{ s.available_quantity }}
+            <span class="row-stock-qty" [class.row-stock-qty--zero]="rowExitableQty(i) === 0">
+              {{ rowExitableQty(i) }}
               {{ getProduct(asGroup(row).get('product_id')?.value)?.base_unit?.abbreviation || 'uds' }}
             </span>
             <span class="row-stock-label">disponibles en {{ selectedWarehouseName }}</span>
           </div>
-
-          @if (s.available_quantity === 0) {
-            <div class="zero-stock-warn">
-              <mat-icon>block</mat-icon>
-              <span>Sin stock disponible para este producto en el almacén seleccionado.</span>
-            </div>
-          }
         }
 
-        @if (!rowStocks()[i]?.loadingFefo && (rowStocks()[i]?.fefo?.length ?? 0) > 0) {
-          <div class="fefo-mini-panel">
-            <mat-icon class="fefo-mini-icon">fact_check</mat-icon>
-            <span class="fefo-mini-label">Lotes FEFO:</span>
-            @for (lote of rowStocks()[i].fefo; track lote.id; let first = $first) {
-              <span class="fefo-mini-chip" [class.fefo-mini-chip--first]="first">
-                {{ first ? '★' : '' }} {{ lote.lot_number }}
-                ({{ lote.quantity_available }} uds
-                @if (lote.expiration_date) { · vence {{ lote.expiration_date | date:'dd/MM/yy' }} }
-                )
-              </span>
-            }
+        @if (rowStocks()[i]?.checkingExpired) {
+          <div class="row-loading">
+            <mat-spinner diameter="14"></mat-spinner>
+            <span>Verificando lotes vencidos...</span>
           </div>
+        }
+
+        @if (!rowStocks()[i]?.loadingFefo && !rowStocks()[i]?.checkingExpired) {
+          @if (rowExitableQty(i) === 0) {
+            @if (rowStocks()[i]?.expiredOnly) {
+              <div class="zero-stock-warn zero-stock-warn--expired">
+                <mat-icon>event_busy</mat-icon>
+                <span>Este producto solo tiene stock vencido en {{ selectedWarehouseName }}. Gestione el lote vencido mediante una devolución, un ajuste o una baja por vencimiento antes de continuar.</span>
+              </div>
+            } @else {
+              <div class="zero-stock-warn">
+                <mat-icon>block</mat-icon>
+                <span>Sin stock disponible para este producto en el almacén seleccionado.</span>
+              </div>
+            }
+          } @else {
+            <div class="fefo-mini-panel">
+              <mat-icon class="fefo-mini-icon">fact_check</mat-icon>
+              <span class="fefo-mini-label">Lotes FEFO:</span>
+              @for (lote of rowStocks()[i].fefo; track lote.id; let first = $first) {
+                <span class="fefo-mini-chip" [class.fefo-mini-chip--first]="first">
+                  {{ first ? '★' : '' }} {{ lote.lot_number }}
+                  ({{ lote.quantity_available }} uds
+                  @if (lote.expiration_date) { · vence {{ lote.expiration_date | date:'dd/MM/yy' }} }
+                  )
+                </span>
+              }
+            </div>
+          }
         }
 
       </div>

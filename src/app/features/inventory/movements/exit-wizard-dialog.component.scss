@@ -121,6 +121,11 @@
   background: #fff5f5; border: 1px solid #fc8181; border-radius: 7px;
   padding: 0.4rem 0.7rem; font-size: 0.78rem; color: #742a2a;
   mat-icon { color: #c53030; font-size: 1rem; height: 1rem; width: 1rem; flex-shrink: 0; }
+
+  &--expired {
+    background: #fffaf0; border-color: #fbd38d; color: #7b341e;
+    mat-icon { color: #dd6b20; }
+  }
 }
 
 // ── FEFO mini panel ──────────────────────────────────────────

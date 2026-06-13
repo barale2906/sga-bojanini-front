@@ -25,6 +25,7 @@ const TYPE_TITLES: Record<string, string> = {
   transfer:   'Comprobante de Transferencia de Inventario',
   adjustment: 'Comprobante de Ajuste de Inventario',
   return:     'Comprobante de Devolución a Proveedor',
+  loss:       'Comprobante de Baja de Inventario',
 };
 
 const SIGN_LABELS: Record<string, { left: string; right: string }> = {
@@ -32,6 +33,7 @@ const SIGN_LABELS: Record<string, { left: string; right: string }> = {
   transfer:   { left: 'Almacén origen (entrega)', right: 'Almacén destino (recibe)' },
   adjustment: { left: 'Responsable del ajuste',   right: 'Supervisor / Auditor' },
   return:     { left: 'Almacén (entrega)',         right: 'Proveedor (recibe)' },
+  loss:       { left: 'Responsable de la baja',    right: 'Supervisor / Auditor' },
 };
 
 @Injectable({ providedIn: 'root' })

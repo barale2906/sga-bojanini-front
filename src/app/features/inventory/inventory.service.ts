@@ -34,7 +34,7 @@ export interface BatchLocation {
   location_name: string;
   location_code: string;
   quantity: number;
-  zone: { zone_id: number; zone_name: string; zone_code: string } | null;
+  zone: { zone_id: number; zone_name: string; zone_code: string; warehouse_id: number } | null;
 }
 
 /** Respuesta de GET /stock/summary */
@@ -44,6 +44,8 @@ export interface StockSummary {
   total_quantity:     number;
   reserved_quantity:  number;
   available_quantity: number;
+  /** Unidades de lotes vencidos (no incluidas en available_quantity), gestionables vía devolución, ajuste o baja. */
+  expired_quantity:   number;
   last_movement_at:   string | null;
 }
 
@@ -146,9 +148,19 @@ export class InventoryService {
     return this.http.get<ApiResponse<BatchDetail>>(`${this.api}/batches/${batchId}`);
   }
 
-  /** Paso 3 — Lotes del producto ordenados FEFO (expiration_date ASC) */
-  getProductBatches(productId: number): Observable<ApiResponse<BatchDetail[]>> {
-    return this.http.get<ApiResponse<BatchDetail[]>>(`${this.api}/products/${productId}/batches`);
+  /**
+   * Paso 3 — Lotes del producto ordenados FEFO (expiration_date ASC)
+   * @param availableForExit Si es true, solo devuelve lotes activos, no vencidos y con stock disponible
+   *   (usar en salidas/transferencias). Sin este parámetro incluye también lotes vencidos
+   *   (usar en devoluciones, ajustes y bajas).
+   * @param warehouseId Si se indica, solo devuelve lotes con stock en alguna ubicación de ese
+   *   almacén (usar en el selector de lote de la baja de inventario).
+   */
+  getProductBatches(productId: number, availableForExit = false, warehouseId?: number): Observable<ApiResponse<BatchDetail[]>> {
+    let params = new HttpParams();
+    if (availableForExit) params = params.set('available_for_exit', '1');
+    if (warehouseId) params = params.set('warehouse_id', String(warehouseId));
+    return this.http.get<ApiResponse<BatchDetail[]>>(`${this.api}/products/${productId}/batches`, { params });
   }
 
   // Stock
@@ -229,6 +241,10 @@ export class InventoryService {
   }
   writeOff(batchId: number): Observable<ApiResponse<any>> {
     return this.http.post<ApiResponse<any>>(`${this.api}/movements/write-off`, { batch_id: batchId });
+  }
+  /** Baja de inventario por daño, muestra, pérdida/robo o vencimiento — requiere `batch_id` y `location_id` elegidos explícitamente por el usuario (no aplica FEFO). */
+  loss(payload: any): Observable<ApiResponse<any>> {
+    return this.http.post<ApiResponse<any>>(`${this.api}/movements/loss`, payload);
   }
 
   getCostCenters(f: { is_active?: boolean } = {}): Observable<ApiResponse<CostCenter[]>> {

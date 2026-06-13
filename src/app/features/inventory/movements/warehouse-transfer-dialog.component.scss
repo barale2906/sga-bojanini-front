@@ -128,11 +128,22 @@
 }
 
 .stock-warn-msg {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
   font-size: 0.8rem;
   color: #c53030;
   font-weight: 600;
   margin-top: 0.25rem;
   grid-column: 1 / -1;
+
+  &--expired {
+    color: #7b341e;
+  }
+
+  &--checking {
+    color: #718096;
+  }
 }
 
 // ── FEFO note ─────────────────────────────────────────────

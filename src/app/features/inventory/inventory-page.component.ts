@@ -148,7 +148,7 @@ export class InventoryPageComponent implements OnInit {
   loading = signal(false);
   loadingPdf = signal<number | null>(null);
 
-  readonly PRINTABLE_TYPES = new Set(['exit', 'transfer', 'adjustment', 'return']);
+  readonly PRINTABLE_TYPES = new Set(['exit', 'transfer', 'adjustment', 'return', 'loss']);
 
   movTypes = [
     { value: 'entry',                label: '↓ Entrada' },

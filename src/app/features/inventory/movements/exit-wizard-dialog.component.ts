@@ -36,6 +36,10 @@ interface RowStock {
   fefo: BatchDetail[];
   loadingStock: boolean;
   loadingFefo: boolean;
+  /** true mientras se verifica si el stock sin lotes vigentes corresponde a stock vencido */
+  checkingExpired: boolean;
+  /** true si el producto no tiene stock vigente pero sí stock vencido en el almacén */
+  expiredOnly: boolean;
 }
 
 @Component({
@@ -121,9 +125,12 @@ export class ExitWizardDialogComponent implements OnInit {
     return this.productRows.controls.every((row, i) => {
       const v = (row as FormGroup).value;
       if (!v.product_id || !v.quantity || v.quantity < 1) return false;
-      const stock = this.rowStocks()[i]?.summary;
-      if (stock !== null && stock !== undefined && stock.available_quantity === 0) return false;
-      if (stock && v.quantity > stock.available_quantity) return false;
+      const rs = this.rowStocks()[i];
+      if (!rs) return false;
+      if (rs.loadingStock || rs.loadingFefo || rs.checkingExpired) return false;
+      const exitable = this.rowExitableQty(i);
+      if (exitable === 0) return false;
+      if (v.quantity > exitable) return false;
       return true;
     });
   }
@@ -155,7 +162,7 @@ export class ExitWizardDialogComponent implements OnInit {
           .subscribe({ next: r => this.locations.set(r.data), error: () => {} });
         this.productRows.controls.forEach((_, i) => this._loadRowStock(i));
       } else {
-        this.rowStocks.update(arr => arr.map(r => ({ ...r, summary: null, fefo: [] })));
+        this.rowStocks.update(arr => arr.map(r => ({ ...r, summary: null, fefo: [], checkingExpired: false, expiredOnly: false })));
       }
     });
 
@@ -203,7 +210,7 @@ export class ExitWizardDialogComponent implements OnInit {
     row.get('product_id')!.valueChanges.subscribe(() => this._loadRowStock(idx));
 
     this.productRows.push(row);
-    this.rowStocks.update(arr => [...arr, { summary: null, fefo: [], loadingStock: false, loadingFefo: false }]);
+    this.rowStocks.update(arr => [...arr, { summary: null, fefo: [], loadingStock: false, loadingFefo: false, checkingExpired: false, expiredOnly: false }]);
   }
 
   removeProductRow(i: number): void {
@@ -219,7 +226,7 @@ export class ExitWizardDialogComponent implements OnInit {
 
     this.rowStocks.update(arr => {
       const a = [...arr];
-      if (a[rowIdx]) a[rowIdx] = { ...a[rowIdx], loadingStock: true, loadingFefo: true, summary: null, fefo: [] };
+      if (a[rowIdx]) a[rowIdx] = { ...a[rowIdx], loadingStock: true, loadingFefo: true, summary: null, fefo: [], checkingExpired: false, expiredOnly: false };
       return a;
     });
 
@@ -236,29 +243,65 @@ export class ExitWizardDialogComponent implements OnInit {
         }),
       });
 
-    this.data.inventorySvc.getProductBatches(Number(pId))
+    this.data.inventorySvc.getProductBatches(Number(pId), true)
       .pipe(finalize(() => this.rowStocks.update(arr => {
         const a = [...arr]; if (a[rowIdx]) a[rowIdx] = { ...a[rowIdx], loadingFefo: false }; return a;
       })))
       .subscribe({
-        next: r => this.rowStocks.update(arr => {
-          const a = [...arr];
-          if (a[rowIdx]) a[rowIdx] = { ...a[rowIdx], fefo: r.data.filter(b => b.status === 'active' && b.quantity_available > 0) };
-          return a;
-        }),
+        next: r => {
+          const available = r.data.filter(b => b.status === 'active' && b.quantity_available > 0);
+          this.rowStocks.update(arr => {
+            const a = [...arr];
+            if (a[rowIdx]) a[rowIdx] = { ...a[rowIdx], fefo: available };
+            return a;
+          });
+          // Si no hay lotes vigentes, verificar si el producto tiene stock vencido en este almacén
+          if (available.length === 0) this._checkExpiredOnly(rowIdx, Number(pId));
+        },
         error: () => {},
       });
+  }
+
+  /** Verifica si un producto sin stock vigente tiene, en cambio, stock vencido en el almacén. */
+  private _checkExpiredOnly(rowIdx: number, productId: number): void {
+    this.rowStocks.update(arr => {
+      const a = [...arr];
+      if (a[rowIdx]) a[rowIdx] = { ...a[rowIdx], checkingExpired: true };
+      return a;
+    });
+
+    this.data.inventorySvc.getProductBatches(productId)
+      .pipe(finalize(() => this.rowStocks.update(arr => {
+        const a = [...arr]; if (a[rowIdx]) a[rowIdx] = { ...a[rowIdx], checkingExpired: false }; return a;
+      })))
+      .subscribe({
+        next: r => {
+          const hasExpiredStock = r.data.some(b => b.quantity_available > 0);
+          this.rowStocks.update(arr => {
+            const a = [...arr];
+            if (a[rowIdx]) a[rowIdx] = { ...a[rowIdx], expiredOnly: hasExpiredStock };
+            return a;
+          });
+        },
+        error: () => {},
+      });
+  }
+
+  /** Cantidad realmente disponible para salida (lotes vigentes, no vencidos). */
+  rowExitableQty(i: number): number {
+    return (this.rowStocks()[i]?.fefo ?? []).reduce((sum, b) => sum + b.quantity_available, 0);
   }
 
   rowStockStatus(i: number): 'ok' | 'warn' | 'danger' | 'loading' | 'none' {
     const s = this.rowStocks()[i];
     if (!s) return 'none';
-    if (s.loadingStock) return 'loading';
+    if (s.loadingStock || s.loadingFefo || s.checkingExpired) return 'loading';
     if (!s.summary) return 'none';
     const qty = Number((this.productRows.at(i) as FormGroup)?.get('quantity')?.value) || 0;
-    if (s.summary.available_quantity === 0) return 'danger';
-    if (qty > 0 && qty > s.summary.available_quantity) return 'danger';
-    if (qty > 0 && qty > s.summary.available_quantity * 0.8) return 'warn';
+    const exitable = this.rowExitableQty(i);
+    if (exitable === 0) return 'danger';
+    if (qty > 0 && qty > exitable) return 'danger';
+    if (qty > 0 && qty > exitable * 0.8) return 'warn';
     return 'ok';
   }
 
@@ -452,6 +495,8 @@ export class ExitWizardDialogComponent implements OnInit {
         this.saving.set(false);
         if (err.status === 422)
           this.errors.set(Object.values(err.error?.errors || {}).flat() as string[]);
+        else if (err.status === 409 && err.error?.error_code === 'EXPIRED_STOCK')
+          this.errors.set([err.error?.message || 'El producto solo tiene stock vencido en este almacén. Gestione el lote vencido mediante una devolución, un ajuste o una baja por vencimiento antes de continuar.']);
         else if (err.status === 409)
           this.errors.set([err.error?.message || 'Error de stock o negocio']);
         else
