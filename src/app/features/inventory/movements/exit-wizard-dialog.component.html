@@ -71,7 +71,9 @@
           <mat-form-field appearance="outline" class="field-qty">
             <mat-label>Cantidad *</mat-label>
             <input matInput type="number" formControlName="quantity" min="1" />
-            @if (rowStocks()[i]?.summary) {
+            @if (rowStocks()[i]?.isKit) {
+              <mat-hint>Armables: {{ rowStocks()[i]?.kitAvailable ?? 0 }} kit(s)</mat-hint>
+            } @else if (rowStocks()[i]?.summary) {
               <mat-hint>
                 Disponible: {{ rowStocks()[i].summary!.available_quantity }}
                 {{ getProduct(asGroup(row).get('product_id')?.value)?.base_unit?.abbreviation || 'uds' }}
@@ -103,16 +105,23 @@
           </div>
         }
 
-        @if (!rowStocks()[i]?.loadingStock && rowStocks()[i]?.summary; as s) {
+        @if (!rowStocks()[i]?.loadingStock && (rowStocks()[i]?.isKit || rowStocks()[i]?.summary)) {
           <div class="row-stock-panel row-stock-panel--{{ rowStockStatus(i) }}">
             <mat-icon class="row-stock-icon">
               {{ rowExitableQty(i) === 0 ? 'remove_shopping_cart' : rowStockStatus(i) === 'warn' ? 'warning' : 'check_circle' }}
             </mat-icon>
-            <span class="row-stock-qty" [class.row-stock-qty--zero]="rowExitableQty(i) === 0">
-              {{ rowExitableQty(i) }}
-              {{ getProduct(asGroup(row).get('product_id')?.value)?.base_unit?.abbreviation || 'uds' }}
-            </span>
-            <span class="row-stock-label">disponibles en {{ selectedWarehouseName }}</span>
+            @if (rowStocks()[i]?.isKit) {
+              <span class="row-stock-qty" [class.row-stock-qty--zero]="rowExitableQty(i) === 0">
+                {{ rowExitableQty(i) }} kit(s)
+              </span>
+              <span class="row-stock-label">armables en {{ selectedWarehouseName }} según stock de componentes</span>
+            } @else {
+              <span class="row-stock-qty" [class.row-stock-qty--zero]="rowExitableQty(i) === 0">
+                {{ rowExitableQty(i) }}
+                {{ getProduct(asGroup(row).get('product_id')?.value)?.base_unit?.abbreviation || 'uds' }}
+              </span>
+              <span class="row-stock-label">disponibles en {{ selectedWarehouseName }}</span>
+            }
           </div>
         }
 
@@ -125,7 +134,12 @@
 
         @if (!rowStocks()[i]?.loadingFefo && !rowStocks()[i]?.checkingExpired) {
           @if (rowExitableQty(i) === 0) {
-            @if (rowStocks()[i]?.expiredOnly) {
+            @if (rowStocks()[i]?.isKit) {
+              <div class="zero-stock-warn">
+                <mat-icon>block</mat-icon>
+                <span>No hay stock suficiente de los componentes de este kit en el almacén seleccionado.</span>
+              </div>
+            } @else if (rowStocks()[i]?.expiredOnly) {
               <div class="zero-stock-warn zero-stock-warn--expired">
                 <mat-icon>event_busy</mat-icon>
                 <span>Este producto solo tiene stock vencido en {{ selectedWarehouseName }}. Gestione el lote vencido mediante una devolución, un ajuste o una baja por vencimiento antes de continuar.</span>
@@ -136,6 +150,11 @@
                 <span>Sin stock disponible para este producto en el almacén seleccionado.</span>
               </div>
             }
+          } @else if (rowStocks()[i]?.isKit) {
+            <div class="fefo-mini-panel">
+              <mat-icon class="fefo-mini-icon">build</mat-icon>
+              <span class="fefo-mini-label">Disponibilidad calculada según el stock vigente de los componentes del kit (FEFO por componente al despachar).</span>
+            </div>
           } @else {
             <div class="fefo-mini-panel">
               <mat-icon class="fefo-mini-icon">fact_check</mat-icon>

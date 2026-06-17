@@ -40,6 +40,10 @@ interface RowStock {
   checkingExpired: boolean;
   /** true si el producto no tiene stock vigente pero sí stock vencido en el almacén */
   expiredOnly: boolean;
+  /** true si el producto seleccionado es de tipo kit (su disponibilidad depende del stock de sus componentes) */
+  isKit: boolean;
+  /** kits armables según el stock vigente de sus componentes en el almacén seleccionado */
+  kitAvailable: number | null;
 }
 
 @Component({
@@ -210,7 +214,10 @@ export class ExitWizardDialogComponent implements OnInit {
     row.get('product_id')!.valueChanges.subscribe(() => this._loadRowStock(idx));
 
     this.productRows.push(row);
-    this.rowStocks.update(arr => [...arr, { summary: null, fefo: [], loadingStock: false, loadingFefo: false, checkingExpired: false, expiredOnly: false }]);
+    this.rowStocks.update(arr => [...arr, {
+      summary: null, fefo: [], loadingStock: false, loadingFefo: false,
+      checkingExpired: false, expiredOnly: false, isKit: false, kitAvailable: null,
+    }]);
   }
 
   removeProductRow(i: number): void {
@@ -224,11 +231,36 @@ export class ExitWizardDialogComponent implements OnInit {
     const wId = this.warehouseControl.value;
     if (!pId || !wId) return;
 
+    const isKit = this.getProduct(Number(pId))?.product_type === 'kit';
+
     this.rowStocks.update(arr => {
       const a = [...arr];
-      if (a[rowIdx]) a[rowIdx] = { ...a[rowIdx], loadingStock: true, loadingFefo: true, summary: null, fefo: [], checkingExpired: false, expiredOnly: false };
+      if (a[rowIdx]) {
+        a[rowIdx] = {
+          ...a[rowIdx], isKit, loadingStock: true, loadingFefo: !isKit,
+          summary: null, fefo: [], kitAvailable: null, checkingExpired: false, expiredOnly: false,
+        };
+      }
       return a;
     });
+
+    if (isKit) {
+      // Los kits no tienen stock propio: su disponibilidad depende del stock
+      // vigente de sus componentes, calculado por el backend.
+      this.data.inventorySvc.getKitAvailability(Number(pId), Number(wId))
+        .pipe(finalize(() => this.rowStocks.update(arr => {
+          const a = [...arr]; if (a[rowIdx]) a[rowIdx] = { ...a[rowIdx], loadingStock: false }; return a;
+        })))
+        .subscribe({
+          next: r => this.rowStocks.update(arr => {
+            const a = [...arr]; if (a[rowIdx]) a[rowIdx] = { ...a[rowIdx], kitAvailable: r.data.available_kits }; return a;
+          }),
+          error: () => this.rowStocks.update(arr => {
+            const a = [...arr]; if (a[rowIdx]) a[rowIdx] = { ...a[rowIdx], kitAvailable: 0 }; return a;
+          }),
+        });
+      return;
+    }
 
     this.data.inventorySvc.getStockSummary(Number(wId), Number(pId))
       .pipe(finalize(() => this.rowStocks.update(arr => {
@@ -287,16 +319,23 @@ export class ExitWizardDialogComponent implements OnInit {
       });
   }
 
-  /** Cantidad realmente disponible para salida (lotes vigentes, no vencidos). */
+  /**
+   * Cantidad realmente disponible para salida: para productos simples, la
+   * suma de lotes vigentes (no vencidos); para kits, los kits armables según
+   * el stock de sus componentes en el almacén seleccionado.
+   */
   rowExitableQty(i: number): number {
-    return (this.rowStocks()[i]?.fefo ?? []).reduce((sum, b) => sum + b.quantity_available, 0);
+    const s = this.rowStocks()[i];
+    if (s?.isKit) return s.kitAvailable ?? 0;
+    return (s?.fefo ?? []).reduce((sum, b) => sum + b.quantity_available, 0);
   }
 
   rowStockStatus(i: number): 'ok' | 'warn' | 'danger' | 'loading' | 'none' {
     const s = this.rowStocks()[i];
     if (!s) return 'none';
     if (s.loadingStock || s.loadingFefo || s.checkingExpired) return 'loading';
-    if (!s.summary) return 'none';
+    if (s.isKit) { if (s.kitAvailable === null) return 'none'; }
+    else if (!s.summary) return 'none';
     const qty = Number((this.productRows.at(i) as FormGroup)?.get('quantity')?.value) || 0;
     const exitable = this.rowExitableQty(i);
     if (exitable === 0) return 'danger';
@@ -432,25 +471,32 @@ export class ExitWizardDialogComponent implements OnInit {
       next: (results) => {
         if (!this.isExternalCenter || this.procedureRows.length === 0) {
           if (!this.isExternalCenter && results.length > 0) {
+            // Una salida de kit responde {kit_transaction_id, movements: [...]}
+            // (un movimiento por cada lote consumido de cada componente) en vez
+            // de un único movimiento; se expande a varias líneas del comprobante.
+            const flatMovements = results.flatMap(r =>
+              r.data?.kit_transaction_id ? (r.data.movements ?? []) : [r.data]
+            );
+
             const wh = this.data.warehouses.find(w => w.id === wId);
             const cc = this.costCenters().find(c => c.id === cv.cost_center_id);
-            const expiry$ = forkJoin(results.map(r => r.data.batch_id
-              ? this.data.inventorySvc.getBatchById(r.data.batch_id).pipe(map(b => b.data.expiration_date), catchError(() => of(null)))
+            const expiry$ = forkJoin(flatMovements.map(m => m.batch_id
+              ? this.data.inventorySvc.getBatchById(m.batch_id).pipe(map(b => b.data.expiration_date), catchError(() => of(null)))
               : of(null)));
             expiry$.subscribe(expirations => {
               this.pdfSvc.generateAndPrint({
                 movement_type:    'exit',
-                doc_id:           results[0].data.id,
-                date:             results[0].data.created_at,
-                user_name:        results[0].data.user_name,
+                doc_id:           flatMovements[0]?.id,
+                date:             flatMovements[0]?.created_at,
+                user_name:        flatMovements[0]?.user_name,
                 warehouse_name:   wh?.name ?? `Almacén ${wId}`,
                 cost_center_name: cc?.name ?? null,
                 reason:           cv.reason || null,
-                lines: results.map((r, i) => ({
-                  product_name:    r.data.product_name,
-                  lot_number:      r.data.batch_lot_number,
+                lines: flatMovements.map((m, i) => ({
+                  product_name:    m.product_name,
+                  lot_number:      m.batch_lot_number,
                   expiration_date: expirations[i],
-                  quantity:        r.data.quantity,
+                  quantity:        m.quantity,
                 })),
               });
               this.saving.set(false);

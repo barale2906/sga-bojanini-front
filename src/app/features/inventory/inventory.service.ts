@@ -185,6 +185,14 @@ export class InventoryService {
     return this.http.get<ApiResponse<StockSummary>>(`${this.api}/stock/summary`, { params });
   }
 
+  /** Kits armables a partir del stock de componentes en un almacén. */
+  getKitAvailability(kitProductId: number, warehouseId: number): Observable<ApiResponse<{ kit_product_id: number; warehouse_id: number; available_kits: number }>> {
+    const params = new HttpParams()
+      .set('kit_product_id', String(kitProductId))
+      .set('warehouse_id',   String(warehouseId));
+    return this.http.get<ApiResponse<{ kit_product_id: number; warehouse_id: number; available_kits: number }>>(`${this.api}/stock/kit-availability`, { params });
+  }
+
   // Movements
   getMovement(id: number): Observable<ApiResponse<Movement>> {
     return this.http.get<ApiResponse<Movement>>(`${this.api}/movements/${id}`);
