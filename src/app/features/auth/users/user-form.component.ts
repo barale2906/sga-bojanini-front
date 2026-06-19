@@ -1,4 +1,4 @@
-import { Component, inject, signal, OnInit } from '@angular/core';
+import { Component, inject, signal, computed, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Router, ActivatedRoute, RouterModule } from '@angular/router';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
@@ -12,10 +12,11 @@ import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { of } from 'rxjs';
-import { switchMap } from 'rxjs/operators';
+import { map, switchMap } from 'rxjs/operators';
 import { UserService } from './user.service';
 import { RoleService } from '../roles/role.service';
 import { WarehouseService, Warehouse } from '../../warehouse/warehouse.service';
+import { MonitoringService, Sensor } from '../../monitoring/monitoring.service';
 import { AuthService } from '../../../core/services/auth.service';
 import { PageHeaderComponent } from '../../../shared/components/page-header/page-header.component';
 import { FormErrorsComponent } from '../../../shared/components/form-errors/form-errors.component';
@@ -50,6 +51,7 @@ export class UserFormComponent implements OnInit {
   private userService = inject(UserService);
   private roleService = inject(RoleService);
   private warehouseService = inject(WarehouseService);
+  private monitoringService = inject(MonitoringService);
   private authService = inject(AuthService);
   private snackBar = inject(MatSnackBar);
 
@@ -61,9 +63,21 @@ export class UserFormComponent implements OnInit {
   fieldErrors = signal<Record<string, string[]>>({});
   roles = signal<{ id: number; name: string; permissions: string[] }[]>([]);
   warehouses = signal<Warehouse[]>([]);
+  sensors = signal<Sensor[]>([]);
   showPassword = signal(false);
 
   canAssignWarehouses = this.authService.hasPermission('almacenes.asignar');
+  canAssignSensors = this.authService.hasPermission('sensores.asignar');
+
+  sensorsByZone = computed(() => {
+    const groups = new Map<string, Sensor[]>();
+    for (const sensor of this.sensors()) {
+      const zoneName = sensor.zone?.name || 'Sin zona';
+      if (!groups.has(zoneName)) groups.set(zoneName, []);
+      groups.get(zoneName)!.push(sensor);
+    }
+    return Array.from(groups.entries()).map(([zoneName, sensors]) => ({ zoneName, sensors }));
+  });
 
   form = this.fb.group({
     name: ['', [Validators.required, Validators.maxLength(255)]],
@@ -73,6 +87,7 @@ export class UserFormComponent implements OnInit {
     is_active: [true],
     role_ids: [[] as number[]],
     warehouse_ids: [[] as number[]],
+    sensor_ids: [[] as number[]],
   });
 
   ngOnInit(): void {
@@ -88,6 +103,13 @@ export class UserFormComponent implements OnInit {
       this.loadWarehouses();
       if (id) {
         this.loadAssignedWarehouses(Number(id));
+      }
+    }
+
+    if (this.canAssignSensors) {
+      this.loadSensors();
+      if (id) {
+        this.loadAssignedSensors(Number(id));
       }
     }
   }
@@ -131,6 +153,20 @@ export class UserFormComponent implements OnInit {
     });
   }
 
+  loadSensors(): void {
+    this.monitoringService.getSensors().subscribe({
+      next: (res) => this.sensors.set(res.data ?? []),
+      error: () => {},
+    });
+  }
+
+  loadAssignedSensors(id: number): void {
+    this.userService.getSensors(id).subscribe({
+      next: (res) => this.form.patchValue({ sensor_ids: (res.data ?? []).map((s) => s.id) }),
+      error: () => {},
+    });
+  }
+
   onSubmit(): void {
     if (this.form.invalid || this.saving()) return;
 
@@ -156,13 +192,18 @@ export class UserFormComponent implements OnInit {
       : this.userService.create(payload as any);
 
     const warehouseIds = value.warehouse_ids;
+    const sensorIds = value.sensor_ids;
 
     request$
       .pipe(
         switchMap((res) => {
           const id = this.isEdit() ? this.userId()! : res.data.id;
-          if (!this.canAssignWarehouses || !warehouseIds) return of(res);
-          return this.userService.assignWarehouses(id, warehouseIds);
+          if (!this.canAssignWarehouses || !warehouseIds) return of(id);
+          return this.userService.assignWarehouses(id, warehouseIds).pipe(map(() => id));
+        }),
+        switchMap((id) => {
+          if (!this.canAssignSensors || !sensorIds) return of(id);
+          return this.userService.assignSensors(id, sensorIds).pipe(map(() => id));
         })
       )
       .subscribe({

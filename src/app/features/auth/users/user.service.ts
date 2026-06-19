@@ -5,6 +5,7 @@ import { environment } from '../../../../environments/environment';
 import { ApiResponse, PaginatedResponse } from '../../../core/models/api-response.model';
 import { User } from '../../../core/models/user.model';
 import { Warehouse } from '../../warehouse/warehouse.service';
+import { Sensor } from '../../monitoring/monitoring.service';
 
 export interface UserCreatePayload {
   name: string;
@@ -69,6 +70,16 @@ export class UserService {
   assignWarehouses(id: number, warehouseIds: number[]): Observable<ApiResponse<User>> {
     return this.http.put<ApiResponse<User>>(`${this.api}/users/${id}/warehouses`, {
       warehouse_ids: warehouseIds,
+    });
+  }
+
+  getSensors(id: number): Observable<ApiResponse<Sensor[]>> {
+    return this.http.get<ApiResponse<Sensor[]>>(`${this.api}/users/${id}/sensors`);
+  }
+
+  assignSensors(id: number, sensorIds: number[]): Observable<ApiResponse<User>> {
+    return this.http.put<ApiResponse<User>>(`${this.api}/users/${id}/sensors`, {
+      sensor_ids: sensorIds,
     });
   }
 }

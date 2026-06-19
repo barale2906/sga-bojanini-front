@@ -3,6 +3,7 @@ import { HttpClient, HttpParams } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { environment } from '../../../environments/environment';
 import { ApiResponse } from '../../core/models/api-response.model';
+import { User } from '../../core/models/user.model';
 
 export interface Sensor {
   id: number; zone_id: number; code: string; name: string;
@@ -52,6 +53,10 @@ export class MonitoringService {
 
   deleteSensor(id: number): Observable<ApiResponse<null>> {
     return this.http.delete<ApiResponse<null>>(`${this.api}/sensors/${id}`);
+  }
+
+  getSensorUsers(sensorId: number): Observable<ApiResponse<User[]>> {
+    return this.http.get<ApiResponse<User[]>>(`${this.api}/sensors/${sensorId}/users`);
   }
 
   getReadings(sensorId: number, dateFrom?: string, dateTo?: string): Observable<ApiResponse<SensorReading[]>> {

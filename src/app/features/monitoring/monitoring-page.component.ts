@@ -20,6 +20,7 @@ import { DateFormatPipe } from '../../shared/pipes/date-format.pipe';
 import { ConfirmDialogComponent } from '../../shared/components/confirm-dialog/confirm-dialog.component';
 import { SensorFormDialogComponent } from './dialogs/sensor-form-dialog.component';
 import { ReadingFormDialogComponent } from './dialogs/reading-form-dialog.component';
+import { SensorUsersDialogComponent } from './dialogs/sensor-users-dialog.component';
 import { SpcChartComponent } from './spc-chart/spc-chart.component';
 
 @Component({
@@ -82,6 +83,11 @@ export class MonitoringPageComponent implements OnInit {
   openReading(sensor: Sensor): void {
     this.dialog.open(ReadingFormDialogComponent, { data: { sensor, monitoringSvc: this.svc }, width: '460px' })
       .afterClosed().subscribe(ok => { if (ok) this.snack.open('Lectura registrada', 'OK', { duration: 3000 }); });
+  }
+
+  openSensorUsers(sensor: Sensor): void {
+    this.dialog.open(SensorUsersDialogComponent, { data: { sensor }, width: '480px' })
+      .afterClosed().subscribe(ok => { if (ok) this.snack.open('Acceso actualizado', 'OK', { duration: 3000 }); });
   }
 
   selectSensorForChart(sensor: Sensor): void {
