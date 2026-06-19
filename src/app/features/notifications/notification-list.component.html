@@ -35,6 +35,11 @@
         </div>
         <p>{{ notif.message }}</p>
         <mat-chip [class]="'chip-' + notif.severity" disableRipple>{{ notif.severity }}</mat-chip>
+        @if (isReportReady(notif)) {
+          <button mat-stroked-button color="primary" class="notif-download-btn" (click)="downloadReport(notif)">
+            <mat-icon>download</mat-icon> Descargar reporte
+          </button>
+        }
       </div>
       @if (!notif.read_at) {
         <button mat-icon-button (click)="markAsRead(notif.id)" matTooltip="Marcar como leída">

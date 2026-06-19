@@ -64,6 +64,13 @@
   margin: 0 0 0.5rem 0;
 }
 
+.notif-download-btn {
+  display: flex;
+  margin-top: 0.5rem;
+
+  mat-icon { margin-right: 0.25rem; }
+}
+
 .read-icon {
   color: #68d391;
   flex-shrink: 0;

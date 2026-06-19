@@ -11,6 +11,7 @@ import { PageHeaderComponent } from '../../shared/components/page-header/page-he
 import { NotificationService, SgaNotification } from '../../core/services/notification.service';
 import { DateFormatPipe } from '../../shared/pipes/date-format.pipe';
 import { PaginationMeta } from '../../core/models/api-response.model';
+import { ReportsService } from '../reports/reports.service';
 
 @Component({
   selector: 'app-notification-list',
@@ -31,6 +32,7 @@ import { PaginationMeta } from '../../core/models/api-response.model';
 })
 export class NotificationListComponent implements OnInit {
   private notifService = inject(NotificationService);
+  private reportsSvc = inject(ReportsService);
   private snackBar = inject(MatSnackBar);
 
   notifications = signal<SgaNotification[]>([]);
@@ -75,5 +77,17 @@ export class NotificationListComponent implements OnInit {
 
   getSeverityClass(severity: string): string {
     return `severity-${severity}`;
+  }
+
+  isReportReady(notif: SgaNotification): boolean {
+    return notif.data?.['type'] === 'report_ready';
+  }
+
+  downloadReport(notif: SgaNotification): void {
+    const exportId = notif.data?.['export_id'] as string | undefined;
+    if (!exportId) return;
+    this.reportsSvc.downloadExport(exportId).subscribe({
+      error: () => this.snackBar.open('No se pudo descargar el reporte, puede haber expirado.', 'Cerrar', { duration: 5000 }),
+    });
   }
 }

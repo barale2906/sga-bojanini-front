@@ -1,4 +1,5 @@
-.reports-layout { display: grid; grid-template-columns: 320px 1fr; gap: 1.5rem; align-items: flex-start; }
+.reports-tabs { display: block; margin-top: 1rem; }
+.reports-layout { display: grid; grid-template-columns: 320px 1fr; gap: 1.5rem; align-items: flex-start; padding-top: 1.25rem; }
 .report-types { h3 { font-size: 0.875rem; font-weight: 600; color: #4a5568; text-transform: uppercase; letter-spacing: 0.05em; margin: 0 0 0.75rem; } }
 .report-card { display: flex; gap: 0.75rem; align-items: flex-start; padding: 0.875rem; border-radius: 8px; border: 1px solid #e2e8f0; cursor: pointer; margin-bottom: 0.5rem; transition: all 150ms; background: #fff;
   mat-icon { color: #C02F86; flex-shrink: 0; }
@@ -12,3 +13,21 @@
 h4 { font-size: 0.875rem; font-weight: 600; color: #4a5568; margin: 0 0 0.5rem; }
 .format-label { font-size: 0.875rem; color: #718096; margin: 0 0.5rem 0 0; }
 mat-card-actions { display: flex; align-items: center; gap: 0.5rem; padding: 1rem 1rem 0.5rem; }
+
+.exports-panel { padding-top: 1.25rem; }
+.exports-toolbar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.75rem;
+  .total { font-size: 0.875rem; color: #718096; }
+}
+.table-wrap { background: #fff; border-radius: 8px; overflow: hidden; }
+.no-data { text-align: center; padding: 2rem; color: #a0aec0; }
+.act { text-align: center; width: 90px; }
+.error-msg { font-size: 0.7rem; color: #c53030; margin: 0.2rem 0 0; }
+.status-badge {
+  display: inline-flex; align-items: center; gap: 0.4rem; padding: 0.2rem 0.6rem; border-radius: 12px;
+  font-size: 0.75rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.02em;
+  &.st-queued { background: #edf2f7; color: #4a5568; }
+  &.st-processing { background: #ebf8ff; color: #2b6cb0; }
+  &.st-ready { background: #f0fff4; color: #2f855a; }
+  &.st-failed { background: #fff5f5; color: #c53030; }
+  &.st-expired { background: #f7fafc; color: #a0aec0; }
+}

@@ -54,6 +54,11 @@
           <p class="notif-title">{{ notif.title }}</p>
           <p class="notif-msg">{{ notif.message }}</p>
           <small class="notif-time">{{ notif.created_at | dateFormat:'relative' }}</small>
+          @if (isReportReady(notif)) {
+            <button mat-stroked-button color="primary" class="notif-download-btn" (click)="downloadReport(notif); $event.stopPropagation()">
+              <mat-icon>download</mat-icon> Descargar
+            </button>
+          }
         </div>
       </div>
     }
