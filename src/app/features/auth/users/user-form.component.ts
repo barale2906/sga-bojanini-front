@@ -11,10 +11,15 @@ import { MatSelectModule } from '@angular/material/select';
 import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
+import { of } from 'rxjs';
+import { switchMap } from 'rxjs/operators';
 import { UserService } from './user.service';
 import { RoleService } from '../roles/role.service';
+import { WarehouseService, Warehouse } from '../../warehouse/warehouse.service';
+import { AuthService } from '../../../core/services/auth.service';
 import { PageHeaderComponent } from '../../../shared/components/page-header/page-header.component';
 import { FormErrorsComponent } from '../../../shared/components/form-errors/form-errors.component';
+import { PermissionDirective } from '../../../shared/directives/permission.directive';
 
 @Component({
   selector: 'app-user-form',
@@ -33,6 +38,7 @@ import { FormErrorsComponent } from '../../../shared/components/form-errors/form
     MatProgressSpinnerModule,
     PageHeaderComponent,
     FormErrorsComponent,
+    PermissionDirective,
   ],
   templateUrl: './user-form.component.html',
   styleUrl: './user-form.component.scss',
@@ -43,6 +49,8 @@ export class UserFormComponent implements OnInit {
   private route = inject(ActivatedRoute);
   private userService = inject(UserService);
   private roleService = inject(RoleService);
+  private warehouseService = inject(WarehouseService);
+  private authService = inject(AuthService);
   private snackBar = inject(MatSnackBar);
 
   isEdit = signal(false);
@@ -52,7 +60,10 @@ export class UserFormComponent implements OnInit {
   validationErrors = signal<string[]>([]);
   fieldErrors = signal<Record<string, string[]>>({});
   roles = signal<{ id: number; name: string; permissions: string[] }[]>([]);
+  warehouses = signal<Warehouse[]>([]);
   showPassword = signal(false);
+
+  canAssignWarehouses = this.authService.hasPermission('almacenes.asignar');
 
   form = this.fb.group({
     name: ['', [Validators.required, Validators.maxLength(255)]],
@@ -61,6 +72,7 @@ export class UserFormComponent implements OnInit {
     phone: ['', [Validators.maxLength(20)]],
     is_active: [true],
     role_ids: [[] as number[]],
+    warehouse_ids: [[] as number[]],
   });
 
   ngOnInit(): void {
@@ -71,6 +83,13 @@ export class UserFormComponent implements OnInit {
       this.loadUser(Number(id));
     }
     this.loadRoles();
+
+    if (this.canAssignWarehouses) {
+      this.loadWarehouses();
+      if (id) {
+        this.loadAssignedWarehouses(Number(id));
+      }
+    }
   }
 
   loadUser(id: number): void {
@@ -94,6 +113,20 @@ export class UserFormComponent implements OnInit {
   loadRoles(): void {
     this.roleService.getAll().subscribe({
       next: (res) => this.roles.set(res.data),
+      error: () => {},
+    });
+  }
+
+  loadWarehouses(): void {
+    this.warehouseService.getWarehouses().subscribe({
+      next: (res) => this.warehouses.set(res.data ?? []),
+      error: () => {},
+    });
+  }
+
+  loadAssignedWarehouses(id: number): void {
+    this.userService.getWarehouses(id).subscribe({
+      next: (res) => this.form.patchValue({ warehouse_ids: (res.data ?? []).map((w) => w.id) }),
       error: () => {},
     });
   }
@@ -122,26 +155,36 @@ export class UserFormComponent implements OnInit {
       ? this.userService.update(this.userId()!, payload as any)
       : this.userService.create(payload as any);
 
-    request$.subscribe({
-      next: () => {
-        this.snackBar.open(
-          this.isEdit() ? 'Usuario actualizado' : 'Usuario creado',
-          'Cerrar',
-          { duration: 3000 }
-        );
-        this.router.navigate(['/users']);
-      },
-      error: (err) => {
-        this.saving.set(false);
-        if (err.status === 422 && err.error?.errors) {
-          this.fieldErrors.set(err.error.errors);
-          const msgs: string[] = [];
-          Object.values(err.error.errors as Record<string, string[]>).forEach(
-            (arr) => msgs.push(...arr)
+    const warehouseIds = value.warehouse_ids;
+
+    request$
+      .pipe(
+        switchMap((res) => {
+          const id = this.isEdit() ? this.userId()! : res.data.id;
+          if (!this.canAssignWarehouses || !warehouseIds) return of(res);
+          return this.userService.assignWarehouses(id, warehouseIds);
+        })
+      )
+      .subscribe({
+        next: () => {
+          this.snackBar.open(
+            this.isEdit() ? 'Usuario actualizado' : 'Usuario creado',
+            'Cerrar',
+            { duration: 3000 }
           );
-          this.validationErrors.set(msgs);
-        }
-      },
-    });
+          this.router.navigate(['/users']);
+        },
+        error: (err) => {
+          this.saving.set(false);
+          if (err.status === 422 && err.error?.errors) {
+            this.fieldErrors.set(err.error.errors);
+            const msgs: string[] = [];
+            Object.values(err.error.errors as Record<string, string[]>).forEach(
+              (arr) => msgs.push(...arr)
+            );
+            this.validationErrors.set(msgs);
+          }
+        },
+      });
   }
 }

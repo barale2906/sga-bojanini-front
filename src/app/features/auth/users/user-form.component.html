@@ -84,6 +84,18 @@
             </mat-select>
           </mat-form-field>
 
+          <!-- Almacenes -->
+          <mat-form-field appearance="outline" *sgaPermission="'almacenes.asignar'">
+            <mat-label>Almacenes</mat-label>
+            <mat-icon matPrefix>warehouse</mat-icon>
+            <mat-select formControlName="warehouse_ids" multiple>
+              @for (warehouse of warehouses(); track warehouse.id) {
+                <mat-option [value]="warehouse.id">{{ warehouse.name }}</mat-option>
+              }
+            </mat-select>
+            <mat-hint>Almacenes a los que este usuario tendrá acceso</mat-hint>
+          </mat-form-field>
+
           <!-- Estado -->
           <div class="toggle-field">
             <label>Estado</label>

@@ -4,6 +4,7 @@ import { Observable } from 'rxjs';
 import { environment } from '../../../../environments/environment';
 import { ApiResponse, PaginatedResponse } from '../../../core/models/api-response.model';
 import { User } from '../../../core/models/user.model';
+import { Warehouse } from '../../warehouse/warehouse.service';
 
 export interface UserCreatePayload {
   name: string;
@@ -58,6 +59,16 @@ export class UserService {
   assignRoles(id: number, roleIds: number[]): Observable<ApiResponse<User>> {
     return this.http.post<ApiResponse<User>>(`${this.api}/users/${id}/roles`, {
       role_ids: roleIds,
+    });
+  }
+
+  getWarehouses(id: number): Observable<ApiResponse<Warehouse[]>> {
+    return this.http.get<ApiResponse<Warehouse[]>>(`${this.api}/users/${id}/warehouses`);
+  }
+
+  assignWarehouses(id: number, warehouseIds: number[]): Observable<ApiResponse<User>> {
+    return this.http.put<ApiResponse<User>>(`${this.api}/users/${id}/warehouses`, {
+      warehouse_ids: warehouseIds,
     });
   }
 }
