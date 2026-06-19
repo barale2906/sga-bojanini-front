@@ -1,6 +1,7 @@
 import { Injectable, inject } from '@angular/core';
-import { HttpClient, HttpParams } from '@angular/common/http';
-import { Observable } from 'rxjs';
+import { HttpClient, HttpErrorResponse, HttpParams, HttpResponse } from '@angular/common/http';
+import { Observable, catchError, from, map, switchMap, throwError } from 'rxjs';
+import { saveAs } from 'file-saver';
 import { environment } from '../../../environments/environment';
 import { ApiResponse } from '../../core/models/api-response.model';
 import { User } from '../../core/models/user.model';
@@ -98,11 +99,51 @@ export class MonitoringService {
     return this.http.delete<ApiResponse<null>>(`${this.api}/alert-rules/${ruleId}`);
   }
 
-  generateReport(sensorId: number, dateFrom: string, dateTo: string): Observable<ApiResponse<{ path: string; filename: string }>> {
-    return this.http.post<ApiResponse<any>>(`${this.api}/monitoring/reports/generate`, { sensor_id: sensorId, date_from: dateFrom, date_to: dateTo });
+  /**
+   * Genera el PDF de condiciones de un sensor y dispara su descarga
+   * directa en el navegador (el backend no lo guarda en disco).
+   */
+  generateReport(sensorId: number, dateFrom: string, dateTo: string): Observable<void> {
+    return this.http
+      .post(
+        `${this.api}/monitoring/reports/generate`,
+        { sensor_id: sensorId, date_from: dateFrom, date_to: dateTo },
+        { responseType: 'blob', observe: 'response' },
+      )
+      .pipe(
+        map((res: HttpResponse<Blob>) => {
+          const filename = this.extractFilename(res.headers.get('content-disposition')) ?? 'reporte-condiciones.pdf';
+          saveAs(res.body as Blob, filename);
+        }),
+        catchError((err: HttpErrorResponse) => this.parseBlobError(err)),
+      );
   }
 
+  /** Reportes diarios de condiciones archivados automáticamente (ver sga:generate-condition-reports). */
   getReports(): Observable<ApiResponse<any[]>> {
     return this.http.get<ApiResponse<any[]>>(`${this.api}/monitoring/reports`);
+  }
+
+  private parseBlobError(err: HttpErrorResponse): Observable<never> {
+    if (err.error instanceof Blob && err.error.type.includes('json')) {
+      return from(err.error.text()).pipe(
+        switchMap((text) => {
+          let parsed: unknown = {};
+          try {
+            parsed = JSON.parse(text);
+          } catch {
+            /* respuesta no parseable, se conserva el error original */
+          }
+          return throwError(() => new HttpErrorResponse({ error: parsed, headers: err.headers, status: err.status, statusText: err.statusText, url: err.url ?? undefined }));
+        }),
+      );
+    }
+    return throwError(() => err);
+  }
+
+  private extractFilename(header: string | null): string | null {
+    if (!header) return null;
+    const match = header.match(/filename="?([^";]+)"?/i);
+    return match ? match[1] : null;
   }
 }

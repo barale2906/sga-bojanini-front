@@ -38,7 +38,7 @@
                   <mat-label>{{ filter.label }}</mat-label>
                   @switch (filter.type) {
                     @case ('date') {
-                      <input matInput type="date" [(ngModel)]="filterValues[filter.field]" [name]="filter.field" />
+                      <input matInput [matDatepicker]="picker" [(ngModel)]="filterValues[filter.field]" [name]="filter.field" placeholder="DD/MM/AAAA" (click)="picker.open()" />
                     }
                     @case ('number') {
                       <input matInput type="number" [(ngModel)]="filterValues[filter.field]" [name]="filter.field" />
@@ -83,6 +83,10 @@
                       <input matInput type="text" [(ngModel)]="filterValues[filter.field]" [name]="filter.field" />
                     }
                   }
+                  @if (filter.type === 'date') {
+                    <mat-datepicker-toggle matIconSuffix [for]="picker"></mat-datepicker-toggle>
+                  }
+                  <mat-datepicker #picker></mat-datepicker>
                 </mat-form-field>
               }
             </mat-card-content>

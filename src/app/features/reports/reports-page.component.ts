@@ -14,6 +14,8 @@ import { MatTableModule } from '@angular/material/table';
 import { MatPaginatorModule, PageEvent } from '@angular/material/paginator';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { MatSnackBar } from '@angular/material/snack-bar';
+import { MatDatepickerModule } from '@angular/material/datepicker';
+import { DateAdapter, MAT_DATE_FORMATS } from '@angular/material/core';
 import { PageHeaderComponent } from '../../shared/components/page-header/page-header.component';
 import { PermissionDirective } from '../../shared/directives/permission.directive';
 import { LoadingSpinnerComponent } from '../../shared/components/loading-spinner/loading-spinner.component';
@@ -25,6 +27,7 @@ import { CatalogService, Category } from '../catalog/catalog.service';
 import { MonitoringService, Sensor } from '../monitoring/monitoring.service';
 import { UserService } from '../auth/users/user.service';
 import { User } from '../../core/models/user.model';
+import { EsDateAdapter, ES_DATE_FORMATS } from '../../shared/adapters/es-date.adapter';
 
 type FilterFieldType = 'date' | 'number' | 'text' | 'select-warehouse' | 'select-category' | 'select-sensor' | 'select-user' | 'select-action' | 'select-status';
 
@@ -108,8 +111,12 @@ const EXPORTS_POLL_MS = 5000;
   imports: [
     CommonModule, FormsModule, MatButtonModule, MatIconModule, MatFormFieldModule, MatInputModule,
     MatSelectModule, MatCardModule, MatProgressSpinnerModule, MatTabsModule, MatTableModule,
-    MatPaginatorModule, MatTooltipModule, PageHeaderComponent, PermissionDirective,
+    MatPaginatorModule, MatTooltipModule, MatDatepickerModule, PageHeaderComponent, PermissionDirective,
     LoadingSpinnerComponent, DateFormatPipe,
+  ],
+  providers: [
+    { provide: DateAdapter, useClass: EsDateAdapter },
+    { provide: MAT_DATE_FORMATS, useValue: ES_DATE_FORMATS },
   ],
   templateUrl: './reports-page.component.html',
   styleUrl: './reports-page.component.scss',
@@ -128,7 +135,7 @@ export class ReportsPageComponent implements OnInit, OnDestroy {
 
   selectedReport = signal<ReportTypeDef | null>(null);
   generating = signal(false);
-  filterValues: Record<string, string> = {};
+  filterValues: Record<string, string | Date | null> = {};
 
   warehouses = signal<Warehouse[]>([]);
   categories = signal<Category[]>([]);
@@ -158,7 +165,7 @@ export class ReportsPageComponent implements OnInit, OnDestroy {
   selectReport(rt: ReportTypeDef): void {
     this.selectedReport.set(rt);
     this.filterValues = {};
-    rt.filters.forEach((f) => (this.filterValues[f.field] = ''));
+    rt.filters.forEach((f) => (this.filterValues[f.field] = f.type === 'date' ? null : ''));
   }
 
   generate(format: ReportFormat): void {
@@ -167,7 +174,10 @@ export class ReportsPageComponent implements OnInit, OnDestroy {
     this.generating.set(true);
 
     const filters: ReportFilters = { format };
-    Object.entries(this.filterValues).forEach(([k, v]) => { if (v) filters[k] = v; });
+    Object.entries(this.filterValues).forEach(([k, v]) => {
+      if (v instanceof Date) filters[k] = this.toApiDate(v);
+      else if (v) filters[k] = v;
+    });
 
     this.reportsSvc.generate(rt.id, filters).subscribe({
       next: (result) => {
@@ -240,6 +250,10 @@ export class ReportsPageComponent implements OnInit, OnDestroy {
         error: () => {},
       });
     });
+  }
+
+  private toApiDate(date: Date): string {
+    return date.toISOString().substring(0, 10);
   }
 
   private extractErrorMessage(err: HttpErrorResponse, fallback: string): string {
