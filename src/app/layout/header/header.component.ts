@@ -55,8 +55,11 @@ export class HeaderComponent implements OnInit, OnDestroy {
     });
   }
 
-  markAsRead(id: string): void {
-    this.notifService.markAsRead(id).subscribe();
+  markAsRead(notif: SgaNotification): void {
+    if (notif.read_at) return;
+    this.notifService.markAsRead(notif.id).subscribe({
+      next: () => (notif.read_at = new Date().toISOString()),
+    });
   }
 
   isReportReady(notif: SgaNotification): boolean {

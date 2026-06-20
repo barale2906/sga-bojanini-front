@@ -45,7 +45,7 @@
         class="notif-item"
         [class.notif-item--unread]="!notif.read_at"
         [class.notif-item--critical]="notif.severity === 'critical'"
-        (click)="markAsRead(notif.id)"
+        (click)="markAsRead(notif)"
       >
         <mat-icon class="notif-icon" [class]="'notif-icon--' + notif.severity">
           {{ notif.severity === 'critical' ? 'error' : notif.severity === 'warning' ? 'warning' : 'info' }}

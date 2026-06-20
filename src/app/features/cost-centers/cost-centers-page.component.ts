@@ -1,7 +1,7 @@
 import { Component, OnInit, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormBuilder, ReactiveFormsModule } from '@angular/forms';
-import { debounceTime, distinctUntilChanged } from 'rxjs';
+import { Subscription, debounceTime } from 'rxjs';
 import { MatTabsModule } from '@angular/material/tabs';
 import { MatTableModule } from '@angular/material/table';
 import { MatPaginatorModule, PageEvent } from '@angular/material/paginator';
@@ -60,6 +60,7 @@ export class CostCentersPageComponent implements OnInit {
   // ── Tab 1: Centros de costo ──────────────────────────────────
   costCenters = signal<CostCenter[]>([]);
   loading = signal(false);
+  private loadSub?: Subscription;
 
   cols = ['actions', 'code', 'name', 'type', 'description', 'is_active'];
 
@@ -69,6 +70,7 @@ export class CostCentersPageComponent implements OnInit {
   services = signal<MedicalService[]>([]);
   medicalServices = signal<MedicalService[]>([]);
   loadingMedicalServices = signal(false);
+  private msLoadSub?: Subscription;
 
   msCols = ['actions', 'type', 'code', 'name', 'parent', 'description', 'is_active'];
 
@@ -79,6 +81,7 @@ export class CostCentersPageComponent implements OnInit {
   recordsMeta = signal<PaginationMeta>({ current_page: 1, last_page: 1, per_page: 10, total: 0 });
   loadingRecords = signal(false);
   procedureOptions = signal<MedicalServiceNode[]>([]);
+  private recordsLoadSub?: Subscription;
 
   recordCols = ['actions', 'procedure', 'patient', 'quantity', 'unit_price', 'total', 'service_date', 'is_active'];
 
@@ -92,16 +95,11 @@ export class CostCentersPageComponent implements OnInit {
 
   ngOnInit(): void {
     this.load();
-    this.filters.get('search')!.valueChanges.pipe(debounceTime(400), distinctUntilChanged()).subscribe(() => this.load());
-    this.filters.get('type')!.valueChanges.subscribe(() => this.load());
-    this.filters.get('is_active')!.valueChanges.subscribe(() => this.load());
+    this.filters.valueChanges.pipe(debounceTime(300)).subscribe(() => this.load());
 
     this.loadServices();
     this.loadMedicalServices();
-    this.msFilters.get('search')!.valueChanges.pipe(debounceTime(400), distinctUntilChanged()).subscribe(() => this.loadMedicalServices());
-    this.msFilters.get('type')!.valueChanges.subscribe(() => this.loadMedicalServices());
-    this.msFilters.get('parent_id')!.valueChanges.subscribe(() => this.loadMedicalServices());
-    this.msFilters.get('is_active')!.valueChanges.subscribe(() => this.loadMedicalServices());
+    this.msFilters.valueChanges.pipe(debounceTime(300)).subscribe(() => this.loadMedicalServices());
 
     this.loadProcedureOptions();
     this.loadRecords();
@@ -112,7 +110,8 @@ export class CostCentersPageComponent implements OnInit {
   load(): void {
     this.loading.set(true);
     const { search, type, is_active } = this.filters.value;
-    this.svc.getCostCenters({
+    this.loadSub?.unsubscribe();
+    this.loadSub = this.svc.getCostCenters({
       search: search || undefined,
       type: (type || undefined) as 'internal' | 'external' | undefined,
       is_active: is_active === '' ? undefined : is_active === 'true',
@@ -215,7 +214,8 @@ export class CostCentersPageComponent implements OnInit {
   loadRecords(page = 1): void {
     this.loadingRecords.set(true);
     const { patient_document, medical_service_id, service_date_from, service_date_to, is_active } = this.recordFilters.value;
-    this.medSvc.getPatientProcedureRecords({
+    this.recordsLoadSub?.unsubscribe();
+    this.recordsLoadSub = this.medSvc.getPatientProcedureRecords({
       patient_document: patient_document || undefined,
       medical_service_id: medical_service_id ?? undefined,
       service_date_from: service_date_from ? this._toApiDate(service_date_from) : undefined,
@@ -283,7 +283,8 @@ export class CostCentersPageComponent implements OnInit {
   loadMedicalServices(): void {
     this.loadingMedicalServices.set(true);
     const { type, parent_id, search, is_active } = this.msFilters.value;
-    this.medSvc.getMedicalServices({
+    this.msLoadSub?.unsubscribe();
+    this.msLoadSub = this.medSvc.getMedicalServices({
       type: (type || undefined) as 'service' | 'procedure' | undefined,
       parent_id: parent_id ?? undefined,
       search: search || undefined,
