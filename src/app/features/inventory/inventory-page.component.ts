@@ -32,6 +32,7 @@ import { DateFormatPipe } from '../../shared/pipes/date-format.pipe';
 import { MovementFormDialogComponent } from './movements/movement-form-dialog.component';
 import { ExitWizardDialogComponent } from './movements/exit-wizard-dialog.component';
 import { WarehouseTransferDialogComponent } from './movements/warehouse-transfer-dialog.component';
+import { InitialEntriesImportDialogComponent } from './initial-entries/initial-entries-import-dialog.component';
 import { ConfirmDialogComponent } from '../../shared/components/confirm-dialog/confirm-dialog.component';
 import { PurchaseReceiveContextService } from '../purchasing/purchase-receive-context.service';
 import { PurchaseOrder } from '../purchasing/purchasing.service';
@@ -327,6 +328,17 @@ export class InventoryPageComponent implements OnInit {
 
   goToPatientRecords(): void {
     this.router.navigate(['/inventory/patient-records']);
+  }
+
+  openInitialEntriesImport(): void {
+    this.dialog.open(InitialEntriesImportDialogComponent, {
+      data: { warehouses: this.warehouses() },
+      width: '600px', maxWidth: '96vw', maxHeight: '94vh',
+    }).afterClosed().subscribe(imported => {
+      if (!imported) return;
+      this.loadStock(); this.loadMovements(); this.loadBatches();
+      this.snack.open('Carga masiva de entradas finalizada', 'OK', { duration: 3500 });
+    });
   }
 
   printMovement(row: MovementRow): void {

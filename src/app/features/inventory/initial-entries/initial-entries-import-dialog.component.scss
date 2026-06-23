@@ -1,0 +1,67 @@
+.hint-text {
+  color: #718096;
+  font-size: 0.83rem;
+  margin: -0.5rem 0 1rem;
+}
+
+.upload-zone {
+  border: 2px dashed #CBD5E0;
+  border-radius: 8px;
+  padding: 2rem;
+  text-align: center;
+  cursor: pointer;
+  transition: border-color .2s;
+
+  &.drag-over { border-color: #4299e1; background: #ebf8ff; }
+
+  .upload-icon { font-size: 3rem; width: 3rem; height: 3rem; color: #a0aec0; }
+  p { color: #4a5568; margin: 0.5rem 0; }
+  .hint { color: #a0aec0; }
+}
+
+.template-hint {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  margin-top: 0.75rem;
+  color: #718096;
+  font-size: .85rem;
+}
+
+.upload-error {
+  color: #c53030;
+  background: #fff5f5;
+  border-left: 3px solid #fc8181;
+  padding: 0.5rem 0.75rem;
+  border-radius: 4px;
+}
+
+.result-summary {
+  display: flex;
+  gap: 1.5rem;
+  justify-content: center;
+  padding: 1rem 0;
+}
+
+.stat {
+  text-align: center;
+  .stat-n { display: block; font-size: 2rem; font-weight: 700; }
+  .stat-l { font-size: .8rem; color: #718096; }
+}
+.stat--ok .stat-n { color: #276749; }
+.stat--err .stat-n { color: #c53030; }
+.stat--total .stat-n { color: #2b6cb0; }
+
+.error-list {
+  max-height: 200px;
+  overflow-y: auto;
+  border: 1px solid #fed7d7;
+  border-radius: 4px;
+}
+
+.error-row {
+  padding: 0.4rem 0.75rem;
+  font-size: .83rem;
+  border-bottom: 1px solid #fff5f5;
+  .row-label { font-weight: 600; margin-right: 0.5rem; }
+}

@@ -119,6 +119,14 @@ export interface MovementReport {
   rows: MovementReportRow[];
 }
 
+/** Resultado de POST /movements/initial-entries/import */
+export interface InitialEntriesImportResult {
+  total: number;
+  success: number;
+  failed: number;
+  errors: { row: number; errors: Record<string, string[]> }[];
+}
+
 @Injectable({ providedIn: 'root' })
 export class InventoryService {
   private http = inject(HttpClient);
@@ -265,5 +273,21 @@ export class InventoryService {
     let p = new HttpParams();
     if (f.is_active !== undefined) p = p.set('is_active', String(f.is_active));
     return this.http.get<ApiResponse<MedicalService[]>>(`${this.api}/medical-services`, { params: p });
+  }
+
+  // ── Carga masiva de inventario inicial ──────────────────────────
+  // Ver /mnt/trabajo/repos/Back/laravel/sga-bojanini/src/docs/frontend-initial-entries-import.md
+
+  downloadInitialEntriesTemplate(warehouseId?: number): Observable<Blob> {
+    let p = new HttpParams();
+    if (warehouseId) p = p.set('warehouse_id', String(warehouseId));
+    return this.http.get(`${this.api}/movements/initial-entries/template`, { params: p, responseType: 'blob' });
+  }
+
+  importInitialEntries(file: File, warehouseId?: number): Observable<ApiResponse<InitialEntriesImportResult>> {
+    const fd = new FormData();
+    fd.append('file', file);
+    if (warehouseId) fd.append('warehouse_id', String(warehouseId));
+    return this.http.post<ApiResponse<InitialEntriesImportResult>>(`${this.api}/movements/initial-entries/import`, fd);
   }
 }

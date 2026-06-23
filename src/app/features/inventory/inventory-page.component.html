@@ -23,6 +23,9 @@
   <button *sgaPermission="'movimientos.devolucion'" mat-stroked-button (click)="openMovement('return')"><mat-icon>undo</mat-icon> Devolución</button>
   <button *sgaPermission="'movimientos.baja'" mat-stroked-button color="warn" (click)="openMovement('loss')"><mat-icon>remove_circle</mat-icon> Baja</button>
   <span class="action-bar-sep"></span>
+  <button *sgaPermission="'movimientos.importar'" mat-stroked-button (click)="openInitialEntriesImport()">
+    <mat-icon>upload_file</mat-icon> Carga Masiva Entradas
+  </button>
   <button *sgaPermission="'registros_procedimientos.ver'" mat-stroked-button (click)="goToPatientRecords()">
     <mat-icon>receipt_long</mat-icon> Registros Paciente
   </button>

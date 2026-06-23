@@ -1,0 +1,74 @@
+<h2 mat-dialog-title>Carga masiva de entradas iniciales</h2>
+<mat-dialog-content style="min-width:480px">
+
+  @if (!result()) {
+    <mat-form-field appearance="outline" style="width:100%">
+      <mat-label>Almacén destino (opcional)</mat-label>
+      <mat-select [(ngModel)]="warehouseId">
+        <mat-option [value]="null">Almacén por defecto del sistema</mat-option>
+        @for (w of activeWarehouses; track w.id) {
+          <mat-option [value]="w.id">{{ w.code }} — {{ w.name }}</mat-option>
+        }
+      </mat-select>
+    </mat-form-field>
+    <p class="hint-text">
+      Si no eliges un almacén, las entradas se cargarán en el primer almacén activo del sistema.
+      La zona y el estante se calculan siempre de forma automática.
+    </p>
+
+    <div class="upload-zone" [class.drag-over]="dragging()"
+         (dragover)="$event.preventDefault(); dragging.set(true)"
+         (dragleave)="dragging.set(false)"
+         (drop)="onDrop($event)">
+      <mat-icon class="upload-icon">upload_file</mat-icon>
+      <p>Arrastra un archivo <strong>.xlsx, .xls o .csv</strong> aquí</p>
+      <p class="hint">o</p>
+      <button mat-stroked-button (click)="fileInput.click()" [disabled]="uploading()">
+        Seleccionar archivo
+      </button>
+      <input #fileInput type="file" accept=".xlsx,.xls,.csv" style="display:none" (change)="onFileChange($event)" />
+    </div>
+
+    <div class="template-hint">
+      <mat-icon style="font-size:1rem;vertical-align:middle">info</mat-icon>
+      <button mat-button color="primary" (click)="downloadTemplate()" [disabled]="downloading()">
+        @if (downloading()) { <mat-spinner diameter="14" style="display:inline-block"></mat-spinner> }
+        Descargar plantilla Excel
+      </button>
+    </div>
+
+    @if (uploading()) {
+      <div style="text-align:center;padding:1.5rem">
+        <mat-spinner diameter="40"></mat-spinner>
+        <p>Procesando archivo...</p>
+      </div>
+    }
+
+    @if (uploadError()) {
+      <p class="upload-error">{{ uploadError() }}</p>
+    }
+  }
+
+  @if (result(); as r) {
+    <div class="result-summary">
+      <div class="stat stat--ok"><span class="stat-n">{{ r.success }}</span><span class="stat-l">Exitosas</span></div>
+      <div class="stat stat--err"><span class="stat-n">{{ r.failed }}</span><span class="stat-l">Con errores</span></div>
+      <div class="stat stat--total"><span class="stat-n">{{ r.total }}</span><span class="stat-l">Total filas</span></div>
+    </div>
+    @if (r.errors.length) {
+      <p style="font-weight:600;margin:1rem 0 0.5rem">Filas con errores:</p>
+      <div class="error-list">
+        @for (e of r.errors; track e.row) {
+          <div class="error-row">
+            <span class="row-label">Fila {{ e.row }}:</span>
+            <span>{{ formatRowErrors(e.errors) }}</span>
+          </div>
+        }
+      </div>
+    }
+  }
+
+</mat-dialog-content>
+<mat-dialog-actions align="end">
+  <button mat-button (click)="close()">{{ result() ? 'Cerrar' : 'Cancelar' }}</button>
+</mat-dialog-actions>
