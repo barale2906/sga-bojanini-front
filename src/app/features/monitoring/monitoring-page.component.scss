@@ -12,6 +12,8 @@
 }
 .type-badge { display:inline-flex; padding:0.15rem 0.6rem; border-radius:9999px; font-size:0.75rem; font-weight:600; background:#EDF2F7; color:#4a5568; }
 .act { /* global col-actions en styles.scss */ }
+.zone-name { font-weight: 500; }
+.zone-range { color: #718096; font-size: 0.75rem; }
 .no-data, .empty-state {
   text-align: center; padding: 2.5rem; color: #a0aec0;
   mat-icon { font-size: 3rem; width: 3rem; height: 3rem; display: block; margin: 0 auto 0.5rem; }

@@ -30,7 +30,15 @@
         <table mat-table [dataSource]="sensors()">
           <ng-container matColumnDef="code"><th mat-header-cell *matHeaderCellDef>Código</th><td mat-cell *matCellDef="let s"><code class="code-tag">{{ s.code }}</code></td></ng-container>
           <ng-container matColumnDef="name"><th mat-header-cell *matHeaderCellDef>Nombre</th><td mat-cell *matCellDef="let s">{{ s.name }}</td></ng-container>
-          <ng-container matColumnDef="zone"><th mat-header-cell *matHeaderCellDef>Zona</th><td mat-cell *matCellDef="let s">{{ s.zone?.name || '—' }}</td></ng-container>
+          <ng-container matColumnDef="zone">
+            <th mat-header-cell *matHeaderCellDef>Zona</th>
+            <td mat-cell *matCellDef="let s">
+              <span class="zone-name">{{ getZone(s.zone_id)?.name || s.zone?.name || '—' }}</span>
+              @if (zoneRangeLabel(s)) {
+                <br><small class="zone-range">{{ zoneRangeLabel(s) }}</small>
+              }
+            </td>
+          </ng-container>
           <ng-container matColumnDef="type"><th mat-header-cell *matHeaderCellDef>Tipo</th><td mat-cell *matCellDef="let s"><span class="type-badge type-{{ s.type }}">{{ s.type }}</span></td></ng-container>
           <ng-container matColumnDef="is_active"><th mat-header-cell *matHeaderCellDef>Estado</th>
             <td mat-cell *matCellDef="let s"><span class="badge" [class.badge--on]="s.is_active" [class.badge--off]="!s.is_active">{{ s.is_active ? 'Activo' : 'Inactivo' }}</span></td>

@@ -12,7 +12,9 @@ import { MatTooltipModule } from '@angular/material/tooltip';
 import { MatDialog } from '@angular/material/dialog';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { MonitoringService, Sensor, SensorStats } from './monitoring.service';
-import { WarehouseService, Zone } from '../warehouse/warehouse.service';
+import { WarehouseService, Warehouse, Zone } from '../warehouse/warehouse.service';
+import { UserService } from '../auth/users/user.service';
+import { AuthService } from '../../core/services/auth.service';
 import { PageHeaderComponent } from '../../shared/components/page-header/page-header.component';
 import { LoadingSpinnerComponent } from '../../shared/components/loading-spinner/loading-spinner.component';
 import { PermissionDirective } from '../../shared/directives/permission.directive';
@@ -38,12 +40,16 @@ import { SpcChartComponent } from './spc-chart/spc-chart.component';
 export class MonitoringPageComponent implements OnInit {
   private svc = inject(MonitoringService);
   private wSvc = inject(WarehouseService);
+  private userSvc = inject(UserService);
+  private authSvc = inject(AuthService);
   private dialog = inject(MatDialog);
   private snack = inject(MatSnackBar);
   private fb = inject(FormBuilder);
 
   sensors = signal<Sensor[]>([]);
+  private allSensors = signal<Sensor[]>([]);
   zones = signal<Zone[]>([]);
+  warehouses = signal<Warehouse[]>([]);
   selectedSensor = signal<Sensor | null>(null);
   stats = signal<SensorStats | null>(null);
   loading = signal(false);
@@ -59,19 +65,49 @@ export class MonitoringPageComponent implements OnInit {
 
   ngOnInit(): void {
     this.wSvc.getZones().subscribe({ next: r => this.zones.set(r.data ?? []), error: () => {} });
+    this.wSvc.getWarehouses().subscribe({ next: r => this.warehouses.set(r.data ?? []), error: () => {} });
     this.loadSensors();
-    this.sensorFilters.valueChanges.subscribe(() => this.loadSensors());
+    this.sensorFilters.valueChanges.subscribe(() => this.applyFilters());
   }
 
   loadSensors(): void {
-    const { zone_id, type } = this.sensorFilters.value;
-    this.svc.getSensors({ zone_id: zone_id ? Number(zone_id) : undefined, type: type || undefined }).subscribe({
-      next: r => this.sensors.set(r.data ?? []), error: () => {},
+    const userId = this.authSvc.user()?.id;
+    if (!userId) return;
+    this.userSvc.getSensors(userId).subscribe({
+      next: r => { this.allSensors.set(r.data ?? []); this.applyFilters(); },
+      error: () => {},
     });
   }
 
+  applyFilters(): void {
+    const { zone_id, type } = this.sensorFilters.value;
+    let filtered = this.allSensors();
+    if (zone_id) filtered = filtered.filter(s => s.zone_id === Number(zone_id));
+    if (type) filtered = filtered.filter(s => s.type === type);
+    this.sensors.set(filtered);
+  }
+
+  getZone(zoneId: number): Zone | undefined {
+    return this.zones().find(z => z.id === zoneId);
+  }
+
+  zoneRangeLabel(sensor: Sensor): string {
+    const z = this.getZone(sensor.zone_id);
+    if (!z) return '';
+    if (sensor.type === 'temperature' && z.temp_min != null && z.temp_max != null) {
+      return `${z.temp_min}°C – ${z.temp_max}°C`;
+    }
+    if (sensor.type === 'humidity' && z.humidity_min != null && z.humidity_max != null) {
+      return `${z.humidity_min}% – ${z.humidity_max}%`;
+    }
+    if (z.temp_min != null && z.temp_max != null) {
+      return `${z.temp_min}°C – ${z.temp_max}°C`;
+    }
+    return '';
+  }
+
   openSensorForm(sensor?: Sensor): void {
-    this.dialog.open(SensorFormDialogComponent, { data: { sensor: sensor || null, zones: this.zones() }, width: '500px' })
+    this.dialog.open(SensorFormDialogComponent, { data: { sensor: sensor || null, zones: this.zones(), warehouses: this.warehouses() }, width: '500px' })
       .afterClosed().subscribe(ok => { if (ok) { this.snack.open(sensor ? 'Sensor actualizado' : 'Sensor creado', 'OK', { duration: 3000 }); this.loadSensors(); } });
   }
 

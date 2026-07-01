@@ -9,7 +9,7 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MonitoringService, Sensor } from '../monitoring.service';
-import { Zone } from '../../warehouse/warehouse.service';
+import { Warehouse, Zone } from '../../warehouse/warehouse.service';
 import { FormErrorsComponent } from '../../../shared/components/form-errors/form-errors.component';
 
 @Component({
@@ -23,7 +23,7 @@ import { FormErrorsComponent } from '../../../shared/components/form-errors/form
       <form [formGroup]="form" class="df">
         <mat-form-field appearance="outline" class="w"><mat-label>Zona *</mat-label>
           <mat-select formControlName="zone_id">
-            @for (z of data.zones; track z.id) { <mat-option [value]="z.id">{{ z.name }}</mat-option> }
+            @for (z of data.zones; track z.id) { <mat-option [value]="z.id">{{ z.name }} — {{ warehouseName(z.warehouse_id) }}</mat-option> }
           </mat-select>
         </mat-form-field>
         <mat-form-field appearance="outline" class="w"><mat-label>Código *</mat-label><input matInput formControlName="code" placeholder="TEMP-ZR01-01" /></mat-form-field>
@@ -49,12 +49,13 @@ import { FormErrorsComponent } from '../../../shared/components/form-errors/form
   styles: ['.df{display:flex;flex-direction:column;gap:0.25rem;padding:0.5rem 0;}.w{width:100%;}'],
 })
 export class SensorFormDialogComponent implements OnInit {
-  data: { sensor: Sensor | null; zones: Zone[] } = inject(MAT_DIALOG_DATA);
+  data: { sensor: Sensor | null; zones: Zone[]; warehouses: Warehouse[] } = inject(MAT_DIALOG_DATA);
   private ref = inject(MatDialogRef<SensorFormDialogComponent>);
   private svc = inject(MonitoringService); private fb = inject(FormBuilder);
   saving = signal(false); errors = signal<string[]>([]);
   form = this.fb.group({ zone_id: [null as number | null, Validators.required], code: ['', Validators.required], name: ['', Validators.required], type: ['temperature', Validators.required], unit: ['°C'], is_active: [true] });
   ngOnInit(): void { if (this.data.sensor) this.form.patchValue(this.data.sensor as any); }
+  warehouseName(warehouseId: number): string { return this.data.warehouses.find(w => w.id === warehouseId)?.name ?? ''; }
   save(): void {
     if (this.form.invalid || this.saving()) return; this.saving.set(true);
     const req$ = this.data.sensor ? this.svc.updateSensor(this.data.sensor.id, this.form.value as any) : this.svc.createSensor(this.form.value as any);

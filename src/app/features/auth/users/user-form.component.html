@@ -96,23 +96,7 @@
             <mat-hint>Almacenes a los que este usuario tendrá acceso</mat-hint>
           </mat-form-field>
 
-          <!-- Equipos de monitoreo -->
-          <mat-form-field appearance="outline" *sgaPermission="'sensores.asignar'">
-            <mat-label>Equipos de monitoreo</mat-label>
-            <mat-icon matPrefix>thermostat</mat-icon>
-            <mat-select formControlName="sensor_ids" multiple>
-              @for (group of sensorsByZone(); track group.zoneName) {
-                <mat-optgroup [label]="group.zoneName">
-                  @for (sensor of group.sensors; track sensor.id) {
-                    <mat-option [value]="sensor.id">{{ sensor.name }} ({{ sensor.code }})</mat-option>
-                  }
-                </mat-optgroup>
-              }
-            </mat-select>
-            <mat-hint>Sensores a los que este usuario tendrá acceso</mat-hint>
-          </mat-form-field>
-
-          <!-- Estado -->
+<!-- Estado -->
           <div class="toggle-field">
             <label>Estado</label>
             <mat-slide-toggle formControlName="is_active" color="primary">
