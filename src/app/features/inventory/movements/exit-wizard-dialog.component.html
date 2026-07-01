@@ -1,7 +1,13 @@
 <h2 mat-dialog-title class="wizard-title">
-  <mat-icon>output</mat-icon>
-  Salida de Stock
-  <span class="step-indicator">Paso {{ step() }} de 2</span>
+  @if (step() < 3) {
+    <mat-icon>output</mat-icon>
+    Salida de Stock
+    <span class="step-indicator">Paso {{ step() }} de 2</span>
+  } @else {
+    <mat-icon class="title-icon--success">check_circle</mat-icon>
+    Salida Registrada
+    <span class="step-indicator step-indicator--success">Completado</span>
+  }
 </h2>
 
 <mat-dialog-content class="wizard-content">
@@ -14,9 +20,14 @@
       <span class="wizard-step__label">Productos</span>
     </div>
     <div class="wizard-step__divider"></div>
-    <div class="wizard-step" [class.wizard-step--active]="step() === 2">
-      <div class="wizard-step__num">2</div>
+    <div class="wizard-step" [class.wizard-step--active]="step() === 2" [class.wizard-step--done]="step() > 2">
+      <div class="wizard-step__num">{{ step() > 2 ? '✓' : '2' }}</div>
       <span class="wizard-step__label">Centro de Costos</span>
+    </div>
+    <div class="wizard-step__divider"></div>
+    <div class="wizard-step" [class.wizard-step--active]="step() === 3">
+      <div class="wizard-step__num">{{ step() === 3 ? '✓' : '3' }}</div>
+      <span class="wizard-step__label">Confirmación</span>
     </div>
   </div>
 
@@ -392,10 +403,96 @@
 
   } <!-- /paso 2 -->
 
+  <!-- ═══════════════════ PASO 3: CONFIRMACIÓN ════════════════ -->
+  @if (step() === 3 && exitSummaryData(); as summary) {
+
+    <div class="confirm-success-banner">
+      <mat-icon>check_circle</mat-icon>
+      <div>
+        <div class="confirm-success-title">Salida registrada exitosamente</div>
+        @if (summary.withRecords) {
+          <div class="confirm-success-sub">Los registros de procedimientos del paciente también fueron guardados.</div>
+        }
+      </div>
+    </div>
+
+    <div class="confirm-meta">
+      <div class="confirm-meta-row">
+        <span class="confirm-meta-label">N° Documento</span>
+        <span class="confirm-meta-value">#{{ summary.doc_id }}</span>
+      </div>
+      <div class="confirm-meta-row">
+        <span class="confirm-meta-label">Almacén</span>
+        <span class="confirm-meta-value">{{ summary.warehouse_name }}</span>
+      </div>
+      @if (summary.cost_center_name) {
+        <div class="confirm-meta-row">
+          <span class="confirm-meta-label">Centro de Costo</span>
+          <span class="confirm-meta-value">{{ summary.cost_center_name }}</span>
+        </div>
+      }
+      @if (summary.reason) {
+        <div class="confirm-meta-row">
+          <span class="confirm-meta-label">Motivo</span>
+          <span class="confirm-meta-value">{{ summary.reason }}</span>
+        </div>
+      }
+      <div class="confirm-meta-row">
+        <span class="confirm-meta-label">Registrado por</span>
+        <span class="confirm-meta-value">{{ summary.user_name }}</span>
+      </div>
+      <div class="confirm-meta-row">
+        <span class="confirm-meta-label">Fecha y hora</span>
+        <span class="confirm-meta-value">{{ summary.date | date:'dd/MM/yyyy HH:mm' }}</span>
+      </div>
+    </div>
+
+    <div class="section-title" style="margin-top:0.75rem">
+      <mat-icon>inventory_2</mat-icon>
+      <span>Productos despachados</span>
+    </div>
+
+    <table class="confirm-table">
+      <thead>
+        <tr>
+          <th>Producto</th>
+          <th class="col-center">N° Lote</th>
+          <th class="col-center">Vencimiento</th>
+          <th class="col-center">Cantidad</th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (line of summary.lines; track $index) {
+          <tr>
+            <td>{{ line.product_name }}</td>
+            <td class="col-center">
+              @if (line.lot_number) {
+                <span class="lot-chip">{{ line.lot_number }}</span>
+              } @else {
+                <span class="col-dash">—</span>
+              }
+            </td>
+            <td class="col-center">
+              @if (line.expiration_date) {
+                {{ line.expiration_date | date:'dd/MM/yyyy':'UTC' }}
+              } @else {
+                <span class="col-dash">—</span>
+              }
+            </td>
+            <td class="col-center col-qty">{{ line.quantity }}</td>
+          </tr>
+        }
+      </tbody>
+    </table>
+
+  } <!-- /paso 3 -->
+
 </mat-dialog-content>
 
 <mat-dialog-actions align="end">
-  <button mat-button [mat-dialog-close]="false" [disabled]="saving()">Cancelar</button>
+  @if (step() < 3) {
+    <button mat-button [mat-dialog-close]="false" [disabled]="saving()">Cancelar</button>
+  }
 
   @if (step() === 2) {
     <button mat-stroked-button type="button" (click)="prevStep()" [disabled]="saving()">
@@ -417,6 +514,17 @@
             (click)="save()">
       @if (saving()) { <mat-spinner diameter="18"></mat-spinner> }
       Registrar Salida
+    </button>
+  }
+
+  @if (step() === 3) {
+    <button mat-stroked-button type="button" (click)="printComprobante()">
+      <mat-icon>print</mat-icon>
+      Imprimir Comprobante
+    </button>
+    <button mat-raised-button color="primary" (click)="closeDialog()">
+      <mat-icon>check</mat-icon>
+      Cerrar
     </button>
   }
 </mat-dialog-actions>

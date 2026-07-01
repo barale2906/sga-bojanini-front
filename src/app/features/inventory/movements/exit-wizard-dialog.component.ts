@@ -32,6 +32,24 @@ export interface ExitWizardDialogData {
   inventorySvc: InventoryService;
 }
 
+interface ExitSummaryLine {
+  product_name:    string;
+  lot_number:      string | null;
+  expiration_date: string | null;
+  quantity:        number;
+}
+
+interface ExitSummaryData {
+  doc_id:           number;
+  date:             string;
+  user_name:        string;
+  warehouse_name:   string;
+  cost_center_name: string | null;
+  reason:           string | null;
+  lines:            ExitSummaryLine[];
+  withRecords:      boolean;
+}
+
 interface RowStock {
   summary: StockSummary | null;
   fefo: BatchDetail[];
@@ -72,9 +90,10 @@ export class ExitWizardDialogComponent implements OnInit {
   private pdfSvc = inject(MovementPdfService);
 
   // ── Wizard state ─────────────────────────────────────────────
-  step    = signal<1 | 2>(1);
-  saving  = signal(false);
-  errors  = signal<string[]>([]);
+  step            = signal<1 | 2 | 3>(1);
+  saving          = signal(false);
+  errors          = signal<string[]>([]);
+  exitSummaryData = signal<ExitSummaryData | null>(null);
 
   // ── Step 1: Productos ────────────────────────────────────────
   warehouseControl    = this.fb.control<number | null>(null, Validators.required);
@@ -460,7 +479,6 @@ export class ExitWizardDialogComponent implements OnInit {
     const wId = this.warehouseControl.value!;
     const cv  = this.centerForm.value;
 
-    // Construir payloads de salida (uno por fila de producto)
     const exitCalls = this.productRows.controls.map(ctrl => {
       const rv = (ctrl as FormGroup).value;
       const payload: Record<string, unknown> = {
@@ -482,72 +500,73 @@ export class ExitWizardDialogComponent implements OnInit {
 
     forkJoin(exitCalls).subscribe({
       next: (results) => {
-        if (!this.isExternalCenter || this.procedureRows.length === 0) {
-          if (!this.isExternalCenter && results.length > 0) {
-            // Una salida de kit responde {kit_transaction_id, movements: [...]}
-            // (un movimiento por cada lote consumido de cada componente) en vez
-            // de un único movimiento; se expande a varias líneas del comprobante.
-            const flatMovements = results.flatMap(r =>
-              r.data?.kit_transaction_id ? (r.data.movements ?? []) : [r.data]
-            );
+        // Una salida de kit responde {kit_transaction_id, movements: [...]}
+        // (un movimiento por cada lote consumido de cada componente) en vez
+        // de un único movimiento; se expande a varias líneas del comprobante.
+        const flatMovements = results.flatMap(r =>
+          r.data?.kit_transaction_id ? (r.data.movements ?? []) : [r.data]
+        );
 
-            const wh = this.data.warehouses.find(w => w.id === wId);
-            const cc = this.costCenters().find(c => c.id === cv.cost_center_id);
-            const expiry$ = forkJoin(flatMovements.map(m => m.batch_id
-              ? this.data.inventorySvc.getBatchById(m.batch_id).pipe(map(b => b.data.expiration_date), catchError(() => of(null)))
-              : of(null)));
-            expiry$.subscribe(expirations => {
-              this.pdfSvc.generateAndPrint({
-                movement_type:    'exit',
-                doc_id:           flatMovements[0]?.id,
-                date:             flatMovements[0]?.created_at,
-                user_name:        flatMovements[0]?.user_name,
-                warehouse_name:   wh?.name ?? `Almacén ${wId}`,
-                cost_center_name: cc?.name ?? null,
-                reason:           cv.reason || null,
-                lines: flatMovements.map((m, i) => ({
-                  product_name:    m.product_name,
-                  lot_number:      m.batch_lot_number,
-                  expiration_date: expirations[i],
-                  quantity:        m.quantity,
-                })),
-              });
-              this.saving.set(false);
-              this.ref.close({ ok: true });
-            });
-            return;
-          }
-          this.saving.set(false);
-          this.ref.close({ ok: true });
-          return;
-        }
+        const wh = this.data.warehouses.find(w => w.id === wId);
+        const cc = this.costCenters().find(c => c.id === cv.cost_center_id);
 
-        // Crear registros de procedimientos del paciente
-        const serviceDate = this._toApiDate(cv.service_date!);
-        const recordCalls = this.procedureRows.controls.map(ctrl => {
-          const rv = (ctrl as FormGroup).value;
-          return this.medSvc.createPatientProcedureRecord({
-            medical_service_id:  rv.procedure_id,
-            patient_external_id: cv.patient_external_id!,
-            patient_document:    cv.patient_document!,
-            patient_first_name:  cv.patient_first_name!,
-            patient_last_name:   cv.patient_last_name!,
-            quantity:            rv.quantity,
-            unit_price:          rv.unit_price,
-            service_date:        serviceDate,
-            notes:               rv.notes || undefined,
+        const expiry$ = forkJoin(flatMovements.map(m => m.batch_id
+          ? this.data.inventorySvc.getBatchById(m.batch_id).pipe(map(b => b.data.expiration_date), catchError(() => of(null)))
+          : of(null)));
+
+        expiry$.subscribe(expirations => {
+          this.exitSummaryData.set({
+            doc_id:           flatMovements[0]?.id,
+            date:             flatMovements[0]?.created_at,
+            user_name:        flatMovements[0]?.user_name,
+            warehouse_name:   wh?.name ?? `Almacén ${wId}`,
+            cost_center_name: cc?.name ?? null,
+            reason:           cv.reason || null,
+            lines: flatMovements.map((m, i) => ({
+              product_name:    m.product_name,
+              lot_number:      m.batch_lot_number ?? null,
+              expiration_date: expirations[i],
+              quantity:        m.quantity,
+            })),
+            withRecords: false,
           });
-        });
 
-        forkJoin(recordCalls).subscribe({
-          next: () => { this.saving.set(false); this.ref.close({ ok: true, withRecords: true }); },
-          error: err => {
+          if (this.isExternalCenter && this.procedureRows.length > 0) {
+            const serviceDate = this._toApiDate(cv.service_date!);
+            const recordCalls = this.procedureRows.controls.map(ctrl => {
+              const rv = (ctrl as FormGroup).value;
+              return this.medSvc.createPatientProcedureRecord({
+                medical_service_id:  rv.procedure_id,
+                patient_external_id: cv.patient_external_id!,
+                patient_document:    cv.patient_document!,
+                patient_first_name:  cv.patient_first_name!,
+                patient_last_name:   cv.patient_last_name!,
+                quantity:            rv.quantity,
+                unit_price:          rv.unit_price,
+                service_date:        serviceDate,
+                notes:               rv.notes || undefined,
+              });
+            });
+
+            forkJoin(recordCalls).subscribe({
+              next: () => {
+                this.exitSummaryData.update(d => d ? { ...d, withRecords: true } : d);
+                this.saving.set(false);
+                this.step.set(3);
+              },
+              error: err => {
+                this.saving.set(false);
+                this.errors.set([
+                  'Las salidas de inventario se registraron correctamente, pero ocurrió un error al guardar los registros de procedimientos del paciente: ' +
+                  (err.error?.message || 'Error desconocido'),
+                ]);
+                this.step.set(3);
+              },
+            });
+          } else {
             this.saving.set(false);
-            this.errors.set([
-              'Las salidas de inventario se registraron correctamente, pero ocurrió un error al guardar los registros de procedimientos del paciente: ' +
-              (err.error?.message || 'Error desconocido'),
-            ]);
-          },
+            this.step.set(3);
+          }
         });
       },
       error: err => {
@@ -562,6 +581,26 @@ export class ExitWizardDialogComponent implements OnInit {
           this.errors.set([err.error?.message || 'Error al registrar la salida']);
       },
     });
+  }
+
+  printComprobante(): void {
+    const d = this.exitSummaryData();
+    if (!d) return;
+    this.pdfSvc.generateAndPrint({
+      movement_type:    'exit',
+      doc_id:           d.doc_id,
+      date:             d.date,
+      user_name:        d.user_name,
+      warehouse_name:   d.warehouse_name,
+      cost_center_name: d.cost_center_name,
+      reason:           d.reason,
+      lines:            d.lines,
+    });
+  }
+
+  closeDialog(): void {
+    const d = this.exitSummaryData();
+    this.ref.close(d ? { ok: true, withRecords: d.withRecords } : false);
   }
 
   private _toApiDate(date: Date): string {
