@@ -1,7 +1,10 @@
 <h2 mat-dialog-title>
-  Nueva Orden de Compra
-  @if (data.orderLabel) { <span class="order-label">{{ data.orderLabel }}</span> }
-  @if (data.prefillItems?.length > 0 && !data.orderLabel) { <span class="order-label">desde sugerencias de reorden</span> }
+  @if (isEditMode) { Editar Orden de Compra <span class="order-label">{{ data.order?.code }}</span> }
+  @else {
+    Nueva Orden de Compra
+    @if (data.orderLabel) { <span class="order-label">{{ data.orderLabel }}</span> }
+    @if (data.prefillItems?.length > 0 && !data.orderLabel) { <span class="order-label">desde sugerencias de reorden</span> }
+  }
 </h2>
 <mat-dialog-content>
   <app-form-errors [errors]="errors()"></app-form-errors>

@@ -1,0 +1,76 @@
+.flow-dialog-content {
+  min-width: 520px;
+  max-width: 640px;
+}
+
+.flow-form {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  padding-top: 0.5rem;
+}
+
+.w-full { width: 100%; }
+
+.toggle-row {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.25rem 0;
+}
+
+.toggle-hint {
+  font-size: 0.8rem;
+  color: var(--mat-sys-on-surface-variant, #666);
+}
+
+.steps-title {
+  margin: 0.25rem 0 0;
+  font-size: 1rem;
+  font-weight: 500;
+}
+
+.steps-hint {
+  margin: 0 0 0.5rem;
+  font-size: 0.85rem;
+  color: var(--mat-sys-on-surface-variant, #666);
+}
+
+.steps-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.step-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.step-num {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--mat-sys-primary, #1976d2);
+  color: #fff;
+  font-size: 0.8rem;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+.role-field {
+  flex: 1;
+  margin-bottom: -1.25em;
+}
+
+.req-check {
+  flex-shrink: 0;
+}
+
+.add-step-btn {
+  align-self: flex-start;
+}

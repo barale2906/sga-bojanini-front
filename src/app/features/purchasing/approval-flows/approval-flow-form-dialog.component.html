@@ -1,0 +1,68 @@
+<h2 mat-dialog-title>{{ isEdit ? 'Editar Flujo de Aprobación' : 'Nuevo Flujo de Aprobación' }}</h2>
+
+<mat-dialog-content class="flow-dialog-content">
+  <app-form-errors [errors]="errors()"></app-form-errors>
+
+  <form [formGroup]="form" class="flow-form">
+
+    <mat-form-field appearance="outline" class="w-full">
+      <mat-label>Nombre del flujo</mat-label>
+      <input matInput formControlName="name" placeholder="Ej: Flujo estándar de compras">
+      <mat-error>El nombre es requerido (mínimo 3 caracteres)</mat-error>
+    </mat-form-field>
+
+    <mat-form-field appearance="outline" class="w-full">
+      <mat-label>Monto mínimo para aplicar (opcional)</mat-label>
+      <span matTextPrefix>$&nbsp;</span>
+      <input matInput type="number" formControlName="amount_gte" min="0" placeholder="0">
+      <mat-hint>Dejar vacío para aplicar a todas las órdenes sin importar el monto</mat-hint>
+    </mat-form-field>
+
+    <div class="toggle-row">
+      <mat-slide-toggle formControlName="is_active" color="primary">Flujo activo</mat-slide-toggle>
+      <span class="toggle-hint">Solo los flujos activos se aplican al enviar una OC a aprobación</span>
+    </div>
+
+    <mat-divider></mat-divider>
+
+    <h3 class="steps-title">Pasos de Aprobación</h3>
+    <p class="steps-hint">Define quién debe aprobar la OC y en qué orden. Se ejecutan en secuencia.</p>
+
+    <div formArrayName="steps" class="steps-list">
+      @for (step of stepsArray.controls; track $index; let i = $index) {
+        <div [formGroupName]="i" class="step-row">
+          <span class="step-num">{{ i + 1 }}</span>
+          <mat-form-field appearance="outline" class="role-field">
+            <mat-label>Rol aprobador</mat-label>
+            <mat-select formControlName="role_id">
+              @for (r of roles(); track r.id) {
+                <mat-option [value]="r.id">{{ r.name }}</mat-option>
+              }
+            </mat-select>
+            <mat-error>Selecciona un rol</mat-error>
+          </mat-form-field>
+          <mat-checkbox formControlName="is_required" color="primary" class="req-check">
+            Requerido
+          </mat-checkbox>
+          @if (stepsArray.length > 1) {
+            <button mat-icon-button color="warn" type="button" (click)="removeStep(i)"
+                    matTooltip="Eliminar paso">
+              <mat-icon>remove_circle_outline</mat-icon>
+            </button>
+          }
+        </div>
+      }
+    </div>
+
+    <button mat-stroked-button type="button" color="primary" (click)="addStep()" class="add-step-btn">
+      <mat-icon>add</mat-icon> Agregar paso
+    </button>
+  </form>
+</mat-dialog-content>
+
+<mat-dialog-actions align="end">
+  <button mat-button [mat-dialog-close]="null">Cancelar</button>
+  <button mat-raised-button color="primary" (click)="save()" [disabled]="form.invalid || saving()">
+    @if (saving()) { Guardando... } @else { {{ isEdit ? 'Guardar cambios' : 'Crear flujo' }} }
+  </button>
+</mat-dialog-actions>

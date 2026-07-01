@@ -31,6 +31,7 @@ export interface PurchaseOrder {
   warehouse?: { id: number; name: string };
   items?: PurchaseOrderItem[];
   tax_breakdown?: TaxBreakdownLine[];
+  approval_records?: PurchaseOrderApprovalRecord[];
 }
 
 export interface ReorderSuggestion {
@@ -41,6 +42,16 @@ export interface ReorderSuggestion {
   reorder_point: number;
   suggested_quantity: number;
   preferred_supplier?: { id: number; name: string };
+}
+
+export interface PurchaseOrderApprovalRecord {
+  id: number;
+  step_order: number;
+  status: 'pending' | 'approved' | 'rejected';
+  role?: { id: number; name: string };
+  approver?: { id: number; name: string };
+  comments?: string | null;
+  decided_at?: string | null;
 }
 
 export interface ApprovalFlow {
@@ -71,6 +82,10 @@ export class PurchasingService {
 
   updateOrder(id: number, payload: any): Observable<ApiResponse<PurchaseOrder>> {
     return this.http.put<ApiResponse<PurchaseOrder>>(`${this.api}/purchase-orders/${id}`, payload);
+  }
+
+  deleteOrder(id: number): Observable<ApiResponse<null>> {
+    return this.http.delete<ApiResponse<null>>(`${this.api}/purchase-orders/${id}`);
   }
 
   submit(id: number): Observable<ApiResponse<PurchaseOrder>> {
@@ -104,6 +119,10 @@ export class PurchasingService {
   // Approval Flows
   getApprovalFlows(): Observable<ApiResponse<ApprovalFlow[]>> {
     return this.http.get<ApiResponse<ApprovalFlow[]>>(`${this.api}/approval-flows`);
+  }
+
+  getApprovalFlow(id: number): Observable<ApiResponse<ApprovalFlow>> {
+    return this.http.get<ApiResponse<ApprovalFlow>>(`${this.api}/approval-flows/${id}`);
   }
 
   createApprovalFlow(payload: any): Observable<ApiResponse<ApprovalFlow>> {

@@ -20,3 +20,37 @@
 .selected-row { background: #ebf8ff !important; }
 .spin-icon { animation: spin 1s linear infinite; display: inline-block; }
 @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+
+/* Flujos de aprobación */
+.flows-toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; }
+.flow-card {
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 1rem 1.25rem;
+  display: flex;
+  align-items: flex-start;
+  gap: 1rem;
+  margin-bottom: 0.75rem;
+  transition: box-shadow 0.15s;
+  &:hover { box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
+}
+.flow-card-body { flex: 1; }
+.flow-name { font-size: 1rem; font-weight: 600; margin: 0 0 0.25rem; }
+.flow-meta { font-size: 0.8rem; color: #718096; display: flex; gap: 1rem; flex-wrap: wrap; margin-bottom: 0.5rem; }
+.flow-steps { display: flex; gap: 0.5rem; flex-wrap: wrap; align-items: center; }
+.flow-step-badge {
+  display: inline-flex; align-items: center; gap: 0.25rem;
+  background: #edf2f7; color: #4a5568;
+  border-radius: 9999px; padding: 0.2rem 0.6rem; font-size: 0.75rem;
+  &.required { background: #bee3f8; color: #2b6cb0; }
+}
+.flow-step-arrow { color: #a0aec0; font-size: 0.8rem; }
+.flow-active-badge { padding: 0.15rem 0.6rem; border-radius: 9999px; font-size: 0.75rem; font-weight: 600; background: #c6f6d5; color: #276749; }
+.flow-inactive-badge { padding: 0.15rem 0.6rem; border-radius: 9999px; font-size: 0.75rem; font-weight: 600; background: #e2e8f0; color: #718096; }
+.flow-actions { display: flex; flex-direction: column; align-items: flex-end; gap: 0.25rem; }
+.no-flows { text-align: center; padding: 3rem; color: #a0aec0;
+  mat-icon { font-size: 3rem; width: 3rem; height: 3rem; display: block; margin: 0 auto 0.5rem; }
+  p { margin: 0.25rem 0; }
+  .no-flows-hint { font-size: 0.85rem; }
+}

@@ -1,6 +1,6 @@
 <h2 mat-dialog-title>
   OC {{ order().code }}
-  <span class="st-badge st-{{ order().status }}">{{ order().status }}</span>
+  <span class="st-badge st-{{ order().status }}">{{ statusLabel(order().status) }}</span>
 </h2>
 
 <mat-dialog-content class="detail-content">
@@ -79,10 +79,30 @@
 
   <mat-divider style="margin:0.5rem 0 1rem"></mat-divider>
 
-  <!-- Acciones de flujo -->
-  <h3>Flujo de Aprobación</h3>
+  <!-- Historial de aprobación -->
+  @if ((order().approval_records ?? []).length > 0) {
+    <h3>Historial de Aprobación</h3>
+    <div class="approval-timeline">
+      @for (rec of order().approval_records; track rec.id) {
+        <div class="approval-step" [class]="'step-' + rec.status">
+          <mat-icon [class]="approvalStatusClass(rec.status)">{{ approvalStatusIcon(rec.status) }}</mat-icon>
+          <div class="step-body">
+            <span class="step-role">Paso {{ rec.step_order }} — {{ rec.role?.name || '—' }}</span>
+            @if (rec.approver) { <span class="step-user">{{ rec.approver.name }}</span> }
+            @if (rec.comments) { <p class="step-comments">{{ rec.comments }}</p> }
+            @if (rec.decided_at) { <span class="step-date">{{ rec.decided_at | dateFormat:'datetime' }}</span> }
+            @if (rec.status === 'pending') { <span class="text-muted">Pendiente de decisión</span> }
+          </div>
+        </div>
+      }
+    </div>
+    <mat-divider style="margin:0.5rem 0 1rem"></mat-divider>
+  }
 
-  @if (isPending || isApproved) {
+  <!-- Acciones de flujo -->
+  <h3>Acciones</h3>
+
+  @if (isPending) {
     <mat-form-field appearance="outline" class="w-full" [formGroup]="commentsForm">
       <mat-label>Comentarios (aprobación/rechazo)</mat-label>
       <textarea matInput formControlName="comments" rows="2"></textarea>
@@ -91,23 +111,29 @@
 
   <div class="action-row">
     @if (isDraft) {
-      <button mat-raised-button color="primary" (click)="action('submit')" [disabled]="saving()">
+      <button *sgaPermission="'ordenes_compra.crear'" mat-raised-button color="primary" (click)="action('submit')" [disabled]="saving()">
         <mat-icon>send</mat-icon> Enviar a Aprobación
       </button>
-      <button mat-stroked-button color="warn" (click)="action('cancel')" [disabled]="saving()">
+      <button *sgaPermission="'ordenes_compra.crear'" mat-stroked-button (click)="editOrder()" [disabled]="saving()">
+        <mat-icon>edit</mat-icon> Editar
+      </button>
+      <button *sgaPermission="'ordenes_compra.crear'" mat-stroked-button color="warn" (click)="action('cancel')" [disabled]="saving()">
         <mat-icon>cancel</mat-icon> Cancelar
+      </button>
+      <button *sgaPermission="'ordenes_compra.crear'" mat-icon-button color="warn" (click)="confirmDelete()" [disabled]="saving()" matTooltip="Eliminar orden">
+        <mat-icon>delete</mat-icon>
       </button>
     }
     @if (isPending) {
-      <button mat-raised-button color="primary" (click)="action('approve')" [disabled]="saving()">
+      <button *sgaPermission="'ordenes_compra.aprobar'" mat-raised-button color="primary" (click)="action('approve')" [disabled]="saving()">
         <mat-icon>check_circle</mat-icon> Aprobar
       </button>
-      <button mat-raised-button color="warn" (click)="action('reject')" [disabled]="saving()">
+      <button *sgaPermission="'ordenes_compra.aprobar'" mat-raised-button color="warn" (click)="action('reject')" [disabled]="saving()">
         <mat-icon>cancel</mat-icon> Rechazar
       </button>
     }
     @if (isApproved) {
-      <button mat-raised-button color="accent" (click)="action('send')" [disabled]="saving()">
+      <button *sgaPermission="'ordenes_compra.enviar'" mat-raised-button color="accent" (click)="action('send')" [disabled]="saving()">
         <mat-icon>local_shipping</mat-icon> Marcar Enviada al Proveedor
       </button>
     }
@@ -123,7 +149,7 @@
           donde podrás validar clasificación, registros INVIMA, zona, ubicación y lote por cada ítem.
         </span>
       </div>
-      <button mat-raised-button color="primary" (click)="goToInventoryEntry()">
+      <button *sgaPermission="'ordenes_compra.recibir'" mat-raised-button color="primary" (click)="goToInventoryEntry()">
         <mat-icon>add_box</mat-icon>
         Ir a Registrar Entrada al Inventario
       </button>

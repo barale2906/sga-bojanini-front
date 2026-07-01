@@ -14,7 +14,7 @@ import { MatCheckboxModule } from '@angular/material/checkbox';
 import { MatDialog } from '@angular/material/dialog';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { SelectionModel } from '@angular/cdk/collections';
-import { PurchasingService, PurchaseOrder, ReorderSuggestion } from './purchasing.service';
+import { PurchasingService, PurchaseOrder, ReorderSuggestion, ApprovalFlow } from './purchasing.service';
 import { CatalogService } from '../catalog/catalog.service';
 import { WarehouseService } from '../warehouse/warehouse.service';
 import { PaginationMeta } from '../../core/models/api-response.model';
@@ -26,6 +26,7 @@ import { ConfirmDialogComponent } from '../../shared/components/confirm-dialog/c
 import { PurchaseOrderFormDialogComponent } from './order-form/purchase-order-form-dialog.component';
 import { PurchaseOrderDetailDialogComponent } from './order-detail/purchase-order-detail-dialog.component';
 import { PurchaseOrderPdfService } from './services/purchase-order-pdf.service';
+import { ApprovalFlowFormDialogComponent } from './approval-flows/approval-flow-form-dialog.component';
 
 @Component({
   selector: 'app-purchasing-page',
@@ -50,6 +51,7 @@ export class PurchasingPageComponent implements OnInit {
   orders = signal<PurchaseOrder[]>([]);
   meta = signal<PaginationMeta>({ current_page: 1, last_page: 1, per_page: 25, total: 0 });
   suggestions = signal<ReorderSuggestion[]>([]);
+  approvalFlows = signal<ApprovalFlow[]>([]);
   loading = signal(false);
   pdfLoadingId = signal<number | null>(null);
 
@@ -67,10 +69,15 @@ export class PurchasingPageComponent implements OnInit {
   ngOnInit(): void {
     this.loadOrders();
     this.loadSuggestions();
+    this.loadApprovalFlows();
     this.cSvc.getSuppliers({ per_page: 200 }).subscribe({ next: r => this.suppliers.set(r.data ?? []), error: () => {} });
     this.wSvc.getWarehouses().subscribe({ next: r => this.warehouses.set(r.data ?? []), error: () => {} });
     this.cSvc.getProducts({ per_page: 200, product_type: 'simple' }).subscribe({ next: r => this.products.set(r.data ?? []), error: () => {} });
     this.filters.get('status')!.valueChanges.subscribe(() => this.loadOrders(1));
+  }
+
+  loadApprovalFlows(): void {
+    this.svc.getApprovalFlows().subscribe({ next: r => this.approvalFlows.set(r.data ?? []), error: () => {} });
   }
 
   loadOrders(page = 1): void {
@@ -104,9 +111,53 @@ export class PurchasingPageComponent implements OnInit {
 
   openDetail(order: PurchaseOrder): void {
     this.dialog.open(PurchaseOrderDetailDialogComponent, {
-      data: { order, purchasingSvc: this.svc, warehouses: this.warehouses() },
+      data: {
+        order,
+        purchasingSvc: this.svc,
+        warehouses: this.warehouses(),
+        suppliers: this.suppliers(),
+        products: this.products(),
+        catalogSvc: this.cSvc,
+      },
       width: '1000px', maxWidth: '96vw', maxHeight: '92vh',
-    }).afterClosed().subscribe(() => this.loadOrders(this.meta().current_page));
+    }).afterClosed().subscribe((result?: { action: string; order?: PurchaseOrder }) => {
+      if (result?.action === 'edit' && result.order) {
+        this.openEdit(result.order);
+      } else {
+        this.loadOrders(this.meta().current_page);
+      }
+    });
+  }
+
+  openEdit(order: PurchaseOrder): void {
+    this.dialog.open(PurchaseOrderFormDialogComponent, {
+      data: {
+        order,
+        suppliers: this.suppliers(),
+        warehouses: this.warehouses(),
+        products: this.products(),
+        purchasingSvc: this.svc,
+        catalogSvc: this.cSvc,
+      },
+      width: '900px', maxWidth: '95vw', maxHeight: '90vh',
+    }).afterClosed().subscribe(ok => {
+      if (ok) {
+        this.snack.open('Orden actualizada', 'OK', { duration: 3000 });
+        this.loadOrders(this.meta().current_page);
+      }
+    });
+  }
+
+  confirmDelete(order: PurchaseOrder): void {
+    this.dialog.open(ConfirmDialogComponent, {
+      data: { title: 'Eliminar orden', message: `¿Eliminar la orden ${order.code}? Esta acción no se puede deshacer.` },
+    }).afterClosed().subscribe(ok => {
+      if (!ok) return;
+      this.svc.deleteOrder(order.id).subscribe({
+        next: () => { this.snack.open('Orden eliminada', 'OK', { duration: 3000 }); this.loadOrders(this.meta().current_page); },
+        error: err => this.snack.open(err.error?.message || 'No se pudo eliminar', 'OK', { duration: 4000 }),
+      });
+    });
   }
 
   onPage(e: PageEvent): void { this.meta.update(m => ({ ...m, per_page: e.pageSize })); this.loadOrders(e.pageIndex + 1); }
@@ -124,6 +175,15 @@ export class PurchasingPageComponent implements OnInit {
         this.snack.open('No se pudo generar el PDF', 'OK', { duration: 3000 });
       },
     });
+  }
+
+  statusLabel(status: string): string {
+    const m: Record<string, string> = {
+      draft: 'Borrador', pending_approval: 'Pend. Aprobación', approved: 'Aprobada',
+      sent: 'Enviada', partially_received: 'Recibida parcialmente', received: 'Recibida',
+      rejected: 'Rechazada', cancelled: 'Cancelada',
+    };
+    return m[status] || status;
   }
 
   getStatusClass(status: string): string {
@@ -163,6 +223,42 @@ export class PurchasingPageComponent implements OnInit {
     }
     const groups = Array.from(groupMap.values());
     this.openSuggOrderSequentially(groups, 0);
+  }
+
+  openFlowForm(flow: ApprovalFlow | null = null): void {
+    this.dialog.open(ApprovalFlowFormDialogComponent, {
+      data: { flow, purchasingSvc: this.svc },
+      width: '680px', maxWidth: '95vw', maxHeight: '90vh',
+    }).afterClosed().subscribe(result => {
+      if (result) {
+        this.snack.open(flow ? 'Flujo actualizado' : 'Flujo creado', 'OK', { duration: 3000 });
+        this.loadApprovalFlows();
+      }
+    });
+  }
+
+  confirmDeleteFlow(flow: ApprovalFlow): void {
+    this.dialog.open(ConfirmDialogComponent, {
+      data: { title: 'Eliminar flujo', message: `¿Eliminar el flujo "${flow.name}"? Esta acción no se puede deshacer.` },
+    }).afterClosed().subscribe(ok => {
+      if (!ok) return;
+      this.svc.deleteApprovalFlow(flow.id).subscribe({
+        next: () => { this.snack.open('Flujo eliminado', 'OK', { duration: 3000 }); this.loadApprovalFlows(); },
+        error: err => this.snack.open(err.error?.message || 'No se pudo eliminar', 'OK', { duration: 4000 }),
+      });
+    });
+  }
+
+  toggleFlowActive(flow: ApprovalFlow): void {
+    this.svc.updateApprovalFlow(flow.id, { ...flow, is_active: !flow.is_active }).subscribe({
+      next: () => this.loadApprovalFlows(),
+      error: err => this.snack.open(err.error?.message || 'Error al actualizar', 'OK', { duration: 4000 }),
+    });
+  }
+
+  flowConditionLabel(flow: ApprovalFlow): string {
+    if (!flow.conditions?.amount_gte && flow.conditions?.amount_gte !== 0) return 'Todas las órdenes';
+    return `Órdenes ≥ ${this.formatCurrency(flow.conditions.amount_gte)}`;
   }
 
   private openSuggOrderSequentially(

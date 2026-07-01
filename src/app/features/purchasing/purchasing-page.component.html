@@ -14,7 +14,7 @@
           <mat-label>Estado</mat-label>
           <mat-select formControlName="status">
             <mat-option value="">Todos</mat-option>
-            @for (s of statuses; track s) { <mat-option [value]="s">{{ s }}</mat-option> }
+            @for (s of statuses; track s) { <mat-option [value]="s">{{ statusLabel(s) }}</mat-option> }
           </mat-select>
         </mat-form-field>
       </div>
@@ -25,7 +25,7 @@
           <ng-container matColumnDef="supplier"><th mat-header-cell *matHeaderCellDef>Proveedor</th><td mat-cell *matCellDef="let o">{{ o.supplier?.name || '—' }}</td></ng-container>
           <ng-container matColumnDef="warehouse"><th mat-header-cell *matHeaderCellDef>Almacén</th><td mat-cell *matCellDef="let o">{{ o.warehouse?.name || '—' }}</td></ng-container>
           <ng-container matColumnDef="status"><th mat-header-cell *matHeaderCellDef>Estado</th>
-            <td mat-cell *matCellDef="let o"><span class="st-badge" [class]="getStatusClass(o.status)">{{ o.status }}</span></td>
+            <td mat-cell *matCellDef="let o"><span class="st-badge" [class]="getStatusClass(o.status)">{{ statusLabel(o.status) }}</span></td>
           </ng-container>
           <ng-container matColumnDef="total"><th mat-header-cell *matHeaderCellDef>Total</th><td mat-cell *matCellDef="let o"><strong>{{ formatCurrency(o.total_amount) }}</strong></td></ng-container>
           <ng-container matColumnDef="created_at"><th mat-header-cell *matHeaderCellDef>Fecha</th><td mat-cell *matCellDef="let o">{{ o.created_at | dateFormat }}</td></ng-container>
@@ -43,6 +43,10 @@
                   <mat-icon>picture_as_pdf</mat-icon>
                 }
               </button>
+              @if (o.status === 'draft') {
+                <button *sgaPermission="'ordenes_compra.crear'" mat-icon-button color="primary" (click)="openEdit(o)" matTooltip="Editar borrador"><mat-icon>edit</mat-icon></button>
+                <button *sgaPermission="'ordenes_compra.crear'" mat-icon-button color="warn" (click)="confirmDelete(o)" matTooltip="Eliminar borrador"><mat-icon>delete</mat-icon></button>
+              }
             </td>
           </ng-container>
           <tr mat-header-row *matHeaderRowDef="cols"></tr>
@@ -118,4 +122,62 @@
       }
     </div>
   </mat-tab>
+
+  <!-- Flujos de Aprobación -->
+  <mat-tab label="Flujos de Aprobación">
+    <div class="tab-body">
+      <div class="flows-toolbar">
+        <p class="hint" style="margin:0">Configura los flujos de aprobación que se aplican al enviar una OC a aprobación.</p>
+        <button *sgaPermission="'ordenes_compra.aprobar'" mat-raised-button color="primary" (click)="openFlowForm()">
+          <mat-icon>add</mat-icon> Nuevo Flujo
+        </button>
+      </div>
+
+      @if (approvalFlows().length === 0) {
+        <div class="no-flows">
+          <mat-icon>approval</mat-icon>
+          <p><strong>No hay flujos de aprobación configurados</strong></p>
+          <p class="no-flows-hint">Sin un flujo activo, no se puede enviar ninguna OC a aprobación.</p>
+        </div>
+      }
+
+      @for (flow of approvalFlows(); track flow.id) {
+        <div class="flow-card">
+          <div class="flow-card-body">
+            <p class="flow-name">{{ flow.name }}</p>
+            <div class="flow-meta">
+              <span>Aplica a: {{ flowConditionLabel(flow) }}</span>
+              @if (flow.is_active) {
+                <span class="flow-active-badge">Activo</span>
+              } @else {
+                <span class="flow-inactive-badge">Inactivo</span>
+              }
+            </div>
+            @if ((flow.steps ?? []).length > 0) {
+              <div class="flow-steps">
+                @for (step of flow.steps; track step.id; let last = $last) {
+                  <span class="flow-step-badge" [class.required]="step.is_required">
+                    {{ step.step_order }}. {{ step.role?.name || 'Rol #' + step.role_id }}
+                    @if (step.is_required) { <mat-icon style="font-size:0.9rem;width:0.9rem;height:0.9rem">star</mat-icon> }
+                  </span>
+                  @if (!last) { <span class="flow-step-arrow">→</span> }
+                }
+              </div>
+            }
+          </div>
+          <div class="flow-actions">
+            <button *sgaPermission="'ordenes_compra.aprobar'" mat-icon-button color="primary"
+                    (click)="openFlowForm(flow)" matTooltip="Editar flujo">
+              <mat-icon>edit</mat-icon>
+            </button>
+            <button *sgaPermission="'ordenes_compra.aprobar'" mat-icon-button color="warn"
+                    (click)="confirmDeleteFlow(flow)" matTooltip="Eliminar flujo">
+              <mat-icon>delete</mat-icon>
+            </button>
+          </div>
+        </div>
+      }
+    </div>
+  </mat-tab>
+
 </mat-tab-group>

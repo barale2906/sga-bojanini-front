@@ -6,7 +6,7 @@ h3 { font-size: 0.9rem; font-weight: 600; margin: 0.75rem 0 0.5rem; }
 .action-row { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: flex-start; }
 .w-full { width: 100%; }
 .st-badge { font-size: 0.7rem; font-weight: 600; padding: 0.1rem 0.5rem; border-radius: 9999px; margin-left: 0.5rem; }
-.st-draft { background:#e2e8f0; color:#4a5568; } .st-pending_approval { background:#fefcbf; color:#744210; }
+.st-draft { background:#e2e8f0; color:#4a5568; } .st-pending_approval, .st-pending { background:#fefcbf; color:#744210; }
 .st-approved { background:#c6f6d5; color:#276749; } .st-sent { background:#bee3f8; color:#2b6cb0; }
 .st-received { background:#c6f6d5; color:#276749; } .st-rejected { background:#fed7d7; color:#c53030; }
 // ── Enrutamiento a inventario ────────────────────────────────
@@ -26,6 +26,24 @@ h3 { font-size: 0.9rem; font-weight: 600; margin: 0.75rem 0 0.5rem; }
 .recv-partial { color: #7b341e; font-weight: 600; }
 .recv-pending { color: #718096; }
 .text-muted   { color: #a0aec0; }
+.text-danger  { color: #c53030; }
+
+// ── Timeline de aprobación ───────────────────────────────────
+.approval-timeline { display: flex; flex-direction: column; gap: 0.5rem; margin-bottom: 0.75rem; }
+.approval-step {
+  display: flex; align-items: flex-start; gap: 0.75rem;
+  padding: 0.6rem 0.75rem; border-radius: 8px; background: #f7fafc;
+  border-left: 3px solid #e2e8f0;
+  &.step-approved { border-left-color: #276749; background: #f0fff4; }
+  &.step-rejected { border-left-color: #c53030; background: #fff5f5; }
+  &.step-pending  { border-left-color: #744210; background: #fffff0; }
+  mat-icon { font-size: 1.2rem; width: 1.2rem; height: 1.2rem; flex-shrink: 0; margin-top: 0.1rem; }
+}
+.step-body { display: flex; flex-direction: column; gap: 0.15rem; font-size: 0.82rem; }
+.step-role { font-weight: 600; color: #2d3748; }
+.step-user { color: #4a5568; }
+.step-comments { margin: 0.1rem 0 0; font-style: italic; color: #718096; }
+.step-date { font-size: 0.75rem; color: #a0aec0; }
 
 .tax-badge { display:inline-block; background:#fefcbf; color:#744210; font-size:0.72rem; font-weight:600; padding:0.1rem 0.4rem; border-radius:4px; }
 .exempt-badge { display:inline-block; background:#e2e8f0; color:#718096; font-size:0.72rem; padding:0.1rem 0.4rem; border-radius:4px; }

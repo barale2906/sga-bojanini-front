@@ -44,14 +44,47 @@ export class PurchaseOrderFormDialogComponent implements OnInit {
 
   get items() { return this.form.get('items') as FormArray; }
 
+  get isEditMode(): boolean { return !!this.data.order; }
+
   ngOnInit(): void {
     this.filteredSuppliers.set(this.data.suppliers ?? []);
-    const prefill: Array<{ product_id: number; suggested_quantity: number }> = this.data.prefillItems ?? [];
-    if (prefill.length > 0) {
-      prefill.forEach((p, i) => this.addPrefillItem(p.product_id, p.suggested_quantity, i));
-      this.loadProductSuppliersForPrefill(prefill.map(p => p.product_id));
+    if (this.isEditMode) {
+      this.loadExistingOrder();
     } else {
-      this.addItem();
+      const prefill: Array<{ product_id: number; suggested_quantity: number }> = this.data.prefillItems ?? [];
+      if (prefill.length > 0) {
+        prefill.forEach((p, i) => this.addPrefillItem(p.product_id, p.suggested_quantity, i));
+        this.loadProductSuppliersForPrefill(prefill.map(p => p.product_id));
+      } else {
+        this.addItem();
+      }
+    }
+  }
+
+  private loadExistingOrder(): void {
+    const order = this.data.order;
+    this.form.patchValue({
+      supplier_id: order.supplier_id,
+      warehouse_id: order.warehouse_id,
+      notes: order.notes || '',
+      expected_delivery_date: order.expected_delivery_date || '',
+    });
+    (order.items ?? []).forEach((item: any, i: number) => {
+      this.items.push(this.fb.group({
+        product_id: [item.product_id, Validators.required],
+        product_presentation_id: [item.product_presentation_id, Validators.required],
+        quantity: [item.quantity_requested, [Validators.required, Validators.min(1)]],
+        unit_price: [Number(item.unit_price), [Validators.required, Validators.min(0)]],
+        tax_rate: [item.tax_rate != null ? Number(item.tax_rate) : null, [Validators.min(0), Validators.max(100)]],
+        notes: [item.notes || ''],
+      }));
+      this.data.catalogSvc.getPresentations(item.product_id).subscribe({
+        next: (r: any) => this.presentationsMap.update(m => ({ ...m, [i]: r.data ?? [] })),
+        error: () => {},
+      });
+    });
+    if ((order.items ?? []).length > 0) {
+      this.loadProductSuppliersForPrefill((order.items as any[]).map((i: any) => i.product_id));
     }
   }
 
@@ -295,7 +328,10 @@ export class PurchaseOrderFormDialogComponent implements OnInit {
       notes: v.notes || undefined, expected_delivery_date: v.expected_delivery_date || undefined,
       items: v.items,
     };
-    this.data.purchasingSvc.createOrder(payload).subscribe({
+    const req$ = this.isEditMode
+      ? this.data.purchasingSvc.updateOrder(this.data.order.id, payload)
+      : this.data.purchasingSvc.createOrder(payload);
+    req$.subscribe({
       next: () => this.ref.close(true),
       error: (err: any) => {
         this.saving.set(false);
