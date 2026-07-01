@@ -22,7 +22,8 @@ import { PermissionDirective } from '../../shared/directives/permission.directiv
 import { DateFormatPipe } from '../../shared/pipes/date-format.pipe';
 import { ConfirmDialogComponent } from '../../shared/components/confirm-dialog/confirm-dialog.component';
 import { WarehouseService } from '../warehouse/warehouse.service';
-import { CatalogService } from '../catalog/catalog.service';
+import { CatalogService, Product } from '../catalog/catalog.service';
+import { ProductSearchComponent } from '../../shared/components/product-search/product-search.component';
 
 @Component({
   selector: 'app-integration-page',
@@ -31,7 +32,7 @@ import { CatalogService } from '../catalog/catalog.service';
     CommonModule, ReactiveFormsModule, MatTabsModule, MatTableModule, MatPaginatorModule,
     MatButtonModule, MatIconModule, MatFormFieldModule, MatInputModule, MatSelectModule,
     MatSlideToggleModule, MatTooltipModule, PageHeaderComponent, LoadingSpinnerComponent,
-    PermissionDirective, DateFormatPipe,
+    PermissionDirective, DateFormatPipe, ProductSearchComponent,
   ],
   templateUrl: './integration-page.component.html',
   styleUrl: './integration-page.component.scss',
@@ -123,11 +124,24 @@ export class IntegrationPageComponent implements OnInit {
     });
   }
 
-  addConsItem(): void {
-    this.consItems.push(this.fb.group({ product_id: [null, Validators.required], quantity: [1, [Validators.required, Validators.min(1)]] }));
+  consItemSelectedProducts = signal<(Product | null)[]>([]);
+
+  onConsItemProductSelected(i: number, product: Product | null): void {
+    this.consItemSelectedProducts.update(arr => { const a = [...arr]; a[i] = product; return a; });
+    this.consItems.at(i).patchValue({ product_id: product?.id ?? null });
   }
 
-  removeConsItem(i: number): void { if (this.consItems.length > 0) this.consItems.removeAt(i); }
+  addConsItem(): void {
+    this.consItems.push(this.fb.group({ product_id: [null, Validators.required], quantity: [1, [Validators.required, Validators.min(1)]] }));
+    this.consItemSelectedProducts.update(arr => [...arr, null]);
+  }
+
+  removeConsItem(i: number): void {
+    if (this.consItems.length > 0) {
+      this.consItems.removeAt(i);
+      this.consItemSelectedProducts.update(arr => arr.filter((_, idx) => idx !== i));
+    }
+  }
 
   saveConsumption(): void {
     if (this.consumptionForm.invalid) return;

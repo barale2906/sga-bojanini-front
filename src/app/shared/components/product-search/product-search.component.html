@@ -1,0 +1,49 @@
+<mat-form-field appearance="outline" class="product-search-field">
+  <mat-label>{{ label }}{{ required ? ' *' : '' }}</mat-label>
+
+  <mat-icon matPrefix class="search-prefix-icon">
+    {{ showClear() ? 'inventory_2' : 'search' }}
+  </mat-icon>
+
+  <input matInput
+         [formControl]="searchCtrl"
+         [matAutocomplete]="productAuto"
+         placeholder="Nombre, código o SKU..."
+         (keydown)="onKeydown($event)"
+         autocomplete="off">
+
+  @if (loading()) {
+    <mat-spinner matSuffix diameter="18" class="search-spinner"></mat-spinner>
+  } @else if (showClear()) {
+    <button matSuffix mat-icon-button type="button"
+            (click)="clear()"
+            matTooltip="Limpiar selección"
+            class="clear-btn">
+      <mat-icon>close</mat-icon>
+    </button>
+  }
+
+  <mat-autocomplete #productAuto
+                    [displayWith]="displayFn"
+                    (optionSelected)="onOptionSelected($event)"
+                    class="product-autocomplete-panel">
+    @for (p of results(); track p.id) {
+      <mat-option [value]="p" class="product-option">
+        <div class="product-option-inner">
+          <span class="product-option-code">{{ p.code }}</span>
+          <span class="product-option-name">{{ p.name }}</span>
+          @if (p.sku) {
+            <span class="product-option-sku">SKU: {{ p.sku }}</span>
+          }
+        </div>
+      </mat-option>
+    }
+
+    @if (!loading() && searched() && results().length === 0) {
+      <mat-option disabled class="product-option-empty">
+        <mat-icon style="font-size:1rem;height:1rem;width:1rem;color:#a0aec0">search_off</mat-icon>
+        Sin resultados
+      </mat-option>
+    }
+  </mat-autocomplete>
+</mat-form-field>

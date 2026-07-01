@@ -40,14 +40,14 @@
         <div [formGroupName]="$index" class="item-block">
           <div class="item-row">
             <!-- Producto -->
-            <mat-form-field appearance="outline" class="item-product">
-              <mat-label>Producto *</mat-label>
-              <mat-select formControlName="product_id" (selectionChange)="onProductChange($index, $event.value)">
-                @for (p of data.products; track p.id) {
-                  <mat-option [value]="p.id">{{ p.code }} — {{ p.name }}</mat-option>
-                }
-              </mat-select>
-            </mat-form-field>
+            <div class="item-product">
+              <app-product-search
+                label="Producto"
+                [required]="true"
+                [selectedProduct]="rowSelectedProducts()[$index]"
+                (productSelected)="onRowProductSelected($index, $event)">
+              </app-product-search>
+            </div>
 
             <!-- Presentación (empaque de compra) -->
             <mat-form-field appearance="outline" class="item-pres">

@@ -91,14 +91,14 @@
     }
 
     <!-- ── Producto ── -->
-    <mat-form-field appearance="outline" class="span2">
-      <mat-label>Producto *</mat-label>
-      <mat-select formControlName="product_id">
-        @for (p of data.products; track p.id) {
-          <mat-option [value]="p.id">{{ p.code }} — {{ p.name }}</mat-option>
-        }
-      </mat-select>
-    </mat-form-field>
+    <div class="span2">
+      <app-product-search
+        label="Producto"
+        [required]="true"
+        [selectedProduct]="_selectedProductFull()"
+        (productSelected)="onProductSelected($event)">
+      </app-product-search>
+    </div>
 
     <!-- ── Panel de clasificación + INVIMA (solo entrada) ── -->
     @if (isEntry) {

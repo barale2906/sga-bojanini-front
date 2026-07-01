@@ -48,17 +48,12 @@
       <span>Producto a Transferir</span>
     </div>
 
-    <mat-form-field appearance="outline" class="full-width">
-      <mat-label>Producto</mat-label>
-      <mat-select formControlName="product_id">
-        @for (p of data.products; track p.id) {
-          <mat-option [value]="p.id">
-            <code class="opt-code">{{ p.code }}</code> — {{ p.name }}
-          </mat-option>
-        }
-      </mat-select>
-      <mat-icon matSuffix>inventory_2</mat-icon>
-    </mat-form-field>
+    <app-product-search
+      label="Producto"
+      [required]="true"
+      [selectedProduct]="_selectedProductFull()"
+      (productSelected)="onProductSelected($event)">
+    </app-product-search>
 
     <!-- Stock disponible -->
     @if (loadingStock() || loadingExitable()) {

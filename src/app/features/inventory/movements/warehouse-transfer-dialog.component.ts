@@ -16,6 +16,7 @@ import { MovementPdfService } from '../../../shared/services/movement-pdf.servic
 import { WarehouseService, Warehouse, Location } from '../../warehouse/warehouse.service';
 import { Product } from '../../catalog/catalog.service';
 import { FormErrorsComponent } from '../../../shared/components/form-errors/form-errors.component';
+import { ProductSearchComponent } from '../../../shared/components/product-search/product-search.component';
 
 export interface WarehouseTransferDialogData {
   warehouses: Warehouse[];
@@ -29,7 +30,7 @@ export interface WarehouseTransferDialogData {
   imports: [
     CommonModule, ReactiveFormsModule, MatDialogModule, MatFormFieldModule,
     MatInputModule, MatSelectModule, MatButtonModule, MatIconModule,
-    MatProgressSpinnerModule, MatDividerModule, FormErrorsComponent,
+    MatProgressSpinnerModule, MatDividerModule, FormErrorsComponent, ProductSearchComponent,
   ],
   templateUrl: './warehouse-transfer-dialog.component.html',
   styleUrl: './warehouse-transfer-dialog.component.scss',
@@ -51,6 +52,13 @@ export class WarehouseTransferDialogComponent implements OnInit {
 
   stockSummary  = signal<StockSummary | null>(null);
   loadingStock  = signal(false);
+
+  _selectedProductFull = signal<Product | null>(null);
+
+  onProductSelected(product: Product | null): void {
+    this._selectedProductFull.set(product);
+    this.form.patchValue({ product_id: product?.id ?? null });
+  }
 
   /** Lotes vigentes (no vencidos) disponibles para transferir */
   exitableLotes    = signal<BatchDetail[]>([]);

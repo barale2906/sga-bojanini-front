@@ -27,6 +27,7 @@ import { CatalogService, Product } from '../catalog/catalog.service';
 import { PaginationMeta } from '../../core/models/api-response.model';
 import { PageHeaderComponent } from '../../shared/components/page-header/page-header.component';
 import { LoadingSpinnerComponent } from '../../shared/components/loading-spinner/loading-spinner.component';
+import { ProductSearchComponent } from '../../shared/components/product-search/product-search.component';
 import { PermissionDirective } from '../../shared/directives/permission.directive';
 import { DateFormatPipe } from '../../shared/pipes/date-format.pipe';
 import { MovementFormDialogComponent } from './movements/movement-form-dialog.component';
@@ -82,6 +83,7 @@ const MOV_TYPE_ICONS: Record<string, string> = {
     MatInputModule, MatSelectModule, MatChipsModule, MatTooltipModule,
     MatDatepickerModule, MatProgressSpinnerModule,
     PageHeaderComponent, LoadingSpinnerComponent, PermissionDirective, DateFormatPipe,
+    ProductSearchComponent,
   ],
   templateUrl: './inventory-page.component.html',
   styleUrl: './inventory-page.component.scss',
@@ -147,6 +149,20 @@ export class InventoryPageComponent implements OnInit {
   products = signal<Product[]>([]);
   locations = signal<Location[]>([]);
   loading = signal(false);
+
+  // Producto seleccionado en cada filtro (para sincronizar con app-product-search)
+  stockFilterProduct = signal<Product | null>(null);
+  moveFilterProduct  = signal<Product | null>(null);
+
+  onStockFilterProduct(p: Product | null): void {
+    this.stockFilterProduct.set(p);
+    this.stockFilters.patchValue({ product_id: p ? String(p.id) : '' });
+  }
+
+  onMoveFilterProduct(p: Product | null): void {
+    this.moveFilterProduct.set(p);
+    this.moveFilters.patchValue({ product_id: p ? String(p.id) : '' });
+  }
   loadingPdf = signal<number | null>(null);
 
   readonly PRINTABLE_TYPES = new Set(['exit', 'transfer', 'adjustment', 'return', 'loss']);

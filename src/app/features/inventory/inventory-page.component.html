@@ -43,12 +43,13 @@
             @for (w of warehouses(); track w.id) { <mat-option [value]="w.id">{{ w.name }}</mat-option> }
           </mat-select>
         </mat-form-field>
-        <mat-form-field appearance="outline" class="sel"><mat-label>Producto</mat-label>
-          <mat-select formControlName="product_id">
-            <mat-option value="">Todos</mat-option>
-            @for (p of products(); track p.id) { <mat-option [value]="p.id">{{ p.code }} — {{ p.name }}</mat-option> }
-          </mat-select>
-        </mat-form-field>
+        <div class="sel">
+          <app-product-search
+            label="Producto"
+            [selectedProduct]="stockFilterProduct()"
+            (productSelected)="onStockFilterProduct($event)">
+          </app-product-search>
+        </div>
       </div>
       <app-loading-spinner [loading]="loading()" [inline]="true"></app-loading-spinner>
       <div class="table-wrap mat-elevation-z1">
@@ -138,13 +139,13 @@
             @for (w of warehouses(); track w.id) { <mat-option [value]="w.id">{{ w.name }}</mat-option> }
           </mat-select>
         </mat-form-field>
-        <mat-form-field appearance="outline" class="sel">
-          <mat-label>Producto</mat-label>
-          <mat-select formControlName="product_id">
-            <mat-option value="">Todos</mat-option>
-            @for (p of products(); track p.id) { <mat-option [value]="p.id">{{ p.code }} — {{ p.name }}</mat-option> }
-          </mat-select>
-        </mat-form-field>
+        <div class="sel">
+          <app-product-search
+            label="Producto"
+            [selectedProduct]="moveFilterProduct()"
+            (productSelected)="onMoveFilterProduct($event)">
+          </app-product-search>
+        </div>
         <mat-form-field appearance="outline" class="date-field">
           <mat-label>Desde</mat-label>
           <input matInput [matDatepicker]="pickerFrom" formControlName="date_from" placeholder="DD/MM/AAAA">

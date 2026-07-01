@@ -18,6 +18,7 @@ import { WarehouseService, Warehouse, Location, LocationCapacity, Zone } from '.
 import { CatalogService, Product, ProductPresentation, ProductClassification } from '../../catalog/catalog.service';
 import { PurchasingService, PurchaseOrder, PurchaseOrderItem } from '../../purchasing/purchasing.service';
 import { FormErrorsComponent } from '../../../shared/components/form-errors/form-errors.component';
+import { ProductSearchComponent } from '../../../shared/components/product-search/product-search.component';
 
 const TYPE_LABELS: Record<string, string> = {
   entry: 'Entrada de Mercancía', exit: 'Salida de Stock', transfer: 'Transferencia',
@@ -51,7 +52,8 @@ export interface MovementDialogData {
   imports: [
     CommonModule, ReactiveFormsModule, MatDialogModule, MatFormFieldModule,
     MatInputModule, MatSelectModule, MatButtonModule, MatIconModule,
-    MatProgressSpinnerModule, MatTooltipModule, MatDividerModule, FormErrorsComponent,
+    MatProgressSpinnerModule, MatTooltipModule, MatDividerModule,
+    FormErrorsComponent, ProductSearchComponent,
   ],
   templateUrl: './movement-form-dialog.component.html',
   styleUrl: './movement-form-dialog.component.scss',
@@ -71,6 +73,9 @@ export class MovementFormDialogComponent implements OnInit {
   zones     = signal<Zone[]>([]);
   presentations = signal<ProductPresentation[]>([]);
   usePresentationMode = signal(false);
+
+  // ── Producto seleccionado (objeto completo para el buscador y para cálculos) ──
+  _selectedProductFull = signal<Product | null>(null);
 
   // ── Detalle de producto (clasificación + INVIMA) ─────────────
   productDetail        = signal<Product | null>(null);
@@ -146,8 +151,13 @@ export class MovementFormDialogComponent implements OnInit {
   }
 
   get selectedProduct(): Product | null {
-    const id = this.form.get('product_id')?.value;
-    return this.data.products.find((p: Product) => p.id === id) ?? null;
+    return this._selectedProductFull();
+  }
+
+  /** Llamado por app-product-search cuando el usuario selecciona un producto. */
+  onProductSelected(product: Product | null): void {
+    this._selectedProductFull.set(product);
+    this.form.patchValue({ product_id: product?.id ?? null });
   }
 
   get selectedPresentation(): ProductPresentation | null {
@@ -495,6 +505,10 @@ export class MovementFormDialogComponent implements OnInit {
       this.form.patchValue({ warehouse_id: order.warehouse_id });
       this.form.patchValue({ product_id: item.product_id });
 
+      // Sincronizar el buscador con el producto de la OC
+      const product = this.data.products.find(p => p.id === item.product_id) ?? null;
+      this._selectedProductFull.set(product);
+
       if (item.product_presentation_id) {
         this.form.patchValue({ quantity_in_presentation: qty });
       } else {
@@ -577,6 +591,10 @@ export class MovementFormDialogComponent implements OnInit {
     const qty = pendingQty > 0 ? pendingQty : item.quantity_requested;
 
     this.form.patchValue({ product_id: item.product_id });
+
+    // Sincronizar el buscador con el producto de la OC
+    const product = this.data.products.find(p => p.id === item.product_id) ?? null;
+    this._selectedProductFull.set(product);
 
     if (item.product_presentation_id) {
       this.form.patchValue({ quantity_in_presentation: qty });

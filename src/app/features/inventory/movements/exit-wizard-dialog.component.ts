@@ -22,6 +22,7 @@ import { WarehouseService, Warehouse, Location } from '../../warehouse/warehouse
 import { Product } from '../../catalog/catalog.service';
 import { MedicalServicesService, MedicalServiceNode, ProcedurePrice } from '../medical-services.service';
 import { FormErrorsComponent } from '../../../shared/components/form-errors/form-errors.component';
+import { ProductSearchComponent } from '../../../shared/components/product-search/product-search.component';
 import { EsDateAdapter, ES_DATE_FORMATS } from '../../../shared/adapters/es-date.adapter';
 import { MovementPdfService } from '../../../shared/services/movement-pdf.service';
 
@@ -57,7 +58,7 @@ interface RowStock {
     CommonModule, ReactiveFormsModule, MatDialogModule, MatFormFieldModule,
     MatInputModule, MatSelectModule, MatButtonModule, MatIconModule,
     MatProgressSpinnerModule, MatTooltipModule, MatDividerModule,
-    MatDatepickerModule, FormErrorsComponent,
+    MatDatepickerModule, FormErrorsComponent, ProductSearchComponent,
   ],
   templateUrl: './exit-wizard-dialog.component.html',
   styleUrl: './exit-wizard-dialog.component.scss',
@@ -76,10 +77,18 @@ export class ExitWizardDialogComponent implements OnInit {
   errors  = signal<string[]>([]);
 
   // ── Step 1: Productos ────────────────────────────────────────
-  warehouseControl = this.fb.control<number | null>(null, Validators.required);
-  productRows      = this.fb.array<FormGroup>([]);
-  locations        = signal<Location[]>([]);
-  rowStocks        = signal<RowStock[]>([]);
+  warehouseControl    = this.fb.control<number | null>(null, Validators.required);
+  productRows         = this.fb.array<FormGroup>([]);
+  locations           = signal<Location[]>([]);
+  rowStocks           = signal<RowStock[]>([]);
+  rowSelectedProducts = signal<(Product | null)[]>([]);
+
+  onRowProductSelected(rowIdx: number, product: Product | null): void {
+    this.rowSelectedProducts.update(arr => {
+      const a = [...arr]; a[rowIdx] = product; return a;
+    });
+    (this.productRows.at(rowIdx) as FormGroup).get('product_id')!.setValue(product?.id ?? null);
+  }
 
   // ── Step 2: Centro de costos y paciente ──────────────────────
   centerForm = this.fb.group({
@@ -218,12 +227,14 @@ export class ExitWizardDialogComponent implements OnInit {
       summary: null, fefo: [], loadingStock: false, loadingFefo: false,
       checkingExpired: false, expiredOnly: false, isKit: false, kitAvailable: null,
     }]);
+    this.rowSelectedProducts.update(arr => [...arr, null]);
   }
 
   removeProductRow(i: number): void {
     if (this.productRows.length <= 1) return;
     this.productRows.removeAt(i);
     this.rowStocks.update(arr => arr.filter((_, idx) => idx !== i));
+    this.rowSelectedProducts.update(arr => arr.filter((_, idx) => idx !== i));
   }
 
   private _loadRowStock(rowIdx: number): void {
@@ -353,7 +364,9 @@ export class ExitWizardDialogComponent implements OnInit {
 
   getProduct(productId: number | null): Product | null {
     if (!productId) return null;
-    return this.data.products.find(p => p.id === productId) ?? null;
+    return this.rowSelectedProducts().find(p => p?.id === productId)
+      ?? this.data.products.find(p => p.id === productId)
+      ?? null;
   }
 
   asGroup(ctrl: AbstractControl): FormGroup { return ctrl as FormGroup; }

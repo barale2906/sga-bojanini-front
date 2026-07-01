@@ -13,13 +13,14 @@ import { MatTooltipModule } from '@angular/material/tooltip';
 import { forkJoin, of } from 'rxjs';
 import { catchError } from 'rxjs/operators';
 import { PurchasingService } from '../purchasing.service';
-import { CatalogService, ProductPresentation, ProductSupplier, Supplier } from '../../catalog/catalog.service';
+import { CatalogService, Product, ProductPresentation, ProductSupplier, Supplier } from '../../catalog/catalog.service';
 import { FormErrorsComponent } from '../../../shared/components/form-errors/form-errors.component';
+import { ProductSearchComponent } from '../../../shared/components/product-search/product-search.component';
 
 @Component({
   selector: 'app-purchase-order-form-dialog',
   standalone: true,
-  imports: [CommonModule, ReactiveFormsModule, MatDialogModule, MatFormFieldModule, MatInputModule, MatSelectModule, MatButtonModule, MatIconModule, MatTableModule, MatProgressSpinnerModule, MatTooltipModule, FormErrorsComponent],
+  imports: [CommonModule, ReactiveFormsModule, MatDialogModule, MatFormFieldModule, MatInputModule, MatSelectModule, MatButtonModule, MatIconModule, MatTableModule, MatProgressSpinnerModule, MatTooltipModule, FormErrorsComponent, ProductSearchComponent],
   templateUrl: './purchase-order-form-dialog.component.html',
   styleUrl: './purchase-order-form-dialog.component.scss',
 })
@@ -30,9 +31,16 @@ export class PurchaseOrderFormDialogComponent implements OnInit {
 
   saving = signal(false);
   errors = signal<string[]>([]);
-  presentationsMap = signal<Record<number, ProductPresentation[]>>({});
-  filteredSuppliers = signal<Supplier[]>([]);
+  presentationsMap    = signal<Record<number, ProductPresentation[]>>({});
+  filteredSuppliers   = signal<Supplier[]>([]);
   productSuppliersMap = signal<Record<number, ProductSupplier[]>>({});
+  rowSelectedProducts = signal<(Product | null)[]>([]);
+
+  onRowProductSelected(i: number, product: Product | null): void {
+    this.rowSelectedProducts.update(arr => { const a = [...arr]; a[i] = product; return a; });
+    this.items.at(i).patchValue({ product_id: product?.id ?? null });
+    if (product?.id) this.onProductChange(i, product.id);
+  }
 
   form = this.fb.group({
     supplier_id: [null as number | null, Validators.required],
@@ -78,6 +86,9 @@ export class PurchaseOrderFormDialogComponent implements OnInit {
         tax_rate: [item.tax_rate != null ? Number(item.tax_rate) : null, [Validators.min(0), Validators.max(100)]],
         notes: [item.notes || ''],
       }));
+      // Sincronizar buscador con producto existente
+      const product = (this.data.products as Product[] ?? []).find(p => p.id === item.product_id) ?? null;
+      this.rowSelectedProducts.update(arr => { const a = [...arr]; a[i] = product; return a; });
       this.data.catalogSvc.getPresentations(item.product_id).subscribe({
         next: (r: any) => this.presentationsMap.update(m => ({ ...m, [i]: r.data ?? [] })),
         error: () => {},
@@ -186,6 +197,7 @@ export class PurchaseOrderFormDialogComponent implements OnInit {
       tax_rate: [null as number | null, [Validators.min(0), Validators.max(100)]],
       notes: [''],
     }));
+    this.rowSelectedProducts.update(arr => [...arr, null]);
   }
 
   private addPrefillItem(productId: number, qty: number, index: number): void {
@@ -197,6 +209,9 @@ export class PurchaseOrderFormDialogComponent implements OnInit {
       tax_rate: [null as number | null, [Validators.min(0), Validators.max(100)]],
       notes: [''],
     }));
+    // Sincronizar el buscador con el producto pre-cargado
+    const product = (this.data.products as Product[] ?? []).find(p => p.id === productId) ?? null;
+    this.rowSelectedProducts.update(arr => { const a = [...arr]; a[index] = product; return a; });
     this.data.catalogSvc.getPresentations(productId).subscribe({
       next: (r: any) => {
         const presentations: ProductPresentation[] = r.data ?? [];
@@ -213,7 +228,12 @@ export class PurchaseOrderFormDialogComponent implements OnInit {
     });
   }
 
-  removeItem(i: number): void { if (this.items.length > 1) this.items.removeAt(i); }
+  removeItem(i: number): void {
+    if (this.items.length > 1) {
+      this.items.removeAt(i);
+      this.rowSelectedProducts.update(arr => arr.filter((_, idx) => idx !== i));
+    }
+  }
 
   onProductChange(i: number, productId: number): void {
     if (!productId) return;

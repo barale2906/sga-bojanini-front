@@ -85,11 +85,14 @@
           <div formArrayName="items">
             @for (item of consItems.controls; track $index) {
               <div [formGroupName]="$index" class="cons-item">
-                <mat-form-field appearance="outline" class="flex2"><mat-label>Producto</mat-label>
-                  <mat-select formControlName="product_id">
-                    @for (p of products(); track p.id) { <mat-option [value]="p.id">{{ p.code }} — {{ p.name }}</mat-option> }
-                  </mat-select>
-                </mat-form-field>
+                <div class="flex2">
+                  <app-product-search
+                    label="Producto"
+                    [required]="true"
+                    [selectedProduct]="consItemSelectedProducts()[$index]"
+                    (productSelected)="onConsItemProductSelected($index, $event)">
+                  </app-product-search>
+                </div>
                 <mat-form-field appearance="outline" class="qty"><mat-label>Cantidad</mat-label><input matInput type="number" formControlName="quantity" min="1" /></mat-form-field>
                 <button mat-icon-button color="warn" type="button" (click)="removeConsItem($index)"><mat-icon>remove</mat-icon></button>
               </div>

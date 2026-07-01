@@ -140,6 +140,61 @@ th.actions-col, td.actions-col {
 .font-bold   { font-weight: 700; }
 .text-center { text-align: center; }
 
+// ============================================================
+// app-product-search — estilos del panel overlay (fuera del shadow DOM)
+// ============================================================
+.product-option {
+  height: auto !important;
+  line-height: normal !important;
+  padding-top: 0.45rem !important;
+  padding-bottom: 0.45rem !important;
+}
+
+.product-option-inner {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  width: 100%;
+  overflow: hidden;
+}
+
+.product-option-code {
+  font-family: monospace;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #553c9a;
+  flex-shrink: 0;
+  background: #f3f0ff;
+  padding: 0.1rem 0.35rem;
+  border-radius: 4px;
+}
+
+.product-option-name {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.88rem;
+  color: #2d3748;
+}
+
+.product-option-sku {
+  font-size: 0.72rem;
+  color: #718096;
+  font-family: monospace;
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+.product-option-empty {
+  font-size: 0.85rem !important;
+  color: #a0aec0 !important;
+  font-style: italic;
+  display: flex !important;
+  align-items: center;
+  gap: 0.4rem;
+}
+
 // Scrollbar personalizado
 ::-webkit-scrollbar {
   width: 6px;

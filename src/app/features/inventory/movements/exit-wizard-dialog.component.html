@@ -59,14 +59,14 @@
         </div>
 
         <div class="product-row-fields">
-          <mat-form-field appearance="outline" class="field-product">
-            <mat-label>Producto *</mat-label>
-            <mat-select formControlName="product_id">
-              @for (p of data.products; track p.id) {
-                <mat-option [value]="p.id">{{ p.code }} — {{ p.name }}</mat-option>
-              }
-            </mat-select>
-          </mat-form-field>
+          <div class="field-product">
+            <app-product-search
+              label="Producto"
+              [required]="true"
+              [selectedProduct]="rowSelectedProducts()[i]"
+              (productSelected)="onRowProductSelected(i, $event)">
+            </app-product-search>
+          </div>
 
           <mat-form-field appearance="outline" class="field-qty">
             <mat-label>Cantidad *</mat-label>
@@ -76,7 +76,7 @@
             } @else if (rowStocks()[i]?.summary) {
               <mat-hint>
                 Disponible: {{ rowStocks()[i].summary!.available_quantity }}
-                {{ getProduct(asGroup(row).get('product_id')?.value)?.base_unit?.abbreviation || 'uds' }}
+                {{ rowSelectedProducts()[i]?.base_unit?.abbreviation || 'uds' }}
               </mat-hint>
             }
           </mat-form-field>
@@ -118,7 +118,7 @@
             } @else {
               <span class="row-stock-qty" [class.row-stock-qty--zero]="rowExitableQty(i) === 0">
                 {{ rowExitableQty(i) }}
-                {{ getProduct(asGroup(row).get('product_id')?.value)?.base_unit?.abbreviation || 'uds' }}
+                {{ rowSelectedProducts()[i]?.base_unit?.abbreviation || 'uds' }}
               </span>
               <span class="row-stock-label">disponibles en {{ selectedWarehouseName }}</span>
             }
@@ -192,7 +192,7 @@
       </div>
       <div class="step2-summary-rows">
         @for (row of productRows.controls; track $index; let i = $index) {
-          @if (getProduct(asGroup(row).get('product_id')?.value); as prod) {
+          @if (rowSelectedProducts()[i]; as prod) {
             <span class="step2-summary-chip">{{ prod.code }} × {{ asGroup(row).get('quantity')?.value }}</span>
           }
         }
