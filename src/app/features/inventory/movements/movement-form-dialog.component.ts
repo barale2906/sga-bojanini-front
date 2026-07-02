@@ -365,6 +365,8 @@ export class MovementFormDialogComponent implements OnInit {
     lot_number:               [''],
     expiration_date:          [''],
     manufacturing_date:       [''],
+    invoice_number:           [''],
+    entry_temperature:        [null as number | null],
     reason:                   [''],
     loss_reason_category:     [null as string | null],
     notes:                    [''],
@@ -915,6 +917,8 @@ export class MovementFormDialogComponent implements OnInit {
         lot_number:         v.lot_number         || undefined,
         expiration_date:    v.expiration_date     || undefined,
         manufacturing_date: v.manufacturing_date  || undefined,
+        invoice_number:     v.invoice_number      || undefined,
+        entry_temperature:  v.entry_temperature   != null ? v.entry_temperature : undefined,
         notes:              v.notes               || undefined,
       };
 

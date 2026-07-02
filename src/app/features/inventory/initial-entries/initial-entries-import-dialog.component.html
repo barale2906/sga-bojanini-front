@@ -16,6 +16,14 @@
       La zona y el estante se calculan siempre de forma automática.
     </p>
 
+    <div class="new-cols-note">
+      <mat-icon>thermostat</mat-icon>
+      <span>
+        La plantilla incluye las columnas opcionales <strong>invoice_number</strong> (N° factura del proveedor)
+        y <strong>entry_temperature</strong> (temperatura de recepción en °C, admite negativos y decimales).
+      </span>
+    </div>
+
     <div class="upload-zone" [class.drag-over]="dragging()"
          (dragover)="$event.preventDefault(); dragging.set(true)"
          (dragleave)="dragging.set(false)"
@@ -64,6 +72,12 @@
             <span>{{ formatRowErrors(e.errors) }}</span>
           </div>
         }
+      </div>
+    }
+    @if (r.failed === 0) {
+      <div class="expired-lots-note">
+        <mat-icon>info</mat-icon>
+        <span>Algunos lotes pueden estar excluidos del stock disponible por tener fecha de vencimiento anterior a hoy.</span>
       </div>
     }
   }

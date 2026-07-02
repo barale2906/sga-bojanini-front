@@ -107,6 +107,14 @@
 .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.25rem 0.75rem; padding: 0.5rem 0; }
 .span2 { grid-column: span 2; }
 
+// ── Hints: más pequeños y claramente secundarios ─────────────
+.form-grid ::ng-deep .mat-mdc-form-field-hint {
+  font-size: 0.68rem;
+  color: #a0aec0;
+  font-style: italic;
+  letter-spacing: 0.01em;
+}
+
 // ── Modo de ingreso ──────────────────────────────────────────
 .mode-toggle {
   display: flex; align-items: center; gap: 0.5rem;

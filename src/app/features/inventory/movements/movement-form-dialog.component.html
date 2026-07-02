@@ -204,6 +204,16 @@
         <mat-label>Fecha de Fabricación</mat-label>
         <input matInput type="date" formControlName="manufacturing_date" />
       </mat-form-field>
+      <mat-form-field appearance="outline">
+        <mat-label>N° de Factura</mat-label>
+        <input matInput formControlName="invoice_number" maxlength="100" placeholder="FAC-2025-00892" />
+        <mat-hint>Número de factura del proveedor (opcional)</mat-hint>
+      </mat-form-field>
+      <mat-form-field appearance="outline">
+        <mat-label>Temperatura de entrada (°C)</mat-label>
+        <input matInput type="number" formControlName="entry_temperature" step="0.1" placeholder="4.5" />
+        <mat-hint>Temperatura registrada al recibir el producto (opcional)</mat-hint>
+      </mat-form-field>
 
       <!-- Toggle distribución (solo si hay almacén) -->
       @if (form.get('warehouse_id')?.value) {
