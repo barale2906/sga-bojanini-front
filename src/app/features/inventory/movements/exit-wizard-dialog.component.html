@@ -34,7 +34,7 @@
   <!-- ═══════════════════ PASO 1: PRODUCTOS ════════════════════ -->
   @if (step() === 1) {
 
-    <!-- Almacén (global para todas las filas) -->
+    <!-- Almacén -->
     <div class="section-title">
       <mat-icon>warehouse</mat-icon>
       <span>Almacén de despacho</span>
@@ -49,164 +49,195 @@
       </mat-select>
     </mat-form-field>
 
-    <!-- Filas de productos -->
-    <div class="section-title" style="margin-top:0.5rem">
-      <mat-icon>inventory_2</mat-icon>
-      <span>Productos a despachar</span>
+    <!-- Scanner -->
+    <div class="section-title scanner-section-title">
+      <mat-icon>barcode_scanner</mat-icon>
+      <span>Escanear / buscar producto</span>
+      @if (!warehouseControl.value) {
+        <span class="scanner-inactive-badge">Seleccione un almacén primero</span>
+      }
     </div>
 
-    @for (row of productRows.controls; track $index; let i = $index) {
-      <div class="product-row-card" [formGroup]="asGroup(row)">
+    <app-product-search
+      #scanner
+      label="Escanee código de barras o busque un producto"
+      [disabled]="!warehouseControl.value || scannerChecking()"
+      (productSelected)="onScanProduct($event)">
+    </app-product-search>
 
-        <div class="product-row-header">
-          <span class="product-row-num">Producto {{ i + 1 }}</span>
-          @if (productRows.length > 1) {
-            <button mat-icon-button type="button" color="warn"
-                    (click)="removeProductRow(i)"
-                    matTooltip="Quitar producto">
-              <mat-icon>remove_circle_outline</mat-icon>
-            </button>
-          }
-        </div>
-
-        <div class="product-row-fields">
-          <div class="field-product">
-            <app-product-search
-              label="Producto"
-              [required]="true"
-              [selectedProduct]="rowSelectedProducts()[i]"
-              (productSelected)="onRowProductSelected(i, $event)">
-            </app-product-search>
-          </div>
-
-          <mat-form-field appearance="outline" class="field-qty">
-            <mat-label>Cantidad *</mat-label>
-            <input matInput type="number" formControlName="quantity" min="1" />
-            @if (rowStocks()[i]?.isKit) {
-              <mat-hint>Armables: {{ rowStocks()[i]?.kitAvailable ?? 0 }} kit(s)</mat-hint>
-            } @else if (rowStocks()[i]?.summary) {
-              <mat-hint>
-                Disponible: {{ rowStocks()[i].summary!.available_quantity }}
-                {{ rowSelectedProducts()[i]?.base_unit?.abbreviation || 'uds' }}
-              </mat-hint>
-            }
-          </mat-form-field>
-
-          @if (warehouseControl.value && locations().length > 0) {
-            <mat-form-field appearance="outline" class="field-location">
-              <mat-label>Ubicación (opcional)</mat-label>
-              <mat-select formControlName="location_id">
-                <mat-option [value]="null">
-                  FEFO automático
-                  @if (fefoFirstLocation(i)) { ({{ fefoFirstLocation(i) }}) }
-                </mat-option>
-                @for (l of locations(); track l.id) {
-                  <mat-option [value]="l.id">{{ l.name }}</mat-option>
-                }
-              </mat-select>
-            </mat-form-field>
-          }
-        </div>
-
-        <!-- Stock / FEFO del producto -->
-        @if (rowStocks()[i]?.loadingStock || rowStocks()[i]?.loadingFefo) {
-          <div class="row-loading">
-            <mat-spinner diameter="14"></mat-spinner>
-            <span>Verificando stock...</span>
-          </div>
-        }
-
-        @if (!rowStocks()[i]?.loadingStock && (rowStocks()[i]?.isKit || rowStocks()[i]?.summary)) {
-          <div class="row-stock-panel row-stock-panel--{{ rowStockStatus(i) }}">
-            <mat-icon class="row-stock-icon">
-              {{ rowExitableQty(i) === 0 ? 'remove_shopping_cart' : rowStockStatus(i) === 'warn' ? 'warning' : 'check_circle' }}
-            </mat-icon>
-            @if (rowStocks()[i]?.isKit) {
-              <span class="row-stock-qty" [class.row-stock-qty--zero]="rowExitableQty(i) === 0">
-                {{ rowExitableQty(i) }} kit(s)
-              </span>
-              <span class="row-stock-label">armables en {{ selectedWarehouseName }} según stock de componentes</span>
-            } @else {
-              <span class="row-stock-qty" [class.row-stock-qty--zero]="rowExitableQty(i) === 0">
-                {{ rowExitableQty(i) }}
-                {{ rowSelectedProducts()[i]?.base_unit?.abbreviation || 'uds' }}
-              </span>
-              <span class="row-stock-label">disponibles en {{ selectedWarehouseName }}</span>
-            }
-          </div>
-        }
-
-        @if (rowStocks()[i]?.checkingExpired) {
-          <div class="row-loading">
-            <mat-spinner diameter="14"></mat-spinner>
-            <span>Verificando lotes vencidos...</span>
-          </div>
-        }
-
-        @if (!rowStocks()[i]?.loadingFefo && !rowStocks()[i]?.checkingExpired) {
-          @if (rowExitableQty(i) === 0) {
-            @if (rowStocks()[i]?.isKit) {
-              <div class="zero-stock-warn">
-                <mat-icon>block</mat-icon>
-                <span>No hay stock suficiente de los componentes de este kit en el almacén seleccionado.</span>
-              </div>
-            } @else if (rowStocks()[i]?.expiredOnly) {
-              <div class="zero-stock-warn zero-stock-warn--expired">
-                <mat-icon>event_busy</mat-icon>
-                <span>Este producto solo tiene stock vencido en {{ selectedWarehouseName }}. Gestione el lote vencido mediante una devolución, un ajuste o una baja por vencimiento antes de continuar.</span>
-              </div>
-            } @else {
-              <div class="zero-stock-warn">
-                <mat-icon>block</mat-icon>
-                <span>Sin stock disponible para este producto en el almacén seleccionado.</span>
-              </div>
-            }
-          } @else if (rowStocks()[i]?.isKit) {
-            <div class="fefo-mini-panel">
-              <mat-icon class="fefo-mini-icon">build</mat-icon>
-              <span class="fefo-mini-label">Disponibilidad calculada según el stock vigente de los componentes del kit (FEFO por componente al despachar).</span>
-            </div>
-          } @else {
-            <div class="fefo-mini-panel">
-              <mat-icon class="fefo-mini-icon">fact_check</mat-icon>
-              <span class="fefo-mini-label">Lotes FEFO:</span>
-              @for (lote of rowStocks()[i].fefo; track lote.id; let first = $first) {
-                <span class="fefo-mini-chip" [class.fefo-mini-chip--first]="first">
-                  {{ first ? '★' : '' }} {{ lote.lot_number }}
-                  ({{ lote.quantity_available }} uds
-                  @if (lote.expiration_date) { · vence {{ lote.expiration_date | date:'dd/MM/yy' }} }
-                  )
-                </span>
-              }
-            </div>
-          }
-        }
-
+    @if (scannerChecking()) {
+      <div class="scanner-status scanner-status--checking">
+        <mat-spinner diameter="14"></mat-spinner>
+        <span>Verificando disponibilidad de stock...</span>
+      </div>
+    }
+    @if (scanError()) {
+      <div class="scanner-status scanner-status--error">
+        <mat-icon>error_outline</mat-icon>
+        <span>{{ scanError() }}</span>
       </div>
     }
 
-    <button mat-stroked-button type="button" class="add-row-btn" (click)="addProductRow()">
-      <mat-icon>add</mat-icon>
-      Agregar otro producto
-    </button>
+    <!-- Lista temporal (carrito) -->
+    @if (cartItems().length > 0) {
+      <div class="section-title" style="margin-top:0.9rem">
+        <mat-icon>shopping_cart</mat-icon>
+        <span>Productos a despachar</span>
+        <span class="cart-count-badge">{{ cartItems().length }}</span>
+      </div>
+
+      @for (item of cartItems(); track item.product.id; let i = $index) {
+        <div class="cart-item-card cart-item-card--{{ cartStockStatus(i) }}">
+
+          <div class="cart-item-main">
+            <div class="cart-item-product">
+              <code class="code-tag">{{ item.product.code }}</code>
+              <span class="cart-item-name">{{ item.product.name }}</span>
+            </div>
+            <div class="cart-item-qty">
+              <button mat-icon-button type="button" class="qty-btn"
+                      (click)="decrementCartQty(i)"
+                      [disabled]="item.quantity <= 1">
+                <mat-icon>remove</mat-icon>
+              </button>
+              <mat-form-field appearance="outline" class="qty-field">
+                <input matInput type="number" [value]="item.quantity" min="1"
+                       (change)="updateCartQty(i, +$any($event.target).value)" />
+              </mat-form-field>
+              <button mat-icon-button type="button" class="qty-btn"
+                      (click)="incrementCartQty(i)">
+                <mat-icon>add</mat-icon>
+              </button>
+              <button mat-icon-button type="button" color="warn"
+                      (click)="removeCartItem(i)"
+                      matTooltip="Quitar producto">
+                <mat-icon>delete_outline</mat-icon>
+              </button>
+            </div>
+          </div>
+
+          <!-- Stock / FEFO info -->
+          @if (item.loadingStock || item.loadingFefo) {
+            <div class="row-loading">
+              <mat-spinner diameter="12"></mat-spinner>
+              <span>Verificando stock...</span>
+            </div>
+          }
+          @if (item.checkingExpired) {
+            <div class="row-loading">
+              <mat-spinner diameter="12"></mat-spinner>
+              <span>Verificando lotes vencidos...</span>
+            </div>
+          }
+
+          @if (!item.loadingStock && !item.loadingFefo && !item.checkingExpired) {
+            @if (item.isKit) {
+              @if (item.kitAvailable === 0) {
+                <div class="zero-stock-warn">
+                  <mat-icon>block</mat-icon>
+                  <span>Sin stock de componentes en {{ selectedWarehouseName }}</span>
+                </div>
+              } @else if (item.kitAvailable !== null) {
+                <div class="cart-fefo-row">
+                  <mat-icon class="fefo-mini-icon">build</mat-icon>
+                  <span>{{ item.kitAvailable }} kit(s) armables en {{ selectedWarehouseName }}</span>
+                </div>
+              }
+            } @else if (item.fefo.length > 0) {
+              <div class="cart-fefo-row">
+                <mat-icon class="fefo-mini-icon">fact_check</mat-icon>
+                @for (lote of item.fefo; track lote.id; let first = $first) {
+                  <span class="fefo-mini-chip" [class.fefo-mini-chip--first]="first">
+                    {{ first ? '★' : '' }} {{ lote.lot_number }}
+                    ({{ lote.quantity_available }} uds
+                    @if (lote.expiration_date) { · vence {{ lote.expiration_date | date:'dd/MM/yy' }} }
+                    )
+                  </span>
+                }
+              </div>
+            } @else if (item.expiredOnly) {
+              <div class="zero-stock-warn zero-stock-warn--expired">
+                <mat-icon>event_busy</mat-icon>
+                <span>Solo tiene stock vencido en {{ selectedWarehouseName }}. Gestione el lote antes de continuar.</span>
+              </div>
+            } @else if (item.summary !== null) {
+              <div class="zero-stock-warn">
+                <mat-icon>block</mat-icon>
+                <span>Sin stock disponible en {{ selectedWarehouseName }}</span>
+              </div>
+            }
+
+            @if (item.quantity > cartExitableQty(i) && cartExitableQty(i) > 0) {
+              <div class="zero-stock-warn" style="margin-top:0.25rem">
+                <mat-icon>warning</mat-icon>
+                <span>Cantidad solicitada ({{ item.quantity }}) supera lo disponible ({{ cartExitableQty(i) }})</span>
+              </div>
+            }
+          }
+
+        </div>
+      }
+
+    } @else if (warehouseControl.value) {
+      <div class="cart-empty-hint">
+        <mat-icon>barcode_scanner</mat-icon>
+        <span>Escanee un código de barras o busque un producto para comenzar</span>
+      </div>
+    }
 
   } <!-- /paso 1 -->
 
   <!-- ═══════════════════ PASO 2: CENTRO DE COSTOS ═════════════ -->
   @if (step() === 2) {
 
-    <!-- Resumen de productos (readonly) -->
-    <div class="step2-summary">
-      <div class="step2-summary-header">
-        <mat-icon>inventory_2</mat-icon>
-        <span>{{ productRows.length }} producto{{ productRows.length !== 1 ? 's' : '' }} · Almacén: {{ selectedWarehouseName }}</span>
+    <!-- Resumen de despacho por lote (FEFO) -->
+    <div class="dispatch-preview">
+      <div class="dispatch-preview-header">
+        <mat-icon>fact_check</mat-icon>
+        <span>Despacho — {{ selectedWarehouseName }}</span>
+        <span class="dispatch-preview-badge">
+          {{ dispatchPreview().length }} línea{{ dispatchPreview().length !== 1 ? 's' : '' }} ·
+          {{ cartItems().length }} producto{{ cartItems().length !== 1 ? 's' : '' }}
+        </span>
       </div>
-      <div class="step2-summary-rows">
-        @for (row of productRows.controls; track $index; let i = $index) {
-          @if (rowSelectedProducts()[i]; as prod) {
-            <span class="step2-summary-chip">{{ prod.code }} × {{ asGroup(row).get('quantity')?.value }}</span>
-          }
-        }
+      <div class="dispatch-table-wrap">
+        <table class="dispatch-table">
+          <thead>
+            <tr>
+              <th>Producto</th>
+              <th class="col-center">Lote</th>
+              <th class="col-center">Vencimiento</th>
+              <th class="col-center">Cant.</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (line of dispatchPreview(); track $index) {
+              <tr>
+                <td>
+                  <span class="dispatch-code">{{ line.product_code }}</span>
+                  {{ line.product_name }}
+                </td>
+                <td class="col-center">
+                  @if (line.is_kit) {
+                    <span class="dispatch-badge dispatch-badge--kit">Kit</span>
+                  } @else if (line.lot_number) {
+                    <span class="dispatch-badge">{{ line.lot_number }}</span>
+                  } @else {
+                    <span class="col-dash">—</span>
+                  }
+                </td>
+                <td class="col-center">
+                  @if (line.expiration_date) {
+                    {{ line.expiration_date | date:'dd/MM/yyyy':'UTC' }}
+                  } @else {
+                    <span class="col-dash">—</span>
+                  }
+                </td>
+                <td class="col-center col-qty-dispatch">{{ line.quantity }}</td>
+              </tr>
+            }
+          </tbody>
+        </table>
       </div>
     </div>
 
@@ -259,7 +290,6 @@
               <mat-label>Nombres *</mat-label>
               <input matInput formControlName="patient_first_name" maxlength="100" placeholder="Carlos Andrés" />
             </mat-form-field>
-
             <mat-form-field appearance="outline">
               <mat-label>Apellidos *</mat-label>
               <input matInput formControlName="patient_last_name" maxlength="100" placeholder="Pérez Gómez" />
@@ -272,13 +302,11 @@
               <input matInput formControlName="patient_document" maxlength="50" placeholder="1012345678" />
               <mat-hint>Cédula o documento</mat-hint>
             </mat-form-field>
-
             <mat-form-field appearance="outline">
               <mat-label>ID en Sistema Clínico *</mat-label>
               <input matInput formControlName="patient_external_id" maxlength="100" placeholder="EXT-00892" />
               <mat-hint>ID en el HIS/EMR</mat-hint>
             </mat-form-field>
-
             <mat-form-field appearance="outline">
               <mat-label>Fecha de Atención *</mat-label>
               <input matInput [matDatepicker]="serviceDatePicker" formControlName="service_date" />
@@ -287,7 +315,6 @@
             </mat-form-field>
           </div>
 
-          <!-- Selector de servicio para filtrar procedimientos -->
           <div class="section-title" style="margin-top:0.75rem">
             <mat-icon>medical_services</mat-icon>
             <span>Procedimientos aplicados</span>
@@ -313,22 +340,18 @@
             </mat-form-field>
           }
 
-          <!-- Filas de procedimientos -->
           @if (centerForm.get('filter_service_id')?.value && selectedProcedures().length > 0) {
             @for (row of procedureRows.controls; track $index; let i = $index) {
               <div class="procedure-row-card" [formGroup]="asGroup(row)">
-
                 <div class="procedure-row-header">
                   <span class="procedure-row-num">Procedimiento {{ i + 1 }}</span>
                   @if (procedureRows.length > 1) {
                     <button mat-icon-button type="button" color="warn"
-                            (click)="removeProcedureRow(i)"
-                            matTooltip="Quitar procedimiento">
+                            (click)="removeProcedureRow(i)" matTooltip="Quitar procedimiento">
                       <mat-icon>remove_circle_outline</mat-icon>
                     </button>
                   }
                 </div>
-
                 <div class="procedure-row-fields">
                   <mat-form-field appearance="outline" class="field-procedure">
                     <mat-label>Procedimiento *</mat-label>
@@ -338,12 +361,10 @@
                       }
                     </mat-select>
                   </mat-form-field>
-
                   <mat-form-field appearance="outline" class="field-qty-sm">
                     <mat-label>Cantidad *</mat-label>
                     <input matInput type="number" formControlName="quantity" min="1" />
                   </mat-form-field>
-
                   <mat-form-field appearance="outline" class="field-price">
                     <mat-label>Valor unitario *</mat-label>
                     <input matInput type="number" formControlName="unit_price" min="0" step="100" />
@@ -355,11 +376,9 @@
                     }
                   </mat-form-field>
                 </div>
-
                 <div class="procedure-row-total">
                   Total: <strong>{{ rowProcedureTotal(i) | currency:'COP':'symbol':'1.0-0' }}</strong>
                 </div>
-
                 <mat-form-field appearance="outline" class="full-width">
                   <mat-label>Evolución Clínica</mat-label>
                   <input matInput formControlName="notes" maxlength="500" />
@@ -367,15 +386,12 @@
                     <mat-error>La evolución clínica es obligatoria</mat-error>
                   }
                 </mat-form-field>
-
               </div>
             }
-
             <button mat-stroked-button type="button" class="add-row-btn" (click)="addProcedureRow()">
               <mat-icon>add</mat-icon>
               Agregar procedimiento
             </button>
-
             @if (procedureRows.length > 0) {
               <div class="procedures-total-bar">
                 <span>Total procedimientos:</span>
@@ -468,16 +484,12 @@
             <td class="col-center">
               @if (line.lot_number) {
                 <span class="lot-chip">{{ line.lot_number }}</span>
-              } @else {
-                <span class="col-dash">—</span>
-              }
+              } @else { <span class="col-dash">—</span> }
             </td>
             <td class="col-center">
               @if (line.expiration_date) {
                 {{ line.expiration_date | date:'dd/MM/yyyy':'UTC' }}
-              } @else {
-                <span class="col-dash">—</span>
-              }
+              } @else { <span class="col-dash">—</span> }
             </td>
             <td class="col-center col-qty">{{ line.quantity }}</td>
           </tr>
@@ -493,21 +505,18 @@
   @if (step() < 3) {
     <button mat-button [mat-dialog-close]="false" [disabled]="saving()">Cancelar</button>
   }
-
   @if (step() === 2) {
     <button mat-stroked-button type="button" (click)="prevStep()" [disabled]="saving()">
       <mat-icon>chevron_left</mat-icon>
       Atrás
     </button>
   }
-
   @if (step() === 1) {
     <button mat-raised-button color="primary" [disabled]="!isStep1Valid" (click)="nextStep()">
       Siguiente
       <mat-icon>chevron_right</mat-icon>
     </button>
   }
-
   @if (step() === 2) {
     <button mat-raised-button color="primary"
             [disabled]="!isStep2Valid || saving()"
@@ -516,7 +525,6 @@
       Registrar Salida
     </button>
   }
-
   @if (step() === 3) {
     <button mat-stroked-button type="button" (click)="printComprobante()">
       <mat-icon>print</mat-icon>

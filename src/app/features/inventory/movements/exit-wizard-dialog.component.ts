@@ -1,4 +1,4 @@
-import { Component, inject, signal, computed, OnInit } from '@angular/core';
+import { Component, inject, signal, computed, OnInit, ViewChild } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import {
   AbstractControl, FormArray, FormBuilder, FormGroup,
@@ -18,7 +18,7 @@ import { DateAdapter, MAT_DATE_FORMATS } from '@angular/material/core';
 import { forkJoin, finalize, of } from 'rxjs';
 import { map, catchError } from 'rxjs/operators';
 import { InventoryService, StockSummary, BatchDetail, CostCenter } from '../inventory.service';
-import { WarehouseService, Warehouse, Location } from '../../warehouse/warehouse.service';
+import { WarehouseService, Warehouse } from '../../warehouse/warehouse.service';
 import { Product } from '../../catalog/catalog.service';
 import { MedicalServicesService, MedicalServiceNode, ProcedurePrice } from '../medical-services.service';
 import { FormErrorsComponent } from '../../../shared/components/form-errors/form-errors.component';
@@ -28,7 +28,7 @@ import { MovementPdfService } from '../../../shared/services/movement-pdf.servic
 
 export interface ExitWizardDialogData {
   warehouses: Warehouse[];
-  products: Product[];
+  products:   Product[];
   inventorySvc: InventoryService;
 }
 
@@ -50,19 +50,26 @@ interface ExitSummaryData {
   withRecords:      boolean;
 }
 
-interface RowStock {
-  summary: StockSummary | null;
-  fefo: BatchDetail[];
-  loadingStock: boolean;
-  loadingFefo: boolean;
-  /** true mientras se verifica si el stock sin lotes vigentes corresponde a stock vencido */
+interface CartItem {
+  product:         Product;
+  quantity:        number;
+  summary:         StockSummary | null;
+  fefo:            BatchDetail[];
+  loadingStock:    boolean;
+  loadingFefo:     boolean;
   checkingExpired: boolean;
-  /** true si el producto no tiene stock vigente pero sí stock vencido en el almacén */
-  expiredOnly: boolean;
-  /** true si el producto seleccionado es de tipo kit (su disponibilidad depende del stock de sus componentes) */
-  isKit: boolean;
-  /** kits armables según el stock vigente de sus componentes en el almacén seleccionado */
-  kitAvailable: number | null;
+  expiredOnly:     boolean;
+  isKit:           boolean;
+  kitAvailable:    number | null;
+}
+
+interface DispatchLine {
+  product_name:    string;
+  product_code:    string;
+  lot_number:      string | null;
+  expiration_date: string | null;
+  quantity:        number;
+  is_kit:          boolean;
 }
 
 @Component({
@@ -79,9 +86,11 @@ interface RowStock {
     MatDatepickerModule, FormErrorsComponent, ProductSearchComponent,
   ],
   templateUrl: './exit-wizard-dialog.component.html',
-  styleUrl: './exit-wizard-dialog.component.scss',
+  styleUrl:    './exit-wizard-dialog.component.scss',
 })
 export class ExitWizardDialogComponent implements OnInit {
+  @ViewChild('scanner') scannerRef?: ProductSearchComponent;
+
   data: ExitWizardDialogData = inject(MAT_DIALOG_DATA);
   private ref    = inject(MatDialogRef<ExitWizardDialogComponent>);
   private fb     = inject(FormBuilder);
@@ -95,19 +104,11 @@ export class ExitWizardDialogComponent implements OnInit {
   errors          = signal<string[]>([]);
   exitSummaryData = signal<ExitSummaryData | null>(null);
 
-  // ── Step 1: Productos ────────────────────────────────────────
-  warehouseControl    = this.fb.control<number | null>(null, Validators.required);
-  productRows         = this.fb.array<FormGroup>([]);
-  locations           = signal<Location[]>([]);
-  rowStocks           = signal<RowStock[]>([]);
-  rowSelectedProducts = signal<(Product | null)[]>([]);
-
-  onRowProductSelected(rowIdx: number, product: Product | null): void {
-    this.rowSelectedProducts.update(arr => {
-      const a = [...arr]; a[rowIdx] = product; return a;
-    });
-    (this.productRows.at(rowIdx) as FormGroup).get('product_id')!.setValue(product?.id ?? null);
-  }
+  // ── Step 1: Scanner / Cart ────────────────────────────────────
+  warehouseControl  = this.fb.control<number | null>(null, Validators.required);
+  cartItems         = signal<CartItem[]>([]);
+  scannerChecking   = signal(false);
+  scanError         = signal<string | null>(null);
 
   // ── Step 2: Centro de costos y paciente ──────────────────────
   centerForm = this.fb.group({
@@ -122,14 +123,14 @@ export class ExitWizardDialogComponent implements OnInit {
   });
   procedureRows = this.fb.array<FormGroup>([]);
 
-  costCenters          = signal<CostCenter[]>([]);
-  loadingCostCenters   = signal(false);
-  servicesTree         = signal<MedicalServiceNode[]>([]);
-  loadingTree          = signal(false);
-  rowPrices            = signal<(ProcedurePrice | null)[]>([]);
-  rowPricesLoading     = signal<boolean[]>([]);
+  costCenters        = signal<CostCenter[]>([]);
+  loadingCostCenters = signal(false);
+  servicesTree       = signal<MedicalServiceNode[]>([]);
+  loadingTree        = signal(false);
+  rowPrices          = signal<(ProcedurePrice | null)[]>([]);
+  rowPricesLoading   = signal<boolean[]>([]);
 
-  // ── Computed ─────────────────────────────────────────────────
+  // ── Computed / helpers ────────────────────────────────────────
 
   get selectedCostCenter(): CostCenter | null {
     const id = this.centerForm.get('cost_center_id')?.value;
@@ -139,6 +140,28 @@ export class ExitWizardDialogComponent implements OnInit {
   get isExternalCenter(): boolean {
     return this.selectedCostCenter?.is_external === true;
   }
+
+  /** Vista previa de despacho por lote (FEFO), calculada en el cliente antes de confirmar. */
+  dispatchPreview = computed((): DispatchLine[] => {
+    const lines: DispatchLine[] = [];
+    for (const item of this.cartItems()) {
+      if (item.isKit) {
+        lines.push({ product_name: item.product.name, product_code: item.product.code, lot_number: null, expiration_date: null, quantity: item.quantity, is_kit: true });
+        continue;
+      }
+      let remaining = item.quantity;
+      for (const lote of item.fefo) {
+        if (remaining <= 0) break;
+        const fromLot = Math.min(remaining, lote.quantity_available);
+        lines.push({ product_name: item.product.name, product_code: item.product.code, lot_number: lote.lot_number, expiration_date: lote.expiration_date, quantity: fromLot, is_kit: false });
+        remaining -= fromLot;
+      }
+      if (remaining > 0) {
+        lines.push({ product_name: item.product.name, product_code: item.product.code, lot_number: null, expiration_date: null, quantity: remaining, is_kit: false });
+      }
+    }
+    return lines;
+  });
 
   selectedProcedures = computed((): MedicalServiceNode[] => {
     const serviceId = this.centerForm.get('filter_service_id')?.value;
@@ -153,16 +176,13 @@ export class ExitWizardDialogComponent implements OnInit {
 
   get isStep1Valid(): boolean {
     if (!this.warehouseControl.valid) return false;
-    if (this.productRows.length === 0) return false;
-    return this.productRows.controls.every((row, i) => {
-      const v = (row as FormGroup).value;
-      if (!v.product_id || !v.quantity || v.quantity < 1) return false;
-      const rs = this.rowStocks()[i];
-      if (!rs) return false;
-      if (rs.loadingStock || rs.loadingFefo || rs.checkingExpired) return false;
-      const exitable = this.rowExitableQty(i);
+    if (this.cartItems().length === 0) return false;
+    return this.cartItems().every((item, i) => {
+      if (item.quantity < 1) return false;
+      if (item.loadingStock || item.loadingFefo || item.checkingExpired) return false;
+      const exitable = this.cartExitableQty(i);
       if (exitable === 0) return false;
-      if (v.quantity > exitable) return false;
+      if (item.quantity > exitable) return false;
       return true;
     });
   }
@@ -184,27 +204,25 @@ export class ExitWizardDialogComponent implements OnInit {
   }
 
   ngOnInit(): void {
-    this._addProductRow();
-
-    // Almacén → ubicaciones + recargar stock de todas las filas
     this.warehouseControl.valueChanges.subscribe(wId => {
-      this.locations.set([]);
       if (wId) {
-        this.wSvc.getWarehouseLocations(Number(wId))
-          .subscribe({ next: r => this.locations.set(r.data), error: () => {} });
-        this.productRows.controls.forEach((_, i) => this._loadRowStock(i));
+        // Recargar stock de todos los items del carrito con el nuevo almacén
+        this.cartItems().forEach((_, i) => this._loadCartItemStock(i));
       } else {
-        this.rowStocks.update(arr => arr.map(r => ({ ...r, summary: null, fefo: [], checkingExpired: false, expiredOnly: false })));
+        // Limpiar info de stock si se quita el almacén
+        this.cartItems.update(arr => arr.map(item => ({
+          ...item,
+          summary: null, fefo: [], checkingExpired: false, expiredOnly: false,
+          loadingStock: false, loadingFefo: false,
+        })));
       }
     });
 
-    // Centros de costo
     this.loadingCostCenters.set(true);
     this.data.inventorySvc.getCostCenters({ is_active: true })
       .pipe(finalize(() => this.loadingCostCenters.set(false)))
       .subscribe({ next: r => this.costCenters.set(r.data), error: () => {} });
 
-    // Centro de costo → árbol si es externo
     this.centerForm.get('cost_center_id')!.valueChanges.subscribe(() => {
       this.procedureRows.clear();
       this.rowPrices.set([]);
@@ -213,12 +231,9 @@ export class ExitWizardDialogComponent implements OnInit {
         { patient_document: null, patient_external_id: null, patient_first_name: null, patient_last_name: null, filter_service_id: null },
         { emitEvent: false },
       );
-      if (this.isExternalCenter && !this.servicesTree().length) {
-        this._loadServicesTree();
-      }
+      if (this.isExternalCenter && !this.servicesTree().length) this._loadServicesTree();
     });
 
-    // Servicio padre → limpiar filas de procedimientos
     this.centerForm.get('filter_service_id')!.valueChanges.subscribe(() => {
       this.procedureRows.clear();
       this.rowPrices.set([]);
@@ -226,166 +241,246 @@ export class ExitWizardDialogComponent implements OnInit {
     });
   }
 
-  // ── Filas de productos ────────────────────────────────────────
+  // ── Gestión del carrito ───────────────────────────────────────
 
-  addProductRow(): void { this._addProductRow(); }
+  onScanProduct(product: Product | null): void {
+    if (!product || !this.warehouseControl.value) return;
+    this.scanError.set(null);
 
-  private _addProductRow(): void {
-    const row = this.fb.group({
-      product_id:  [null as number | null, Validators.required],
-      quantity:    [null as number | null, [Validators.required, Validators.min(1)]],
-      location_id: [null as number | null],
-    });
+    const existing = this.cartItems().findIndex(item => item.product.id === product.id);
 
-    // Cuando cambia el producto en esta fila → recargar stock
-    const idx = this.productRows.length;
-    row.get('product_id')!.valueChanges.subscribe(() => this._loadRowStock(idx));
+    if (existing >= 0) {
+      // Producto ya en carrito: validar antes de acumular
+      const item     = this.cartItems()[existing];
+      const exitable = this.cartExitableQty(existing);
+      const loading  = item.loadingStock || item.loadingFefo;
 
-    this.productRows.push(row);
-    this.rowStocks.update(arr => [...arr, {
-      summary: null, fefo: [], loadingStock: false, loadingFefo: false,
-      checkingExpired: false, expiredOnly: false, isKit: false, kitAvailable: null,
-    }]);
-    this.rowSelectedProducts.update(arr => [...arr, null]);
-  }
-
-  removeProductRow(i: number): void {
-    if (this.productRows.length <= 1) return;
-    this.productRows.removeAt(i);
-    this.rowStocks.update(arr => arr.filter((_, idx) => idx !== i));
-    this.rowSelectedProducts.update(arr => arr.filter((_, idx) => idx !== i));
-  }
-
-  private _loadRowStock(rowIdx: number): void {
-    const pId = (this.productRows.at(rowIdx) as FormGroup)?.get('product_id')?.value;
-    const wId = this.warehouseControl.value;
-    if (!pId || !wId) return;
-
-    const isKit = this.getProduct(Number(pId))?.product_type === 'kit';
-
-    this.rowStocks.update(arr => {
-      const a = [...arr];
-      if (a[rowIdx]) {
-        a[rowIdx] = {
-          ...a[rowIdx], isKit, loadingStock: true, loadingFefo: !isKit,
-          summary: null, fefo: [], kitAvailable: null, checkingExpired: false, expiredOnly: false,
-        };
+      if (!loading && exitable === 0) {
+        this.scanError.set(`"${product.name}" no tiene stock disponible en ${this.selectedWarehouseName}`);
+        this.scannerRef?.clear();
+        return;
       }
-      return a;
+      if (!loading && item.quantity >= exitable) {
+        this.scanError.set(`Stock insuficiente: solo hay ${exitable} unidad(es) de "${product.name}"`);
+        this.scannerRef?.clear();
+        return;
+      }
+      this.cartItems.update(arr => {
+        const u = [...arr]; u[existing] = { ...u[existing], quantity: u[existing].quantity + 1 }; return u;
+      });
+      this.scannerRef?.clear();
+      return;
+    }
+
+    // Producto nuevo: verificar stock ANTES de agregar al carrito
+    this.scannerChecking.set(true);
+    this._preCheckAndAdd(product);
+  }
+
+  private _preCheckAndAdd(product: Product): void {
+    const wId   = this.warehouseControl.value!;
+    const pId   = product.id;
+    const isKit = product.product_type === 'kit';
+
+    if (isKit) {
+      this.data.inventorySvc.getKitAvailability(pId, Number(wId))
+        .pipe(finalize(() => this.scannerChecking.set(false)))
+        .subscribe({
+          next: r => {
+            if (r.data.available_kits === 0) {
+              this.scanError.set(`Sin stock de "${product.name}" en ${this.selectedWarehouseName}`);
+            } else {
+              this.cartItems.update(arr => [...arr, {
+                product, quantity: 1,
+                summary: null, fefo: [], loadingStock: false, loadingFefo: false,
+                checkingExpired: false, expiredOnly: false,
+                isKit: true, kitAvailable: r.data.available_kits,
+              }]);
+            }
+            this.scannerRef?.clear();
+          },
+          error: () => {
+            this.scanError.set(`No se pudo verificar el stock de "${product.name}"`);
+            this.scannerRef?.clear();
+          },
+        });
+      return;
+    }
+
+    // Producto simple: verificar lotes FEFO disponibles
+    this.data.inventorySvc.getProductBatches(pId, true)
+      .pipe(finalize(() => this.scannerChecking.set(false)))
+      .subscribe({
+        next: r => {
+          const available = r.data.filter(b => b.status === 'active' && b.quantity_available > 0);
+          if (available.length === 0) {
+            this.scanError.set(`Sin stock disponible para "${product.name}" en ${this.selectedWarehouseName}`);
+            this.scannerRef?.clear();
+            return;
+          }
+          // Agregar al carrito con FEFO ya cargado; solo cargar el summary
+          const newIdx = this.cartItems().length;
+          this.cartItems.update(arr => [...arr, {
+            product, quantity: 1,
+            summary: null, fefo: available,
+            loadingStock: true, loadingFefo: false,
+            checkingExpired: false, expiredOnly: false,
+            isKit: false, kitAvailable: null,
+          }]);
+          this._loadCartItemSummaryOnly(newIdx);
+          this.scannerRef?.clear();
+        },
+        error: () => {
+          this.scanError.set(`No se pudo verificar el stock de "${product.name}"`);
+          this.scannerRef?.clear();
+        },
+      });
+  }
+
+  /** Carga solo el resumen de stock (cuando los lotes FEFO ya fueron pre-cargados). */
+  private _loadCartItemSummaryOnly(idx: number): void {
+    const item = this.cartItems()[idx];
+    const wId  = this.warehouseControl.value;
+    if (!item || !wId) return;
+    this.data.inventorySvc.getStockSummary(Number(wId), item.product.id)
+      .pipe(finalize(() => this.cartItems.update(arr => {
+        const u = [...arr]; if (u[idx]) u[idx] = { ...u[idx], loadingStock: false }; return u;
+      })))
+      .subscribe({
+        next:  r => this.cartItems.update(arr => {
+          const u = [...arr]; if (u[idx]) u[idx] = { ...u[idx], summary: r.data }; return u;
+        }),
+        error: () => this.cartItems.update(arr => {
+          const u = [...arr]; if (u[idx]) u[idx] = { ...u[idx], summary: null }; return u;
+        }),
+      });
+  }
+
+  removeCartItem(i: number): void {
+    this.cartItems.update(arr => arr.filter((_, idx) => idx !== i));
+  }
+
+  updateCartQty(i: number, qty: number): void {
+    const v = Math.max(1, Math.floor(qty) || 1);
+    this.cartItems.update(arr => {
+      const u = [...arr]; u[i] = { ...u[i], quantity: v }; return u;
+    });
+  }
+
+  incrementCartQty(i: number): void {
+    this.cartItems.update(arr => {
+      const u = [...arr]; u[i] = { ...u[i], quantity: u[i].quantity + 1 }; return u;
+    });
+  }
+
+  decrementCartQty(i: number): void {
+    if ((this.cartItems()[i]?.quantity ?? 1) <= 1) return;
+    this.cartItems.update(arr => {
+      const u = [...arr]; u[i] = { ...u[i], quantity: u[i].quantity - 1 }; return u;
+    });
+  }
+
+  cartExitableQty(i: number): number {
+    const item = this.cartItems()[i];
+    if (!item) return 0;
+    if (item.isKit) return item.kitAvailable ?? 0;
+    return item.fefo.reduce((sum, b) => sum + b.quantity_available, 0);
+  }
+
+  cartStockStatus(i: number): 'ok' | 'warn' | 'danger' | 'loading' | 'none' {
+    const item = this.cartItems()[i];
+    if (!item) return 'none';
+    if (item.loadingStock || item.loadingFefo || item.checkingExpired) return 'loading';
+    if (item.isKit) { if (item.kitAvailable === null) return 'none'; }
+    else if (!item.summary) return 'none';
+    const exitable = this.cartExitableQty(i);
+    if (exitable === 0) return 'danger';
+    if (item.quantity > exitable) return 'danger';
+    if (item.quantity > 0 && item.quantity > exitable * 0.8) return 'warn';
+    return 'ok';
+  }
+
+  private _loadCartItemStock(idx: number): void {
+    const item = this.cartItems()[idx];
+    const wId  = this.warehouseControl.value;
+    if (!item || !wId) return;
+
+    const pId   = item.product.id;
+    const isKit = item.product.product_type === 'kit';
+
+    this.cartItems.update(arr => {
+      const u = [...arr];
+      if (u[idx]) u[idx] = {
+        ...u[idx], isKit,
+        loadingStock: true, loadingFefo: !isKit,
+        summary: null, fefo: [], kitAvailable: null,
+        checkingExpired: false, expiredOnly: false,
+      };
+      return u;
     });
 
     if (isKit) {
-      // Los kits no tienen stock propio: su disponibilidad depende del stock
-      // vigente de sus componentes, calculado por el backend.
-      this.data.inventorySvc.getKitAvailability(Number(pId), Number(wId))
-        .pipe(finalize(() => this.rowStocks.update(arr => {
-          const a = [...arr]; if (a[rowIdx]) a[rowIdx] = { ...a[rowIdx], loadingStock: false }; return a;
+      this.data.inventorySvc.getKitAvailability(pId, Number(wId))
+        .pipe(finalize(() => this.cartItems.update(arr => {
+          const u = [...arr]; if (u[idx]) u[idx] = { ...u[idx], loadingStock: false }; return u;
         })))
         .subscribe({
-          next: r => this.rowStocks.update(arr => {
-            const a = [...arr]; if (a[rowIdx]) a[rowIdx] = { ...a[rowIdx], kitAvailable: r.data.available_kits }; return a;
+          next:  r => this.cartItems.update(arr => {
+            const u = [...arr]; if (u[idx]) u[idx] = { ...u[idx], kitAvailable: r.data.available_kits }; return u;
           }),
-          error: () => this.rowStocks.update(arr => {
-            const a = [...arr]; if (a[rowIdx]) a[rowIdx] = { ...a[rowIdx], kitAvailable: 0 }; return a;
+          error: () => this.cartItems.update(arr => {
+            const u = [...arr]; if (u[idx]) u[idx] = { ...u[idx], kitAvailable: 0 }; return u;
           }),
         });
       return;
     }
 
-    this.data.inventorySvc.getStockSummary(Number(wId), Number(pId))
-      .pipe(finalize(() => this.rowStocks.update(arr => {
-        const a = [...arr]; if (a[rowIdx]) a[rowIdx] = { ...a[rowIdx], loadingStock: false }; return a;
+    this.data.inventorySvc.getStockSummary(Number(wId), pId)
+      .pipe(finalize(() => this.cartItems.update(arr => {
+        const u = [...arr]; if (u[idx]) u[idx] = { ...u[idx], loadingStock: false }; return u;
       })))
       .subscribe({
-        next: r => this.rowStocks.update(arr => {
-          const a = [...arr]; if (a[rowIdx]) a[rowIdx] = { ...a[rowIdx], summary: r.data }; return a;
+        next:  r => this.cartItems.update(arr => {
+          const u = [...arr]; if (u[idx]) u[idx] = { ...u[idx], summary: r.data }; return u;
         }),
-        error: () => this.rowStocks.update(arr => {
-          const a = [...arr]; if (a[rowIdx]) a[rowIdx] = { ...a[rowIdx], summary: null }; return a;
+        error: () => this.cartItems.update(arr => {
+          const u = [...arr]; if (u[idx]) u[idx] = { ...u[idx], summary: null }; return u;
         }),
       });
 
-    this.data.inventorySvc.getProductBatches(Number(pId), true)
-      .pipe(finalize(() => this.rowStocks.update(arr => {
-        const a = [...arr]; if (a[rowIdx]) a[rowIdx] = { ...a[rowIdx], loadingFefo: false }; return a;
+    this.data.inventorySvc.getProductBatches(pId, true)
+      .pipe(finalize(() => this.cartItems.update(arr => {
+        const u = [...arr]; if (u[idx]) u[idx] = { ...u[idx], loadingFefo: false }; return u;
       })))
       .subscribe({
         next: r => {
           const available = r.data.filter(b => b.status === 'active' && b.quantity_available > 0);
-          this.rowStocks.update(arr => {
-            const a = [...arr];
-            if (a[rowIdx]) a[rowIdx] = { ...a[rowIdx], fefo: available };
-            return a;
+          this.cartItems.update(arr => {
+            const u = [...arr]; if (u[idx]) u[idx] = { ...u[idx], fefo: available }; return u;
           });
-          // Si no hay lotes vigentes, verificar si el producto tiene stock vencido en este almacén
-          if (available.length === 0) this._checkExpiredOnly(rowIdx, Number(pId));
+          if (available.length === 0) this._checkCartItemExpired(idx, pId);
         },
         error: () => {},
       });
   }
 
-  /** Verifica si un producto sin stock vigente tiene, en cambio, stock vencido en el almacén. */
-  private _checkExpiredOnly(rowIdx: number, productId: number): void {
-    this.rowStocks.update(arr => {
-      const a = [...arr];
-      if (a[rowIdx]) a[rowIdx] = { ...a[rowIdx], checkingExpired: true };
-      return a;
+  private _checkCartItemExpired(idx: number, productId: number): void {
+    this.cartItems.update(arr => {
+      const u = [...arr]; if (u[idx]) u[idx] = { ...u[idx], checkingExpired: true }; return u;
     });
-
     this.data.inventorySvc.getProductBatches(productId)
-      .pipe(finalize(() => this.rowStocks.update(arr => {
-        const a = [...arr]; if (a[rowIdx]) a[rowIdx] = { ...a[rowIdx], checkingExpired: false }; return a;
+      .pipe(finalize(() => this.cartItems.update(arr => {
+        const u = [...arr]; if (u[idx]) u[idx] = { ...u[idx], checkingExpired: false }; return u;
       })))
       .subscribe({
         next: r => {
           const hasExpiredStock = r.data.some(b => b.quantity_available > 0);
-          this.rowStocks.update(arr => {
-            const a = [...arr];
-            if (a[rowIdx]) a[rowIdx] = { ...a[rowIdx], expiredOnly: hasExpiredStock };
-            return a;
+          this.cartItems.update(arr => {
+            const u = [...arr]; if (u[idx]) u[idx] = { ...u[idx], expiredOnly: hasExpiredStock }; return u;
           });
         },
         error: () => {},
       });
-  }
-
-  /**
-   * Cantidad realmente disponible para salida: para productos simples, la
-   * suma de lotes vigentes (no vencidos); para kits, los kits armables según
-   * el stock de sus componentes en el almacén seleccionado.
-   */
-  rowExitableQty(i: number): number {
-    const s = this.rowStocks()[i];
-    if (s?.isKit) return s.kitAvailable ?? 0;
-    return (s?.fefo ?? []).reduce((sum, b) => sum + b.quantity_available, 0);
-  }
-
-  rowStockStatus(i: number): 'ok' | 'warn' | 'danger' | 'loading' | 'none' {
-    const s = this.rowStocks()[i];
-    if (!s) return 'none';
-    if (s.loadingStock || s.loadingFefo || s.checkingExpired) return 'loading';
-    if (s.isKit) { if (s.kitAvailable === null) return 'none'; }
-    else if (!s.summary) return 'none';
-    const qty = Number((this.productRows.at(i) as FormGroup)?.get('quantity')?.value) || 0;
-    const exitable = this.rowExitableQty(i);
-    if (exitable === 0) return 'danger';
-    if (qty > 0 && qty > exitable) return 'danger';
-    if (qty > 0 && qty > exitable * 0.8) return 'warn';
-    return 'ok';
-  }
-
-  fefoFirstLocation(i: number): string {
-    const first = this.rowStocks()[i]?.fefo?.[0];
-    if (!first?.locations?.length) return '';
-    const loc = first.locations[0];
-    return loc.zone ? `${loc.location_name} · ${loc.zone.zone_name}` : loc.location_name;
-  }
-
-  getProduct(productId: number | null): Product | null {
-    if (!productId) return null;
-    return this.rowSelectedProducts().find(p => p?.id === productId)
-      ?? this.data.products.find(p => p.id === productId)
-      ?? null;
   }
 
   asGroup(ctrl: AbstractControl): FormGroup { return ctrl as FormGroup; }
@@ -399,12 +494,10 @@ export class ExitWizardDialogComponent implements OnInit {
       unit_price:   [null as number | null, [Validators.required, Validators.min(0)]],
       notes:        ['', Validators.required],
     });
-
     const idx = this.procedureRows.length;
     row.get('procedure_id')!.valueChanges.subscribe(procId => {
       if (procId) this._loadProcedurePrice(idx, Number(procId));
     });
-
     this.procedureRows.push(row);
     this.rowPrices.update(arr => [...arr, null]);
     this.rowPricesLoading.update(arr => [...arr, false]);
@@ -419,18 +512,13 @@ export class ExitWizardDialogComponent implements OnInit {
 
   private _loadProcedurePrice(rowIdx: number, procedureId: number): void {
     this.rowPricesLoading.update(arr => { const a = [...arr]; a[rowIdx] = true; return a; });
-
     this.medSvc.getProcedurePrices(procedureId, { is_active: true })
       .pipe(finalize(() => this.rowPricesLoading.update(arr => { const a = [...arr]; a[rowIdx] = false; return a; })))
       .subscribe({
         next: r => {
           const valid = r.data.find(p => p.is_currently_valid) ?? r.data[0] ?? null;
           this.rowPrices.update(arr => { const a = [...arr]; a[rowIdx] = valid; return a; });
-          if (valid) {
-            (this.procedureRows.at(rowIdx) as FormGroup)
-              ?.get('unit_price')
-              ?.setValue(valid.unit_price, { emitEvent: false });
-          }
+          if (valid) (this.procedureRows.at(rowIdx) as FormGroup)?.get('unit_price')?.setValue(valid.unit_price, { emitEvent: false });
         },
         error: () => this.rowPrices.update(arr => { const a = [...arr]; a[rowIdx] = null; return a; }),
       });
@@ -438,15 +526,12 @@ export class ExitWizardDialogComponent implements OnInit {
 
   rowProcedureTotal(i: number): number {
     const row = this.procedureRows.at(i) as FormGroup;
-    const q = Number(row?.get('quantity')?.value) || 0;
-    const p = Number(row?.get('unit_price')?.value) || 0;
-    return q * p;
+    return (Number(row?.get('quantity')?.value) || 0) * (Number(row?.get('unit_price')?.value) || 0);
   }
 
   get proceduresGrandTotal(): number {
-    return (this.procedureRows.value as any[]).reduce((sum, r) => {
-      return sum + (Number(r.quantity) || 0) * (Number(r.unit_price) || 0);
-    }, 0);
+    return (this.procedureRows.value as any[]).reduce((sum, r) =>
+      sum + (Number(r.quantity) || 0) * (Number(r.unit_price) || 0), 0);
   }
 
   // ── Servicios médicos ─────────────────────────────────────────
@@ -458,7 +543,7 @@ export class ExitWizardDialogComponent implements OnInit {
       .subscribe({ next: r => this.servicesTree.set(r.data), error: () => {} });
   }
 
-  // ── Navegación entre pasos ────────────────────────────────────
+  // ── Navegación ────────────────────────────────────────────────
 
   nextStep(): void {
     if (!this.isStep1Valid) return;
@@ -479,16 +564,14 @@ export class ExitWizardDialogComponent implements OnInit {
     const wId = this.warehouseControl.value!;
     const cv  = this.centerForm.value;
 
-    const exitCalls = this.productRows.controls.map(ctrl => {
-      const rv = (ctrl as FormGroup).value;
+    const exitCalls = this.cartItems().map(item => {
       const payload: Record<string, unknown> = {
-        product_id:     rv.product_id,
+        product_id:     item.product.id,
         warehouse_id:   wId,
-        quantity:       rv.quantity,
+        quantity:       item.quantity,
         cost_center_id: cv.cost_center_id,
         reason:         cv.reason || undefined,
       };
-      if (rv.location_id) payload['location_id'] = rv.location_id;
       if (this.isExternalCenter) {
         payload['patient_document']    = cv.patient_document;
         payload['patient_external_id'] = cv.patient_external_id;
@@ -500,13 +583,13 @@ export class ExitWizardDialogComponent implements OnInit {
 
     forkJoin(exitCalls).subscribe({
       next: (results) => {
-        // Una salida de kit responde {kit_transaction_id, movements: [...]}
-        // (un movimiento por cada lote consumido de cada componente) en vez
-        // de un único movimiento; se expande a varias líneas del comprobante.
-        const flatMovements = results.flatMap(r =>
-          r.data?.kit_transaction_id ? (r.data.movements ?? []) : [r.data]
-        );
-
+        // POST /movements/exit devuelve data como array (un elemento por lote FEFO afectado)
+        // Los kits siguen devolviendo { kit_transaction_id, movements: [] }
+        const flatMovements = results.flatMap(r => {
+          if (r.data?.kit_transaction_id) return r.data.movements ?? [];
+          if (Array.isArray(r.data)) return r.data;
+          return [r.data]; // compatibilidad hacia atrás
+        });
         const wh = this.data.warehouses.find(w => w.id === wId);
         const cc = this.costCenters().find(c => c.id === cv.cost_center_id);
 
@@ -547,7 +630,6 @@ export class ExitWizardDialogComponent implements OnInit {
                 notes:               rv.notes || undefined,
               });
             });
-
             forkJoin(recordCalls).subscribe({
               next: () => {
                 this.exitSummaryData.update(d => d ? { ...d, withRecords: true } : d);

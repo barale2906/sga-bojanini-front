@@ -43,6 +43,8 @@ interface MovementRow {
   id: number | null;
   movement_type: string;
   product_name: string;
+  lot_number: string | null;
+  expiration_date: string | null;
   warehouse_name: string;
   warehouse_to_name: string | null;
   quantity: number;
@@ -104,7 +106,8 @@ export class InventoryPageComponent implements OnInit {
   batchMeta = signal<PaginationMeta>({ current_page: 1, last_page: 1, per_page: 25, total: 0 });
   expiringBatches = signal<Batch[]>([]);
   batchCols = ['actions', 'lot_number', 'product', 'status', 'quantity', 'expiration_date', 'days'];
-  batchFilters = this.fb.group({ status: [''], warehouse_id: [''] });
+  batchFilters = this.fb.group({ status: [''], warehouse_id: [''], product_id: [''] });
+  batchFilterProduct = signal<Product | null>(null);
 
   // Stock
   stock = signal<StockItem[]>([]);
@@ -116,7 +119,7 @@ export class InventoryPageComponent implements OnInit {
   // Movements
   moveDisplayRows = signal<MovementRow[]>([]);
   moveMeta = signal<PaginationMeta>({ current_page: 1, last_page: 1, per_page: 25, total: 0 });
-  moveCols = ['type', 'product', 'warehouse', 'quantity', 'user', 'created_at'];
+  moveCols = ['type', 'product', 'lot_number', 'expiration_date', 'warehouse', 'quantity', 'user', 'created_at'];
   moveFilters = this.fb.group({
     movement_type: [''],
     warehouse_id: [''],
@@ -153,6 +156,11 @@ export class InventoryPageComponent implements OnInit {
   // Producto seleccionado en cada filtro (para sincronizar con app-product-search)
   stockFilterProduct = signal<Product | null>(null);
   moveFilterProduct  = signal<Product | null>(null);
+
+  onBatchFilterProduct(p: Product | null): void {
+    this.batchFilterProduct.set(p);
+    this.batchFilters.patchValue({ product_id: p ? String(p.id) : '' });
+  }
 
   onStockFilterProduct(p: Product | null): void {
     this.stockFilterProduct.set(p);
@@ -241,8 +249,8 @@ export class InventoryPageComponent implements OnInit {
   }
 
   loadBatches(page = 1): void {
-    const { status, warehouse_id } = this.batchFilters.value;
-    this.svc.getBatches({ status: status || undefined, warehouse_id: warehouse_id ? Number(warehouse_id) : undefined, page, per_page: this.batchMeta().per_page }).subscribe({
+    const { status, warehouse_id, product_id } = this.batchFilters.value;
+    this.svc.getBatches({ status: status || undefined, warehouse_id: warehouse_id ? Number(warehouse_id) : undefined, product_id: product_id ? Number(product_id) : undefined, page, per_page: this.batchMeta().per_page }).subscribe({
       next: r => { this.batches.set(r.data ?? []); this.batchMeta.set(r.meta); },
       error: () => {},
     });
@@ -256,7 +264,7 @@ export class InventoryPageComponent implements OnInit {
     const { warehouse_id, product_id } = this.stockFilters.value;
     this.loading.set(true);
     this.svc.getStock({ warehouse_id: warehouse_id ? Number(warehouse_id) : undefined, product_id: product_id ? Number(product_id) : undefined, page, per_page: this.stockMeta().per_page }).subscribe({
-      next: r => { this.stock.set(r.data ?? []); this.stockMeta.set(r.meta); this.loading.set(false); },
+      next: r => { this.stock.set((r.data ?? []).filter(s => s.available_quantity > 0)); this.stockMeta.set(r.meta); this.loading.set(false); },
       error: () => this.loading.set(false),
     });
   }
@@ -281,6 +289,8 @@ export class InventoryPageComponent implements OnInit {
           id: m.id,
           movement_type: m.movement_type,
           product_name: m.product_name || m.product?.name || '—',
+          lot_number: m.batch_lot_number ?? null,
+          expiration_date: m.batch_expiration_date ?? null,
           warehouse_name: this.getWarehouseName(m.warehouse_id),
           warehouse_to_name: m.warehouse_to_name ?? (m.warehouse_to_id ? this.getWarehouseName(m.warehouse_to_id) : null),
           quantity: m.quantity,
@@ -331,7 +341,7 @@ export class InventoryPageComponent implements OnInit {
   private _openExitWizard(): void {
     this.dialog.open(ExitWizardDialogComponent, {
       data: { warehouses: this.warehouses(), products: this.products(), inventorySvc: this.svc },
-      width: '800px', maxWidth: '96vw', maxHeight: '94vh',
+      width: '95vw', maxWidth: '1020px', height: '93vh', maxHeight: '93vh',
     }).afterClosed().subscribe(result => {
       if (!result?.ok) return;
       this.loadStock(); this.loadMovements(); this.loadBatches();

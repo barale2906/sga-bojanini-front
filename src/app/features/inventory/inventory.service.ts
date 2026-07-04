@@ -90,6 +90,7 @@ export interface Movement {
   created_at: string;
   product_name: string;
   batch_lot_number: string | null;
+  batch_expiration_date: string | null;
   user_name: string;
   cost_center_id?: number | null;
   service_id?: number | null;

@@ -86,6 +86,13 @@
             @for (w of warehouses(); track w.id) { <mat-option [value]="w.id">{{ w.name }}</mat-option> }
           </mat-select>
         </mat-form-field>
+        <div class="sel">
+          <app-product-search
+            label="Producto"
+            [selectedProduct]="batchFilterProduct()"
+            (productSelected)="onBatchFilterProduct($event)">
+          </app-product-search>
+        </div>
       </div>
       <div class="table-wrap mat-elevation-z1">
         <table mat-table [dataSource]="batches()">
@@ -187,6 +194,16 @@
           <ng-container matColumnDef="product">
             <th mat-header-cell *matHeaderCellDef mat-sort-header>Producto</th>
             <td mat-cell *matCellDef="let m">{{ m.product_name }}</td>
+          </ng-container>
+          <ng-container matColumnDef="lot_number">
+            <th mat-header-cell *matHeaderCellDef>Lote</th>
+            <td mat-cell *matCellDef="let m">
+              @if (m.lot_number) { <code class="code-tag">{{ m.lot_number }}</code> } @else { — }
+            </td>
+          </ng-container>
+          <ng-container matColumnDef="expiration_date">
+            <th mat-header-cell *matHeaderCellDef>Vencimiento</th>
+            <td mat-cell *matCellDef="let m">{{ m.expiration_date ? (m.expiration_date | dateFormat) : '—' }}</td>
           </ng-container>
           <ng-container matColumnDef="warehouse">
             <th mat-header-cell *matHeaderCellDef mat-sort-header>Almacén</th>

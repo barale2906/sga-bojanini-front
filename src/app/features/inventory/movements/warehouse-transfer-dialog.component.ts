@@ -9,7 +9,7 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatDividerModule } from '@angular/material/divider';
-import { finalize, of } from 'rxjs';
+import { forkJoin, finalize, of } from 'rxjs';
 import { map, catchError } from 'rxjs/operators';
 import { InventoryService, StockSummary, BatchDetail } from '../inventory.service';
 import { MovementPdfService } from '../../../shared/services/movement-pdf.service';
@@ -218,21 +218,32 @@ export class WarehouseTransferDialogComponent implements OnInit {
 
     this.data.inventorySvc.transfer(payload).subscribe({
       next: res => {
+        // POST /movements/transfer ahora devuelve data como array (un elemento por lote FEFO)
+        const movements = Array.isArray(res.data) ? res.data : [res.data];
+        const firstMov  = movements[0];
         const wFrom = this.data.warehouses.find(w => w.id === v.warehouse_from_id);
         const wTo   = this.data.warehouses.find(w => w.id === v.warehouse_to_id);
-        const expiry$ = res.data.batch_id
-          ? this.data.inventorySvc.getBatchById(res.data.batch_id).pipe(map(b => b.data.expiration_date), catchError(() => of(null)))
-          : of(null);
-        expiry$.subscribe(expiration_date => {
+
+        forkJoin(movements.map(m =>
+          m.batch_id
+            ? this.data.inventorySvc.getBatchById(m.batch_id).pipe(map(b => b.data.expiration_date), catchError(() => of(null)))
+            : of(null)
+        )).subscribe(expirations => {
+          this.saving.set(false);
           this.pdfSvc.generateAndPrint({
             movement_type:     'transfer',
-            doc_id:            res.data.id,
-            date:              res.data.created_at,
-            user_name:         res.data.user_name,
+            doc_id:            firstMov.id,
+            date:              firstMov.created_at,
+            user_name:         firstMov.user_name,
             warehouse_name:    wFrom?.name ?? `Almacén ${v.warehouse_from_id}`,
             warehouse_to_name: wTo?.name   ?? `Almacén ${v.warehouse_to_id}`,
             reason:            v.reason || null,
-            lines: [{ product_name: res.data.product_name, lot_number: res.data.batch_lot_number, expiration_date, quantity: res.data.quantity }],
+            lines: movements.map((m, i) => ({
+              product_name:    m.product_name,
+              lot_number:      m.batch_lot_number,
+              expiration_date: expirations[i],
+              quantity:        m.quantity,
+            })),
           });
           this.ref.close(true);
         });
