@@ -1,7 +1,7 @@
 import { Component, inject, signal, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
-import { MatDialogModule, MAT_DIALOG_DATA, MatDialogRef } from '@angular/material/dialog';
+import { MatDialogModule, MAT_DIALOG_DATA, MatDialogRef, MatDialog } from '@angular/material/dialog';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatSelectModule } from '@angular/material/select';
@@ -13,6 +13,8 @@ import { forkJoin, finalize, of } from 'rxjs';
 import { map, catchError } from 'rxjs/operators';
 import { InventoryService, StockSummary, BatchDetail } from '../inventory.service';
 import { MovementPdfService } from '../../../shared/services/movement-pdf.service';
+import { MovementConfirmDialogComponent, MovementConfirmResult } from './movement-confirm-dialog.component';
+import { MovementPdfSignature } from '../../../shared/services/movement-pdf.service';
 import { WarehouseService, Warehouse, Location } from '../../warehouse/warehouse.service';
 import { Product } from '../../catalog/catalog.service';
 import { FormErrorsComponent } from '../../../shared/components/form-errors/form-errors.component';
@@ -41,6 +43,7 @@ export class WarehouseTransferDialogComponent implements OnInit {
   private fb     = inject(FormBuilder);
   private wSvc   = inject(WarehouseService);
   private pdfSvc = inject(MovementPdfService);
+  private dialog = inject(MatDialog);
 
   saving = signal(false);
   errors = signal<string[]>([]);
@@ -218,18 +221,17 @@ export class WarehouseTransferDialogComponent implements OnInit {
 
     this.data.inventorySvc.transfer(payload).subscribe({
       next: res => {
-        // POST /movements/transfer ahora devuelve data como array (un elemento por lote FEFO)
+        // POST /movements/transfer devuelve data como array (un elemento por lote FEFO)
         const movements = Array.isArray(res.data) ? res.data : [res.data];
         const firstMov  = movements[0];
         const wFrom = this.data.warehouses.find(w => w.id === v.warehouse_from_id);
         const wTo   = this.data.warehouses.find(w => w.id === v.warehouse_to_id);
 
-        forkJoin(movements.map(m =>
-          m.batch_id
-            ? this.data.inventorySvc.getBatchById(m.batch_id).pipe(map(b => b.data.expiration_date), catchError(() => of(null)))
-            : of(null)
-        )).subscribe(expirations => {
-          this.saving.set(false);
+        const printAndClose = (
+          expirations: (string | null)[],
+          deliveredBy: MovementPdfSignature | null,
+          receivedBy:  MovementPdfSignature | null,
+        ) => {
           this.pdfSvc.generateAndPrint({
             movement_type:     'transfer',
             doc_id:            firstMov.id,
@@ -244,8 +246,57 @@ export class WarehouseTransferDialogComponent implements OnInit {
               expiration_date: expirations[i],
               quantity:        m.quantity,
             })),
+            delivered_by: deliveredBy,
+            received_by:  receivedBy,
           });
           this.ref.close(true);
+        };
+
+        const fetchExpirationsAndFinish = (
+          deliveredBy: MovementPdfSignature | null,
+          receivedBy:  MovementPdfSignature | null,
+        ) => {
+          forkJoin(movements.map(m =>
+            m.batch_id
+              ? this.data.inventorySvc.getBatchById(m.batch_id).pipe(map(b => b.data.expiration_date), catchError(() => of(null)))
+              : of(null)
+          )).subscribe(expirations => {
+            this.saving.set(false);
+            printAndClose(expirations, deliveredBy, receivedBy);
+          });
+        };
+
+        const needsSignature = movements.some(m => m.status === 'pending_signature');
+
+        if (!needsSignature) {
+          fetchExpirationsAndFinish(null, null);
+          return;
+        }
+
+        this.saving.set(false);
+        const dialogRef = this.dialog.open(MovementConfirmDialogComponent, {
+          width: '560px',
+          maxWidth: '96vw',
+          disableClose: true,
+          data: {
+            movements:     movements.map(m => ({
+              id:               m.id,
+              product_name:     m.product_name,
+              batch_lot_number: m.batch_lot_number ?? null,
+              quantity:         m.quantity,
+              movement_type:    m.movement_type ?? 'transfer',
+            })),
+            warehouseName: wFrom?.name ?? `Almacén ${v.warehouse_from_id}`,
+            inventorySvc:  this.data.inventorySvc,
+          },
+        });
+
+        dialogRef.afterClosed().subscribe((result: MovementConfirmResult | { cancelled: true } | undefined) => {
+          if (result && 'confirmed' in result) {
+            fetchExpirationsAndFinish(result.delivered_by, result.received_by);
+          } else {
+            this.ref.close(false);
+          }
         });
       },
       error: err => {

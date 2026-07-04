@@ -1,7 +1,7 @@
 import { Component, inject, signal, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { AbstractControl, FormArray, FormBuilder, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
-import { MatDialogModule, MAT_DIALOG_DATA, MatDialogRef } from '@angular/material/dialog';
+import { MatDialogModule, MAT_DIALOG_DATA, MatDialogRef, MatDialog } from '@angular/material/dialog';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatSelectModule } from '@angular/material/select';
@@ -14,6 +14,8 @@ import { forkJoin, finalize, of } from 'rxjs';
 import { map, catchError } from 'rxjs/operators';
 import { InventoryService, StockSummary, BatchDetail, BatchLocation, CostCenter, MedicalService } from '../inventory.service';
 import { MovementPdfService } from '../../../shared/services/movement-pdf.service';
+import { MovementConfirmDialogComponent, MovementConfirmResult } from './movement-confirm-dialog.component';
+import { MovementPdfSignature } from '../../../shared/services/movement-pdf.service';
 import { WarehouseService, Warehouse, Location, LocationCapacity, Zone } from '../../warehouse/warehouse.service';
 import { CatalogService, Product, ProductPresentation, ProductClassification } from '../../catalog/catalog.service';
 import { PurchasingService, PurchaseOrder, PurchaseOrderItem } from '../../purchasing/purchasing.service';
@@ -66,6 +68,7 @@ export class MovementFormDialogComponent implements OnInit {
   private cSvc         = inject(CatalogService);
   private purchasingSvc = inject(PurchasingService);
   private pdfSvc       = inject(MovementPdfService);
+  private dialog       = inject(MatDialog);
 
   saving = signal(false);
   errors = signal<string[]>([]);
@@ -953,11 +956,23 @@ export class MovementFormDialogComponent implements OnInit {
         const calls = (this.transferRows.value as any[]).map((row: any) =>
           this.data.inventorySvc.transfer({ ...basePayload, location_from_id: v.location_from_id, location_to_id: row.location_to_id, quantity: Number(row.quantity) })
         );
-        forkJoin(calls).subscribe({ next: () => this.ref.close(true), error: err => this._handleError(err) });
+        forkJoin(calls).subscribe({
+          next: results => {
+            const allMovements = results.flatMap(r => Array.isArray(r.data) ? r.data : [r.data]);
+            this._afterMovements(allMovements, null, 'transfer');
+          },
+          error: err => this._handleError(err),
+        });
         return;
       }
       this.data.inventorySvc.transfer({ ...basePayload, location_from_id: v.location_from_id, location_to_id: v.location_to_id, quantity: v.quantity })
-        .subscribe({ next: () => this.ref.close(true), error: err => this._handleError(err) });
+        .subscribe({
+          next: res => {
+            const movements = Array.isArray(res.data) ? res.data : [res.data];
+            this._afterMovements(movements, null, 'transfer');
+          },
+          error: err => this._handleError(err),
+        });
       return;
     }
 
@@ -965,7 +980,7 @@ export class MovementFormDialogComponent implements OnInit {
     if (this.isAdjustment) {
       this.data.inventorySvc.adjustment({ ...basePayload, location_id: v.location_id || undefined, quantity: v.quantity, reason: v.reason })
         .subscribe({
-          next: res => this._printPdfAndClose(res.data, 'adjustment'),
+          next: res => this._afterMovements([res.data], res.data, 'adjustment'),
           error: err => this._handleError(err),
         });
       return;
@@ -1011,7 +1026,7 @@ export class MovementFormDialogComponent implements OnInit {
 
       this.data.inventorySvc.loss({ ...basePayload, batch_id: v.batch_id, location_id: v.location_id, quantity: v.quantity, reason })
         .subscribe({
-          next: res => this._printPdfAndClose(res.data, 'loss'),
+          next: res => this._afterMovements([res.data], res.data, 'loss'),
           error: err => this._handleError(err),
         });
       return;
@@ -1020,18 +1035,69 @@ export class MovementFormDialogComponent implements OnInit {
     // ── DEVOLUCIÓN ───────────────────────────────────────────────
     this.data.inventorySvc.return_({ ...basePayload, location_id: v.location_id || undefined, quantity: v.quantity })
       .subscribe({
-        next: res => this._printPdfAndClose(res.data, 'return'),
+        next: res => this._afterMovements([res.data], res.data, 'return'),
         error: err => this._handleError(err),
       });
   }
 
-  private _printPdfAndClose(movement: any, type: string): void {
+  private _afterMovements(movements: any[], singleMovement: any | null, type: string): void {
+    const needsSignature = movements.some(m => m?.status === 'pending_signature');
+    const wId = this.form.get('warehouse_id')?.value;
+    const wh  = this.data.warehouses.find(w => w.id === Number(wId));
+
+    if (!needsSignature) {
+      if (singleMovement) {
+        this._printPdfAndClose(singleMovement, type, null, null);
+      } else {
+        this.saving.set(false);
+        this.ref.close(true);
+      }
+      return;
+    }
+
+    this.saving.set(false);
+    const ref = this.dialog.open(MovementConfirmDialogComponent, {
+      width: '560px',
+      maxWidth: '96vw',
+      disableClose: true,
+      data: {
+        movements:     movements.map(m => ({
+          id:               m.id,
+          product_name:     m.product_name,
+          batch_lot_number: m.batch_lot_number ?? null,
+          quantity:         m.quantity,
+          movement_type:    m.movement_type ?? type,
+        })),
+        warehouseName: wh?.name ?? `Almacén ${wId}`,
+        inventorySvc:  this.data.inventorySvc,
+      },
+    });
+
+    ref.afterClosed().subscribe((result: MovementConfirmResult | { cancelled: true } | undefined) => {
+      if (result && 'confirmed' in result) {
+        if (singleMovement) {
+          this._printPdfAndClose(singleMovement, type, result.delivered_by, result.received_by);
+        } else {
+          this.ref.close(true);
+        }
+      } else {
+        this.ref.close(result && 'cancelled' in result ? false : undefined);
+      }
+    });
+  }
+
+  private _printPdfAndClose(
+    movement:    any,
+    type:        string,
+    deliveredBy: MovementPdfSignature | null,
+    receivedBy:  MovementPdfSignature | null,
+  ): void {
     const expiry$ = movement.batch_id
       ? this.data.inventorySvc.getBatchById(movement.batch_id).pipe(map(b => b.data.expiration_date), catchError(() => of(null)))
       : of(null);
 
     expiry$.subscribe(expiration_date => {
-      const wh = this.data.warehouses.find(w => w.id === movement.warehouse_id);
+      const wh   = this.data.warehouses.find(w => w.id === movement.warehouse_id);
       const whTo = movement.warehouse_to_id
         ? this.data.warehouses.find(w => w.id === movement.warehouse_to_id)
         : null;
@@ -1045,6 +1111,8 @@ export class MovementFormDialogComponent implements OnInit {
         reason:            movement.reason,
         cost_center_name:  movement.cost_center?.name ?? null,
         lines: [{ product_name: movement.product_name, lot_number: movement.batch_lot_number, expiration_date, quantity: movement.quantity }],
+        delivered_by:      deliveredBy,
+        received_by:       receivedBy,
       });
       this.ref.close(true);
     });

@@ -8,6 +8,13 @@ export interface MovementPdfLine {
   quantity:        number;
 }
 
+export interface MovementPdfSignature {
+  signer_name:     string;
+  signer_document: string;
+  signature_data:  string;
+  signed_at:       string;
+}
+
 export interface MovementPdfData {
   movement_type:     string;
   doc_id:            number;
@@ -18,6 +25,8 @@ export interface MovementPdfData {
   reason?:           string | null;
   cost_center_name?: string | null;
   lines:             MovementPdfLine[];
+  delivered_by?:     MovementPdfSignature | null;
+  received_by?:      MovementPdfSignature | null;
 }
 
 const TYPE_TITLES: Record<string, string> = {
@@ -78,6 +87,7 @@ export class MovementPdfService {
     }).join('');
 
     const signs = SIGN_LABELS[d.movement_type] ?? { left: 'Quien entrega', right: 'Quien recibe' };
+    const signBlock = this._buildSignBlock(signs, d.delivered_by ?? null, d.received_by ?? null);
 
     return `
 <style>
@@ -98,26 +108,48 @@ export class MovementPdfService {
 
   .sec-title { font-size: 11px; font-weight: 700; color: #1E2A3B;
                border-left: 3px solid #FFCF01; padding-left: 8px; margin-bottom: 8px; }
-  .prod-table { width: 100%; border-collapse: collapse; font-size: 11px; margin-bottom: 24px; }
+  .prod-table { width: 100%; border-collapse: collapse; font-size: 11px; margin-bottom: 16px; }
   .prod-table th { background: #1E2A3B; color: #fff; padding: 7px 10px; text-align: left; }
   .prod-table th.center, .prod-table td.center { text-align: center; }
   .prod-table td { padding: 6px 10px; border-bottom: 1px solid #e2e8f0; }
   .prod-table tbody tr:hover td { background: #f7fafc; }
   .qty-val { font-weight: 700; color: #1E2A3B; }
 
-  .sign-wrap { margin-top: 32px; border-top: 1px dashed #cbd5e0; padding-top: 20px; }
-  .sign-head { font-size: 11px; font-weight: 700; color: #1E2A3B; margin-bottom: 16px; }
-  .sign-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
-  .sign-box { border: 1px solid #e2e8f0; border-radius: 6px; padding: 14px 16px; }
-  .sign-box-label { font-size: 9px; font-weight: 700; color: #4a5568;
-                    text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 20px; }
-  .sign-field { display: flex; flex-direction: column; gap: 22px; }
-  .sign-row { display: flex; flex-direction: column; gap: 4px; }
-  .sign-line { border-bottom: 1.5px solid #1E2A3B; height: 18px; }
-  .sign-lbl { font-size: 9px; color: #718096; text-transform: uppercase; letter-spacing: 0.05em; }
+  /* ── Firma con datos reales ── */
+  .sign-wrap { margin-top: 10px; border-top: 1.5px solid #cbd5e0; padding-top: 5px; }
+  .sign-head { font-size: 8px; font-weight: 700; color: #4a5568;
+               text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 4px; }
+  .sign-grid-real { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .sign-col-real { border: 1px solid #e2e8f0; border-radius: 4px; padding: 4px 7px; }
+  .sign-role { font-size: 7px; font-weight: 700; color: #4a5568;
+               text-transform: uppercase; letter-spacing: 0.07em; margin-bottom: 2px; }
+  .sign-person { font-size: 9px; color: #2d3748; margin-bottom: 2px; }
+  .sign-person strong { font-weight: 600; }
+  .sign-person span { color: #718096; margin-left: 6px; font-size: 8px; }
+  .sign-img-box img { max-height: 44px; max-width: 210px; object-fit: contain;
+                      background: #fff; border: 1px solid #e2e8f0;
+                      border-radius: 2px; display: block; }
 
-  .footer { margin-top: 20px; font-size: 9px; color: #a0aec0;
-            text-align: center; border-top: 1px solid #e2e8f0; padding-top: 8px; }
+  /* ── Firma en blanco (sin datos) ── */
+  .sign-grid-blank { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .sign-col-blank { border: 1px solid #e2e8f0; border-radius: 4px; padding: 6px 10px; }
+  .sign-blank-rows { display: flex; flex-direction: column; gap: 12px; margin-top: 4px; }
+  .sign-blank-row { display: flex; flex-direction: column; gap: 2px; }
+  .sign-blank-line { border-bottom: 1.5px solid #2d3748; height: 14px; }
+  .sign-blank-lbl { font-size: 7.5px; color: #a0aec0; text-transform: uppercase; letter-spacing: 0.05em; }
+
+  .footer { margin-top: 10px; font-size: 9px; color: #a0aec0;
+            text-align: center; border-top: 1px solid #e2e8f0; padding-top: 6px; }
+
+  @media print {
+    /* Limitar bloque de firmas a ≤10% del área imprimible (267mm) → ~26mm */
+    .sign-wrap { margin-top: 4mm; padding-top: 2mm; }
+    .sign-img-box img { max-height: 14mm; max-width: 56mm; }
+    .sign-col-real { padding: 1.5mm 2.5mm; }
+    .sign-col-blank { padding: 2mm 3mm; }
+    .sign-blank-rows { gap: 4mm; }
+    .sign-blank-line { height: 4mm; }
+  }
 </style>
 
 <div class="doc-wrap">
@@ -154,30 +186,69 @@ export class MovementPdfService {
     <tbody>${productRows}</tbody>
   </table>
 
-  <div class="sign-wrap">
-    <div class="sign-head">Firmas de conformidad</div>
-    <div class="sign-grid">
-      <div class="sign-box">
-        <div class="sign-box-label">${this._esc(signs.left)}</div>
-        <div class="sign-field">
-          <div class="sign-row"><div class="sign-line"></div><div class="sign-lbl">Nombre completo</div></div>
-          <div class="sign-row"><div class="sign-line"></div><div class="sign-lbl">N&deg; documento</div></div>
-          <div class="sign-row"><div class="sign-line"></div><div class="sign-lbl">Firma</div></div>
-        </div>
-      </div>
-      <div class="sign-box">
-        <div class="sign-box-label">${this._esc(signs.right)}</div>
-        <div class="sign-field">
-          <div class="sign-row"><div class="sign-line"></div><div class="sign-lbl">Nombre completo</div></div>
-          <div class="sign-row"><div class="sign-line"></div><div class="sign-lbl">N&deg; documento</div></div>
-          <div class="sign-row"><div class="sign-line"></div><div class="sign-lbl">Firma</div></div>
-        </div>
-      </div>
-    </div>
-  </div>
+  ${signBlock}
 
   <div class="footer">Documento generado automáticamente por el SGA &middot; ${date}</div>
 </div>`;
+  }
+
+  private _buildSignBlock(
+    labels: { left: string; right: string },
+    deliveredBy: MovementPdfSignature | null,
+    receivedBy:  MovementPdfSignature | null,
+  ): string {
+    const hasData = !!(deliveredBy && receivedBy);
+
+    if (hasData) {
+      const colHtml = (role: string, sig: MovementPdfSignature) => `
+        <div class="sign-col-real">
+          <div class="sign-role">${this._esc(role)}</div>
+          <div class="sign-person">
+            <strong>${this._esc(sig.signer_name)}</strong>
+            <span>C.C. ${this._esc(sig.signer_document)}</span>
+          </div>
+          <div class="sign-img-box">
+            <img src="${sig.signature_data}" alt="Firma ${this._esc(sig.signer_name)}">
+          </div>
+        </div>`;
+
+      return `
+      <div class="sign-wrap">
+        <div class="sign-head">Firmas de conformidad</div>
+        <div class="sign-grid-real">
+          ${colHtml(labels.left,  deliveredBy)}
+          ${colHtml(labels.right, receivedBy)}
+        </div>
+      </div>`;
+    }
+
+    const blankCol = (role: string) => `
+      <div class="sign-col-blank">
+        <div class="sign-role">${this._esc(role)}</div>
+        <div class="sign-blank-rows">
+          <div class="sign-blank-row">
+            <div class="sign-blank-line"></div>
+            <div class="sign-blank-lbl">Nombre completo</div>
+          </div>
+          <div class="sign-blank-row">
+            <div class="sign-blank-line"></div>
+            <div class="sign-blank-lbl">N&deg; documento</div>
+          </div>
+          <div class="sign-blank-row">
+            <div class="sign-blank-line"></div>
+            <div class="sign-blank-lbl">Firma</div>
+          </div>
+        </div>
+      </div>`;
+
+    return `
+    <div class="sign-wrap">
+      <div class="sign-head">Firmas de conformidad</div>
+      <div class="sign-grid-blank">
+        ${blankCol(labels.left)}
+        ${blankCol(labels.right)}
+      </div>
+    </div>`;
   }
 
   private _fmtDate(date: string | null | undefined): string {

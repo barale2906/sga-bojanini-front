@@ -4,7 +4,7 @@ import {
   AbstractControl, FormArray, FormBuilder, FormGroup,
   ReactiveFormsModule, Validators,
 } from '@angular/forms';
-import { MatDialogModule, MAT_DIALOG_DATA, MatDialogRef } from '@angular/material/dialog';
+import { MatDialogModule, MAT_DIALOG_DATA, MatDialogRef, MatDialog } from '@angular/material/dialog';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatSelectModule } from '@angular/material/select';
@@ -18,6 +18,8 @@ import { DateAdapter, MAT_DATE_FORMATS } from '@angular/material/core';
 import { forkJoin, finalize, of } from 'rxjs';
 import { map, catchError } from 'rxjs/operators';
 import { InventoryService, StockSummary, BatchDetail, CostCenter } from '../inventory.service';
+import { MovementConfirmDialogComponent, MovementConfirmResult } from './movement-confirm-dialog.component';
+import { MovementPdfSignature } from '../../../shared/services/movement-pdf.service';
 import { WarehouseService, Warehouse } from '../../warehouse/warehouse.service';
 import { Product } from '../../catalog/catalog.service';
 import { MedicalServicesService, MedicalServiceNode, ProcedurePrice } from '../medical-services.service';
@@ -97,12 +99,14 @@ export class ExitWizardDialogComponent implements OnInit {
   private wSvc   = inject(WarehouseService);
   private medSvc = inject(MedicalServicesService);
   private pdfSvc = inject(MovementPdfService);
+  private dialog = inject(MatDialog);
 
   // ── Wizard state ─────────────────────────────────────────────
   step            = signal<1 | 2 | 3>(1);
   saving          = signal(false);
   errors          = signal<string[]>([]);
   exitSummaryData = signal<ExitSummaryData | null>(null);
+  exitSignatures  = signal<{ delivered_by: MovementPdfSignature; received_by: MovementPdfSignature } | null>(null);
 
   // ── Step 1: Scanner / Cart ────────────────────────────────────
   warehouseControl  = this.fb.control<number | null>(null, Validators.required);
@@ -614,6 +618,42 @@ export class ExitWizardDialogComponent implements OnInit {
             withRecords: false,
           });
 
+          const needsSignature = flatMovements.some(m => m.status === 'pending_signature');
+
+          const afterMovements = (withRecords: boolean) => {
+            this.exitSummaryData.update(d => d ? { ...d, withRecords } : d);
+            this.saving.set(false);
+
+            if (needsSignature) {
+              const ref = this.dialog.open(MovementConfirmDialogComponent, {
+                width: '560px',
+                maxWidth: '96vw',
+                disableClose: true,
+                data: {
+                  movements:     flatMovements.map(m => ({
+                    id:               m.id,
+                    product_name:     m.product_name,
+                    batch_lot_number: m.batch_lot_number ?? null,
+                    quantity:         m.quantity,
+                    movement_type:    m.movement_type,
+                  })),
+                  warehouseName: wh?.name ?? `Almacén ${wId}`,
+                  inventorySvc:  this.data.inventorySvc,
+                },
+              });
+              ref.afterClosed().subscribe((result: MovementConfirmResult | { cancelled: true } | undefined) => {
+                if (result && 'confirmed' in result) {
+                  this.exitSignatures.set({ delivered_by: result.delivered_by, received_by: result.received_by });
+                  this.step.set(3);
+                } else if (result && 'cancelled' in result) {
+                  this.ref.close(false);
+                }
+              });
+            } else {
+              this.step.set(3);
+            }
+          };
+
           if (this.isExternalCenter && this.procedureRows.length > 0) {
             const serviceDate = this._toApiDate(cv.service_date!);
             const recordCalls = this.procedureRows.controls.map(ctrl => {
@@ -631,11 +671,7 @@ export class ExitWizardDialogComponent implements OnInit {
               });
             });
             forkJoin(recordCalls).subscribe({
-              next: () => {
-                this.exitSummaryData.update(d => d ? { ...d, withRecords: true } : d);
-                this.saving.set(false);
-                this.step.set(3);
-              },
+              next:  () => afterMovements(true),
               error: err => {
                 this.saving.set(false);
                 this.errors.set([
@@ -646,8 +682,7 @@ export class ExitWizardDialogComponent implements OnInit {
               },
             });
           } else {
-            this.saving.set(false);
-            this.step.set(3);
+            afterMovements(false);
           }
         });
       },
@@ -666,7 +701,8 @@ export class ExitWizardDialogComponent implements OnInit {
   }
 
   printComprobante(): void {
-    const d = this.exitSummaryData();
+    const d   = this.exitSummaryData();
+    const sig = this.exitSignatures();
     if (!d) return;
     this.pdfSvc.generateAndPrint({
       movement_type:    'exit',
@@ -677,6 +713,8 @@ export class ExitWizardDialogComponent implements OnInit {
       cost_center_name: d.cost_center_name,
       reason:           d.reason,
       lines:            d.lines,
+      delivered_by:     sig?.delivered_by ?? null,
+      received_by:      sig?.received_by  ?? null,
     });
   }
 

@@ -1,0 +1,43 @@
+.sig-pad-wrap {
+  border: 1.5px solid #cbd5e0;
+  border-radius: 8px;
+  overflow: hidden;
+  background: #fff;
+  display: flex;
+  flex-direction: column;
+
+  &.has-error {
+    border-color: #e53e3e;
+    box-shadow: 0 0 0 1px #feb2b2;
+  }
+}
+
+.sig-canvas {
+  display: block;
+  width: 100%;
+  height: auto;
+  touch-action: none;
+  cursor: crosshair;
+  background: #fff;
+}
+
+.sig-pad-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.15rem 0.5rem 0.15rem 0.75rem;
+  background: #f7fafc;
+  border-top: 1px solid #e2e8f0;
+
+  button {
+    font-size: 0.78rem;
+    height: 28px;
+    mat-icon { font-size: 0.9rem; height: 0.9rem; width: 0.9rem; }
+  }
+}
+
+.sig-pad-hint {
+  font-size: 0.72rem;
+  color: #a0aec0;
+  font-style: italic;
+}

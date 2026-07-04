@@ -1,0 +1,202 @@
+<!-- ── Title ── -->
+@if (!confirmed()) {
+  <h2 mat-dialog-title class="confirm-title">
+    <mat-icon>draw</mat-icon>
+    Aprobación con Firma
+    @if (isMultiLot) {
+      <span class="multi-lot-badge">{{ data.movements.length }} lotes</span>
+    }
+  </h2>
+} @else {
+  <h2 mat-dialog-title class="confirm-title confirm-title--success">
+    <mat-icon>check_circle</mat-icon>
+    Movimiento Confirmado
+  </h2>
+}
+
+<mat-dialog-content class="confirm-content">
+
+  <!-- ── Detalle de movimiento(s) ─────────────────────────────── -->
+  @if (!confirmed()) {
+    <div class="movement-summary">
+      <div class="movement-summary-header">
+        <mat-icon>inventory_2</mat-icon>
+        <span>Detalle del movimiento</span>
+        <span class="summary-wh">{{ data.warehouseName }}</span>
+      </div>
+
+      @if (isMultiLot) {
+        <div class="multi-lot-notice">
+          <mat-icon>info</mat-icon>
+          Este movimiento abarca {{ data.movements.length }} lotes (FEFO). La misma firma se aplicará a todos.
+        </div>
+      }
+
+      <table class="summary-table">
+        <thead>
+          <tr>
+            <th>Producto</th>
+            <th>Lote</th>
+            <th class="col-center">Cantidad</th>
+            <th>Tipo</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (m of data.movements; track m.id) {
+            <tr>
+              <td>{{ m.product_name }}</td>
+              <td>
+                @if (m.batch_lot_number) {
+                  <span class="lot-chip">{{ m.batch_lot_number }}</span>
+                } @else {
+                  <span class="col-dash">—</span>
+                }
+              </td>
+              <td class="col-center col-qty">{{ m.quantity | number }}</td>
+              <td class="type-label">{{ typeLabel(m.movement_type) }}</td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+
+    <mat-divider></mat-divider>
+
+    <!-- ── Errores ─────────────────────────────────────────────── -->
+    <app-form-errors [errors]="errors()"></app-form-errors>
+
+    <form [formGroup]="signerForm" class="signers-form">
+
+      <!-- ── Quien entrega ─────────────────────────────────────── -->
+      <div class="signer-block">
+        <div class="signer-block-header">
+          <mat-icon>person</mat-icon>
+          <span>Quien entrega</span>
+        </div>
+
+        <div class="signer-fields">
+          <mat-form-field appearance="outline" class="full-width">
+            <mat-label>Nombre completo *</mat-label>
+            <input matInput formControlName="delivered_name" maxlength="150" autocomplete="off">
+            @if (signerForm.get('delivered_name')?.invalid && signerForm.get('delivered_name')?.touched) {
+              <mat-error>Nombre requerido</mat-error>
+            }
+          </mat-form-field>
+
+          <mat-form-field appearance="outline" class="full-width">
+            <mat-label>Documento de identidad *</mat-label>
+            <input matInput formControlName="delivered_document" maxlength="50" autocomplete="off">
+            @if (signerForm.get('delivered_document')?.invalid && signerForm.get('delivered_document')?.touched) {
+              <mat-error>Documento requerido</mat-error>
+            }
+          </mat-form-field>
+        </div>
+
+        <div class="sig-label">
+          <mat-icon>draw</mat-icon>
+          Firma *
+          @if (padTouched() && deliveredPad?.isEmpty()) {
+            <span class="sig-required-hint">La firma es obligatoria</span>
+          }
+        </div>
+        <app-signature-capture-pad #deliveredPad></app-signature-capture-pad>
+      </div>
+
+      <mat-divider></mat-divider>
+
+      <!-- ── Quien recibe ──────────────────────────────────────── -->
+      <div class="signer-block">
+        <div class="signer-block-header">
+          <mat-icon>person_check</mat-icon>
+          <span>Quien recibe</span>
+        </div>
+
+        <div class="signer-fields">
+          <mat-form-field appearance="outline" class="full-width">
+            <mat-label>Nombre completo *</mat-label>
+            <input matInput formControlName="received_name" maxlength="150" autocomplete="off">
+            @if (signerForm.get('received_name')?.invalid && signerForm.get('received_name')?.touched) {
+              <mat-error>Nombre requerido</mat-error>
+            }
+          </mat-form-field>
+
+          <mat-form-field appearance="outline" class="full-width">
+            <mat-label>Documento de identidad *</mat-label>
+            <input matInput formControlName="received_document" maxlength="50" autocomplete="off">
+            @if (signerForm.get('received_document')?.invalid && signerForm.get('received_document')?.touched) {
+              <mat-error>Documento requerido</mat-error>
+            }
+          </mat-form-field>
+        </div>
+
+        <div class="sig-label">
+          <mat-icon>draw</mat-icon>
+          Firma *
+          @if (padTouched() && receivedPad?.isEmpty()) {
+            <span class="sig-required-hint">La firma es obligatoria</span>
+          }
+        </div>
+        <app-signature-capture-pad #receivedPad></app-signature-capture-pad>
+      </div>
+
+    </form>
+  }
+
+  <!-- ── Estado confirmado ────────────────────────────────────── -->
+  @if (confirmed()) {
+    <div class="success-banner">
+      <mat-icon>verified</mat-icon>
+      <div>
+        <div class="success-title">Movimiento confirmado exitosamente</div>
+        <div class="success-sub">
+          Las firmas fueron registradas y el stock ha sido actualizado.
+          @if (isMultiLot) {
+            Se procesaron {{ data.movements.length }} lotes correctamente.
+          }
+        </div>
+      </div>
+    </div>
+  }
+
+</mat-dialog-content>
+
+<!-- ── Actions ── -->
+<mat-dialog-actions align="end">
+  @if (!confirmed()) {
+    <button
+      mat-button
+      type="button"
+      color="warn"
+      [disabled]="confirming() || cancelling()"
+      (click)="cancelMovements()"
+    >
+      @if (cancelling()) {
+        <mat-spinner diameter="16"></mat-spinner>
+      } @else {
+        <mat-icon>cancel</mat-icon>
+      }
+      Cancelar movimiento
+    </button>
+
+    <button
+      mat-flat-button
+      type="button"
+      color="primary"
+      [disabled]="confirming() || cancelling()"
+      (click)="confirm()"
+    >
+      @if (confirming()) {
+        <mat-spinner diameter="16"></mat-spinner>
+        Confirmando…
+      } @else {
+        <mat-icon>check_circle</mat-icon>
+        Confirmar y firmar
+      }
+    </button>
+  } @else {
+    <button mat-flat-button color="primary" (click)="closeConfirmed()">
+      <mat-icon>close</mat-icon>
+      Cerrar
+    </button>
+  }
+</mat-dialog-actions>

@@ -1,0 +1,133 @@
+// ── Title ────────────────────────────────────────────────────
+.confirm-title {
+  display: flex; align-items: center; gap: 0.5rem;
+  mat-icon { vertical-align: middle; }
+
+  &--success mat-icon { color: #38a169; }
+}
+
+.multi-lot-badge {
+  margin-left: 0.35rem; background: #dbeafe; color: #1d4ed8;
+  font-size: 0.72rem; font-weight: 700; padding: 0.1rem 0.5rem;
+  border-radius: 9999px; border: 1px solid #93c5fd;
+}
+
+// ── Content ──────────────────────────────────────────────────
+.confirm-content {
+  padding-top: 0.25rem !important;
+  min-width: 480px;
+
+  @media (max-width: 540px) { min-width: 0; }
+}
+
+// ── Movement summary ──────────────────────────────────────────
+.movement-summary {
+  border: 1.5px solid #e2e8f0; border-radius: 10px;
+  overflow: hidden; margin-bottom: 1rem;
+}
+
+.movement-summary-header {
+  display: flex; align-items: center; gap: 0.5rem;
+  padding: 0.5rem 0.85rem; background: #edf2f7;
+  font-size: 0.82rem; font-weight: 700; color: #4a5568;
+  mat-icon { font-size: 1rem; height: 1rem; width: 1rem; color: #718096; }
+}
+
+.summary-wh {
+  margin-left: auto; font-size: 0.75rem; font-weight: 400; color: #718096;
+}
+
+.multi-lot-notice {
+  display: flex; align-items: center; gap: 0.45rem;
+  padding: 0.4rem 0.85rem; background: #eff6ff; border-bottom: 1px solid #bfdbfe;
+  font-size: 0.78rem; color: #1e40af;
+  mat-icon { font-size: 0.95rem; height: 0.95rem; width: 0.95rem; color: #3b82f6; flex-shrink: 0; }
+}
+
+.summary-table {
+  width: 100%; border-collapse: collapse; font-size: 0.8rem;
+
+  thead tr { background: #f7fafc; }
+  th {
+    padding: 0.35rem 0.75rem; color: #4a5568; font-weight: 700;
+    text-align: left; font-size: 0.72rem; letter-spacing: 0.04em;
+    border-bottom: 1px solid #e2e8f0;
+  }
+  td {
+    padding: 0.35rem 0.75rem; border-bottom: 1px solid #edf2f7; color: #2d3748;
+  }
+  tbody tr:last-child td { border-bottom: none; }
+}
+
+.lot-chip {
+  background: #dbeafe; border: 1px solid #93c5fd; border-radius: 9999px;
+  padding: 0.1rem 0.45rem; font-size: 0.72rem; font-weight: 700; color: #1d4ed8;
+}
+
+.col-center { text-align: center; }
+.col-qty    { font-weight: 700; color: #1e2a3b; }
+.col-dash   { color: #a0aec0; }
+.type-label { font-size: 0.75rem; color: #718096; }
+
+// ── Signers form ──────────────────────────────────────────────
+.signers-form {
+  margin-top: 0.75rem;
+  display: flex; flex-direction: column; gap: 0;
+}
+
+.signer-block {
+  padding: 0.75rem 0 0.75rem;
+  display: flex; flex-direction: column; gap: 0.5rem;
+}
+
+.signer-block-header {
+  display: flex; align-items: center; gap: 0.45rem;
+  font-size: 0.88rem; font-weight: 700; color: #2b6cb0;
+  mat-icon { font-size: 1.1rem; height: 1.1rem; width: 1.1rem; color: #3182ce; }
+}
+
+.signer-fields {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 0.25rem 0.65rem;
+  mat-form-field { width: 100%; }
+
+  @media (max-width: 480px) {
+    grid-template-columns: 1fr;
+  }
+}
+
+.full-width { width: 100%; }
+
+// ── Signature label ───────────────────────────────────────────
+.sig-label {
+  display: flex; align-items: center; gap: 0.35rem;
+  font-size: 0.8rem; font-weight: 600; color: #4a5568;
+  mat-icon { font-size: 0.95rem; height: 0.95rem; width: 0.95rem; color: #718096; }
+}
+
+.sig-required-hint {
+  color: #e53e3e; font-size: 0.75rem; font-weight: 400;
+}
+
+// ── Success banner ────────────────────────────────────────────
+.success-banner {
+  display: flex; align-items: flex-start; gap: 0.75rem;
+  background: #f0fff4; border: 1.5px solid #9ae6b4; border-radius: 10px;
+  padding: 1rem 1.1rem; margin: 0.5rem 0;
+
+  mat-icon { color: #38a169; font-size: 2rem; height: 2rem; width: 2rem; flex-shrink: 0; margin-top: 0.05rem; }
+}
+
+.success-title {
+  font-size: 1rem; font-weight: 700; color: #276749;
+}
+
+.success-sub {
+  font-size: 0.82rem; color: #48bb78; margin-top: 0.25rem;
+}
+
+// ── Actions ──────────────────────────────────────────────────
+mat-dialog-actions {
+  gap: 0.5rem;
+
+  mat-spinner { display: inline-block; margin-right: 0.35rem; }
+}

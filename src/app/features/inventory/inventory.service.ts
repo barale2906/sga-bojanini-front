@@ -74,6 +74,20 @@ export interface MedicalService {
   is_active: boolean;
 }
 
+export interface MovementSignatureRecord {
+  id: number;
+  role: 'delivered_by' | 'received_by';
+  signer_name: string;
+  signer_document: string;
+  signed_at: string;
+  signature_data?: string;
+}
+
+export interface ConfirmMovementPayload {
+  delivered_by: { name: string; document: string; signature: string };
+  received_by:  { name: string; document: string; signature: string };
+}
+
 export interface Movement {
   id: number;
   product_id: number;
@@ -92,13 +106,14 @@ export interface Movement {
   batch_lot_number: string | null;
   batch_expiration_date: string | null;
   user_name: string;
+  status?: 'pending_signature' | 'confirmed';
+  signatures?: MovementSignatureRecord[] | null;
   cost_center_id?: number | null;
   service_id?: number | null;
   patient_document?: string | null;
   patient_external_id?: string | null;
   cost_center?: { id: number; code: string; name: string; type: string };
   medical_service?: { id: number; code: string; name: string };
-  // Nested objects (algunos endpoints los incluyen)
   product?: { id: number; code: string; name: string };
   warehouse?: { id: number; name: string };
 }
@@ -214,6 +229,7 @@ export class InventoryService {
     movement_type?: string;
     cost_center_id?: number;
     cost_center_type?: 'internal' | 'external';
+    status?: 'pending_signature' | 'confirmed';
     date_from?: string;
     date_to?: string;
     per_page?: number;
@@ -226,6 +242,7 @@ export class InventoryService {
     if (f.movement_type)    p = p.set('movement_type',    f.movement_type);
     if (f.cost_center_id)   p = p.set('cost_center_id',   String(f.cost_center_id));
     if (f.cost_center_type) p = p.set('cost_center_type', f.cost_center_type);
+    if (f.status)           p = p.set('status',           f.status);
     if (f.date_from)        p = p.set('date_from',        f.date_from);
     if (f.date_to)          p = p.set('date_to',          f.date_to);
     if (f.per_page)         p = p.set('per_page',         String(f.per_page));
@@ -262,6 +279,18 @@ export class InventoryService {
   /** Baja de inventario por daño, muestra, pérdida/robo o vencimiento — requiere `batch_id` y `location_id` elegidos explícitamente por el usuario (no aplica FEFO). */
   loss(payload: any): Observable<ApiResponse<any>> {
     return this.http.post<ApiResponse<any>>(`${this.api}/movements/loss`, payload);
+  }
+
+  confirmMovement(id: number, payload: ConfirmMovementPayload): Observable<ApiResponse<Movement>> {
+    return this.http.post<ApiResponse<Movement>>(`${this.api}/movements/${id}/confirm`, payload);
+  }
+
+  cancelPendingMovement(id: number): Observable<ApiResponse<null>> {
+    return this.http.delete<ApiResponse<null>>(`${this.api}/movements/${id}/pending`);
+  }
+
+  getMovementSignature(id: number, role: 'delivered_by' | 'received_by'): Observable<ApiResponse<MovementSignatureRecord>> {
+    return this.http.get<ApiResponse<MovementSignatureRecord>>(`${this.api}/movements/${id}/signature/${role}`);
   }
 
   getCostCenters(f: { is_active?: boolean } = {}): Observable<ApiResponse<CostCenter[]>> {
