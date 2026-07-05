@@ -1,5 +1,6 @@
 import { Routes } from '@angular/router';
 import { authGuard } from './core/guards/auth.guard';
+import { permissionGuard } from './core/guards/permission.guard';
 import { MainLayoutComponent } from './layout/main-layout/main-layout.component';
 
 export const routes: Routes = [
@@ -31,18 +32,21 @@ export const routes: Routes = [
         path: 'users',
         loadComponent: () =>
           import('./features/auth/users/user-list.component').then((m) => m.UserListComponent),
+        canActivate: [permissionGuard],
         data: { title: 'Usuarios', permission: 'usuarios.ver' },
       },
       {
         path: 'users/new',
         loadComponent: () =>
           import('./features/auth/users/user-form.component').then((m) => m.UserFormComponent),
+        canActivate: [permissionGuard],
         data: { title: 'Nuevo Usuario', permission: 'usuarios.crear' },
       },
       {
         path: 'users/:id/edit',
         loadComponent: () =>
           import('./features/auth/users/user-form.component').then((m) => m.UserFormComponent),
+        canActivate: [permissionGuard],
         data: { title: 'Editar Usuario', permission: 'usuarios.editar' },
       },
 
@@ -51,6 +55,7 @@ export const routes: Routes = [
         path: 'roles',
         loadComponent: () =>
           import('./features/auth/roles/role-list.component').then((m) => m.RoleListComponent),
+        canActivate: [permissionGuard],
         data: { title: 'Roles', permission: 'roles.ver' },
       },
 
@@ -71,6 +76,7 @@ export const routes: Routes = [
         path: 'warehouses',
         loadChildren: () =>
           import('./features/warehouse/warehouse.routes').then((m) => m.warehouseRoutes),
+        canActivate: [permissionGuard],
         data: { permission: 'almacenes.ver' },
       },
 
@@ -79,6 +85,7 @@ export const routes: Routes = [
         path: 'catalog',
         loadChildren: () =>
           import('./features/catalog/catalog.routes').then((m) => m.catalogRoutes),
+        canActivate: [permissionGuard],
         data: { permission: 'productos.ver' },
       },
 
@@ -87,6 +94,7 @@ export const routes: Routes = [
         path: 'inventory',
         loadChildren: () =>
           import('./features/inventory/inventory.routes').then((m) => m.inventoryRoutes),
+        canActivate: [permissionGuard],
         data: { permission: 'stock.ver' },
       },
 
@@ -95,6 +103,7 @@ export const routes: Routes = [
         path: 'cost-centers',
         loadChildren: () =>
           import('./features/cost-centers/cost-centers.routes').then((m) => m.costCentersRoutes),
+        canActivate: [permissionGuard],
         data: { title: 'Centros de Costo', permission: 'centros_costo.ver' },
       },
 
@@ -103,6 +112,7 @@ export const routes: Routes = [
         path: 'purchasing',
         loadChildren: () =>
           import('./features/purchasing/purchasing.routes').then((m) => m.purchasingRoutes),
+        canActivate: [permissionGuard],
         data: { permission: 'ordenes_compra.ver' },
       },
 
@@ -111,6 +121,7 @@ export const routes: Routes = [
         path: 'monitoring',
         loadChildren: () =>
           import('./features/monitoring/monitoring.routes').then((m) => m.monitoringRoutes),
+        canActivate: [permissionGuard],
         data: { permission: 'sensores.ver' },
       },
 
@@ -119,6 +130,7 @@ export const routes: Routes = [
         path: 'audit',
         loadComponent: () =>
           import('./features/audit/audit-page.component').then((m) => m.AuditPageComponent),
+        canActivate: [permissionGuard],
         data: { permission: 'auditoria.ver' },
       },
 
@@ -127,6 +139,7 @@ export const routes: Routes = [
         path: 'integrations',
         loadChildren: () =>
           import('./features/integration/integration.routes').then((m) => m.integrationRoutes),
+        canActivate: [permissionGuard],
         data: { permission: 'integraciones.ver' },
       },
 
@@ -135,6 +148,7 @@ export const routes: Routes = [
         path: 'reports',
         loadComponent: () =>
           import('./features/reports/reports-page.component').then((m) => m.ReportsPageComponent),
+        canActivate: [permissionGuard],
         data: { permission: 'reportes.ver' },
       },
 
@@ -145,6 +159,7 @@ export const routes: Routes = [
           import('./features/notifications/notification-list.component').then(
             (m) => m.NotificationListComponent
           ),
+        canActivate: [permissionGuard],
         data: { permission: 'notificaciones.ver' },
       },
     ],

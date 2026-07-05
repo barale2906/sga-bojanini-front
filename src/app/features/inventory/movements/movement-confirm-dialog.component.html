@@ -163,36 +163,40 @@
 <!-- ── Actions ── -->
 <mat-dialog-actions align="end">
   @if (!confirmed()) {
-    <button
-      mat-button
-      type="button"
-      color="warn"
-      [disabled]="confirming() || cancelling()"
-      (click)="cancelMovements()"
-    >
-      @if (cancelling()) {
-        <mat-spinner diameter="16"></mat-spinner>
-      } @else {
-        <mat-icon>cancel</mat-icon>
-      }
-      Cancelar movimiento
-    </button>
+    @if (authSvc.hasPermission('movimientos.cancelar')) {
+      <button
+        mat-button
+        type="button"
+        color="warn"
+        [disabled]="confirming() || cancelling()"
+        (click)="cancelMovements()"
+      >
+        @if (cancelling()) {
+          <mat-spinner diameter="16"></mat-spinner>
+        } @else {
+          <mat-icon>cancel</mat-icon>
+        }
+        Cancelar movimiento
+      </button>
+    }
 
-    <button
-      mat-flat-button
-      type="button"
-      color="primary"
-      [disabled]="confirming() || cancelling()"
-      (click)="confirm()"
-    >
-      @if (confirming()) {
-        <mat-spinner diameter="16"></mat-spinner>
-        Confirmando…
-      } @else {
-        <mat-icon>check_circle</mat-icon>
-        Confirmar y firmar
-      }
-    </button>
+    @if (authSvc.hasPermission('movimientos.confirmar')) {
+      <button
+        mat-flat-button
+        type="button"
+        color="primary"
+        [disabled]="confirming() || cancelling()"
+        (click)="confirm()"
+      >
+        @if (confirming()) {
+          <mat-spinner diameter="16"></mat-spinner>
+          Confirmando…
+        } @else {
+          <mat-icon>check_circle</mat-icon>
+          Confirmar y firmar
+        }
+      </button>
+    }
   } @else {
     <button mat-flat-button color="primary" (click)="closeConfirmed()">
       <mat-icon>close</mat-icon>

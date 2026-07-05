@@ -1,4 +1,4 @@
-import { Component, inject, signal, OnInit } from '@angular/core';
+import { Component, inject, signal, computed, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Router, ActivatedRoute, RouterModule } from '@angular/router';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
@@ -63,7 +63,7 @@ export class UserFormComponent implements OnInit {
   warehouses = signal<Warehouse[]>([]);
   showPassword = signal(false);
 
-  canAssignWarehouses = this.authService.hasPermission('almacenes.asignar');
+  canAssignWarehouses = computed(() => this.authService.hasPermission('almacenes.asignar'));
 
   form = this.fb.group({
     name: ['', [Validators.required, Validators.maxLength(255)]],
@@ -84,7 +84,7 @@ export class UserFormComponent implements OnInit {
     }
     this.loadRoles();
 
-    if (this.canAssignWarehouses) {
+    if (this.canAssignWarehouses()) {
       this.loadWarehouses();
       if (id) {
         this.loadAssignedWarehouses(Number(id));
@@ -162,7 +162,7 @@ export class UserFormComponent implements OnInit {
       .pipe(
         switchMap((res) => {
           const id = this.isEdit() ? this.userId()! : res.data.id;
-          if (!this.canAssignWarehouses || !warehouseIds) return of(id);
+          if (!this.canAssignWarehouses() || !warehouseIds) return of(id);
           return this.userService.assignWarehouses(id, warehouseIds).pipe(map(() => id));
         })
       )
