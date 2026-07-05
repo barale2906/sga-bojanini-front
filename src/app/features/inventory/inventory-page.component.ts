@@ -20,8 +20,8 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { DateAdapter, MAT_DATE_FORMATS } from '@angular/material/core';
 import { MatDialog } from '@angular/material/dialog';
 import { MatSnackBar } from '@angular/material/snack-bar';
-import { InventoryService, Batch, StockItem, Movement } from './inventory.service';
-import { MovementPdfService } from '../../shared/services/movement-pdf.service';
+import { InventoryService, Batch, StockItem, Movement, MovementSignatureRecord } from './inventory.service';
+import { MovementPdfService, MovementPdfSignature } from '../../shared/services/movement-pdf.service';
 import { WarehouseService, Warehouse, Location } from '../warehouse/warehouse.service';
 import { CatalogService, Product } from '../catalog/catalog.service';
 import { PaginationMeta } from '../../core/models/api-response.model';
@@ -373,10 +373,25 @@ export class InventoryPageComponent implements OnInit {
     this.svc.getMovement(row.id).subscribe({
       next: res => {
         const m = res.data;
+
         const expiry$ = m.batch_id
           ? this.svc.getBatchById(m.batch_id).pipe(map(b => b.data.expiration_date), catchError(() => of(null)))
           : of(null);
-        expiry$.subscribe(expiration_date => {
+
+        const hasSignatures = m.status === 'confirmed' && m.signatures && m.signatures.length > 0;
+
+        const toSig = (rec: MovementSignatureRecord | null): MovementPdfSignature | null =>
+          rec ? { signer_name: rec.signer_name, signer_document: rec.signer_document, signature_data: rec.signature_data ?? '', signed_at: rec.signed_at } : null;
+
+        const deliveredSig$ = hasSignatures
+          ? this.svc.getMovementSignature(m.id, 'delivered_by').pipe(map(r => toSig(r.data)), catchError(() => of(null)))
+          : of(null);
+
+        const receivedSig$ = hasSignatures
+          ? this.svc.getMovementSignature(m.id, 'received_by').pipe(map(r => toSig(r.data)), catchError(() => of(null)))
+          : of(null);
+
+        forkJoin([expiry$, deliveredSig$, receivedSig$]).subscribe(([expiration_date, deliveredBy, receivedBy]) => {
           this.loadingPdf.set(null);
           this.movPdfSvc.generateAndPrint({
             movement_type:     m.movement_type,
@@ -388,6 +403,8 @@ export class InventoryPageComponent implements OnInit {
             reason:            m.reason,
             cost_center_name:  m.cost_center?.name ?? null,
             lines: [{ product_name: m.product_name, lot_number: m.batch_lot_number, expiration_date, quantity: m.quantity }],
+            delivered_by: deliveredBy,
+            received_by:  receivedBy,
           });
         });
       },
