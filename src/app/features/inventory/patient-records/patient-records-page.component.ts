@@ -59,12 +59,14 @@ export class PatientRecordsPageComponent implements OnInit {
   loading     = signal(false);
   procedures  = signal<MedicalServiceNode[]>([]);
 
-  cols = ['actions', 'procedure', 'patient', 'quantity', 'unit_price', 'total', 'service_date'];
+  cols = ['actions', 'procedure', 'patient', 'seller_referrer', 'quantity', 'unit_price', 'total', 'service_date'];
 
   filters = this.fb.group({
     patient_document:    [''],
     patient_external_id: [''],
     medical_service_id:  [null as number | null],
+    seller:              [''],
+    referrer:            [''],
     service_date_from:   [null as Date | null],
     service_date_to:     [null as Date | null],
   });
@@ -80,12 +82,14 @@ export class PatientRecordsPageComponent implements OnInit {
   }
 
   loadRecords(page = 1): void {
-    const { patient_document, patient_external_id, medical_service_id, service_date_from, service_date_to } = this.filters.value;
+    const { patient_document, patient_external_id, medical_service_id, seller, referrer, service_date_from, service_date_to } = this.filters.value;
     this.loading.set(true);
     this.svc.getPatientProcedureRecords({
       patient_document:    patient_document    || undefined,
       patient_external_id: patient_external_id || undefined,
       medical_service_id:  medical_service_id  ?? undefined,
+      seller:              seller              || undefined,
+      referrer:            referrer            || undefined,
       service_date_from:   service_date_from   ? this._toApiDate(service_date_from) : undefined,
       service_date_to:     service_date_to     ? this._toApiDate(service_date_to)   : undefined,
       page,
@@ -146,7 +150,7 @@ export class PatientRecordsPageComponent implements OnInit {
   }
 
   clearFilters(): void {
-    this.filters.reset({ patient_document: '', patient_external_id: '', medical_service_id: null, service_date_from: null, service_date_to: null });
+    this.filters.reset({ patient_document: '', patient_external_id: '', medical_service_id: null, seller: '', referrer: '', service_date_from: null, service_date_to: null });
   }
 
   onPage(e: PageEvent): void {

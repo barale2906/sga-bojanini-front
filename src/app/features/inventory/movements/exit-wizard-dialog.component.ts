@@ -14,9 +14,10 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { MatDividerModule } from '@angular/material/divider';
 import { MatDatepickerModule } from '@angular/material/datepicker';
+import { MatAutocompleteModule } from '@angular/material/autocomplete';
 import { DateAdapter, MAT_DATE_FORMATS } from '@angular/material/core';
-import { forkJoin, finalize, of } from 'rxjs';
-import { map, catchError } from 'rxjs/operators';
+import { forkJoin, finalize, of, Subject } from 'rxjs';
+import { map, catchError, debounceTime, distinctUntilChanged, switchMap } from 'rxjs/operators';
 import { InventoryService, StockSummary, BatchDetail, CostCenter } from '../inventory.service';
 import { MovementConfirmDialogComponent, MovementConfirmResult } from './movement-confirm-dialog.component';
 import { MovementPdfSignature } from '../../../shared/services/movement-pdf.service';
@@ -85,7 +86,8 @@ interface DispatchLine {
     CommonModule, ReactiveFormsModule, MatDialogModule, MatFormFieldModule,
     MatInputModule, MatSelectModule, MatButtonModule, MatIconModule,
     MatProgressSpinnerModule, MatTooltipModule, MatDividerModule,
-    MatDatepickerModule, FormErrorsComponent, ProductSearchComponent,
+    MatDatepickerModule, MatAutocompleteModule,
+    FormErrorsComponent, ProductSearchComponent,
   ],
   templateUrl: './exit-wizard-dialog.component.html',
   styleUrl:    './exit-wizard-dialog.component.scss',
@@ -124,6 +126,8 @@ export class ExitWizardDialogComponent implements OnInit {
     patient_last_name:   [null as string | null],
     service_date:        [new Date() as Date | null],
     filter_service_id:   [null as number | null],
+    seller:              [null as string | null],
+    referrer:            [null as string | null],
   });
   procedureRows = this.fb.array<FormGroup>([]);
 
@@ -133,6 +137,12 @@ export class ExitWizardDialogComponent implements OnInit {
   loadingTree        = signal(false);
   rowPrices          = signal<(ProcedurePrice | null)[]>([]);
   rowPricesLoading   = signal<boolean[]>([]);
+
+  selectedServiceId   = signal<number | null>(null);
+  sellerSuggestions  = signal<string[]>([]);
+  referrerSuggestions = signal<string[]>([]);
+  private _sellerSearch$   = new Subject<string>();
+  private _referrerSearch$ = new Subject<string>();
 
   // ── Computed / helpers ────────────────────────────────────────
 
@@ -168,7 +178,7 @@ export class ExitWizardDialogComponent implements OnInit {
   });
 
   selectedProcedures = computed((): MedicalServiceNode[] => {
-    const serviceId = this.centerForm.get('filter_service_id')?.value;
+    const serviceId = this.selectedServiceId();
     if (!serviceId) return [];
     return this.servicesTree().find(s => s.id === serviceId)?.children ?? [];
   });
@@ -198,6 +208,7 @@ export class ExitWizardDialogComponent implements OnInit {
       if (!v.patient_document?.trim() || !v.patient_external_id?.trim()) return false;
       if (!v.patient_first_name?.trim() || !v.patient_last_name?.trim()) return false;
       if (!v.service_date) return false;
+      if (!v.seller?.trim() || !v.referrer?.trim()) return false;
       if (this.procedureRows.length === 0) return false;
       return this.procedureRows.controls.every(row => {
         const rv = (row as FormGroup).value;
@@ -231,19 +242,48 @@ export class ExitWizardDialogComponent implements OnInit {
       this.procedureRows.clear();
       this.rowPrices.set([]);
       this.rowPricesLoading.set([]);
+      this.selectedServiceId.set(null);
       this.centerForm.patchValue(
-        { patient_document: null, patient_external_id: null, patient_first_name: null, patient_last_name: null, filter_service_id: null },
+        { patient_document: null, patient_external_id: null, patient_first_name: null, patient_last_name: null, filter_service_id: null, seller: null, referrer: null },
         { emitEvent: false },
       );
       if (this.isExternalCenter && !this.servicesTree().length) this._loadServicesTree();
     });
 
-    this.centerForm.get('filter_service_id')!.valueChanges.subscribe(() => {
+    this.centerForm.get('filter_service_id')!.valueChanges.subscribe(serviceId => {
       this.procedureRows.clear();
       this.rowPrices.set([]);
       this.rowPricesLoading.set([]);
+      this.selectedServiceId.set(serviceId);
+    });
+
+    this._sellerSearch$.pipe(
+      debounceTime(300),
+      distinctUntilChanged(),
+      switchMap(text => text.trim().length >= 2
+        ? this.medSvc.getPatientProcedureRecords({ seller: text, per_page: 10 })
+        : of(null)),
+    ).subscribe(res => {
+      if (!res) { this.sellerSuggestions.set([]); return; }
+      const unique = [...new Set((res.data ?? []).map(m => m.seller).filter(Boolean) as string[])];
+      this.sellerSuggestions.set(unique);
+    });
+
+    this._referrerSearch$.pipe(
+      debounceTime(300),
+      distinctUntilChanged(),
+      switchMap(text => text.trim().length >= 2
+        ? this.medSvc.getPatientProcedureRecords({ referrer: text, per_page: 10 })
+        : of(null)),
+    ).subscribe(res => {
+      if (!res) { this.referrerSuggestions.set([]); return; }
+      const unique = [...new Set((res.data ?? []).map(m => m.referrer).filter(Boolean) as string[])];
+      this.referrerSuggestions.set(unique);
     });
   }
+
+  onSellerInput(value: string): void  { this._sellerSearch$.next(value); }
+  onReferrerInput(value: string): void { this._referrerSearch$.next(value); }
 
   // ── Gestión del carrito ───────────────────────────────────────
 
@@ -579,6 +619,8 @@ export class ExitWizardDialogComponent implements OnInit {
       if (this.isExternalCenter) {
         payload['patient_document']    = cv.patient_document;
         payload['patient_external_id'] = cv.patient_external_id;
+        payload['seller']              = cv.seller;
+        payload['referrer']            = cv.referrer;
         const firstProc = (this.procedureRows.at(0) as FormGroup)?.value;
         if (firstProc?.procedure_id) payload['service_id'] = firstProc.procedure_id;
       }
@@ -668,6 +710,8 @@ export class ExitWizardDialogComponent implements OnInit {
                 unit_price:          rv.unit_price,
                 service_date:        serviceDate,
                 notes:               rv.notes || undefined,
+                seller:              cv.seller || undefined,
+                referrer:            cv.referrer || undefined,
               });
             });
             forkJoin(recordCalls).subscribe({

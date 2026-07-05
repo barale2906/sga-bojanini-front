@@ -61,6 +61,19 @@
   cursor: default;
 }
 
+.seller-cell {
+  display: flex; flex-direction: column; gap: 0.15rem;
+}
+
+.seller-row {
+  display: flex; align-items: center; gap: 0.3rem;
+  font-size: 0.82rem; color: #4a5568;
+}
+
+.seller-icon { font-size: 0.88rem; height: 0.88rem; width: 0.88rem; color: #718096; }
+
+.col-dash { color: #a0aec0; }
+
 .qty-badge {
   display: inline-flex; align-items: center; justify-content: center;
   background: #ebf8ff; color: #2b6cb0;

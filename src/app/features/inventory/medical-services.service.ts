@@ -78,6 +78,8 @@ export interface PatientProcedureRecord {
   total: number;
   service_date: string;
   notes: string | null;
+  seller?: string | null;
+  referrer?: string | null;
   is_active: boolean;
   created_at?: string;
 }
@@ -92,6 +94,8 @@ export interface PatientProcedureRecordPayload {
   unit_price: number;
   service_date: string;
   notes?: string | null;
+  seller?: string | null;
+  referrer?: string | null;
 }
 
 export interface MedicalServiceImportResult {
@@ -156,6 +160,8 @@ export class MedicalServicesService {
     patient_document?: string;
     service_date_from?: string;
     service_date_to?: string;
+    seller?: string;
+    referrer?: string;
     is_active?: boolean;
     per_page?: number;
     page?: number;
@@ -166,6 +172,8 @@ export class MedicalServicesService {
     if (filter.patient_document)    params = params.set('patient_document',    filter.patient_document);
     if (filter.service_date_from)   params = params.set('service_date_from',   filter.service_date_from);
     if (filter.service_date_to)     params = params.set('service_date_to',     filter.service_date_to);
+    if (filter.seller)              params = params.set('seller',              filter.seller);
+    if (filter.referrer)            params = params.set('referrer',            filter.referrer);
     if (filter.is_active !== undefined) params = params.set('is_active', String(filter.is_active));
     if (filter.per_page)            params = params.set('per_page',            String(filter.per_page));
     if (filter.page)                params = params.set('page',                String(filter.page));

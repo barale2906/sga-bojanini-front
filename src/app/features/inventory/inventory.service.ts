@@ -112,6 +112,8 @@ export interface Movement {
   service_id?: number | null;
   patient_document?: string | null;
   patient_external_id?: string | null;
+  seller?: string | null;
+  referrer?: string | null;
   cost_center?: { id: number; code: string; name: string; type: string };
   medical_service?: { id: number; code: string; name: string };
   product?: { id: number; code: string; name: string };
@@ -232,6 +234,8 @@ export class InventoryService {
     status?: 'pending_signature' | 'confirmed';
     date_from?: string;
     date_to?: string;
+    seller?: string;
+    referrer?: string;
     per_page?: number;
     page?: number;
   } = {}): Observable<PaginatedResponse<Movement>> {
@@ -245,6 +249,8 @@ export class InventoryService {
     if (f.status)           p = p.set('status',           f.status);
     if (f.date_from)        p = p.set('date_from',        f.date_from);
     if (f.date_to)          p = p.set('date_to',          f.date_to);
+    if (f.seller)           p = p.set('seller',           f.seller);
+    if (f.referrer)         p = p.set('referrer',         f.referrer);
     if (f.per_page)         p = p.set('per_page',         String(f.per_page));
     if (f.page)             p = p.set('page',             String(f.page));
     return this.http.get<PaginatedResponse<Movement>>(`${this.api}/movements`, { params: p });

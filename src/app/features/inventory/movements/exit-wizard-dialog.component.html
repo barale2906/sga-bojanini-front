@@ -315,6 +315,37 @@
             </mat-form-field>
           </div>
 
+          <div class="patient-fields">
+            <mat-form-field appearance="outline">
+              <mat-label>Vendedor / Operador *</mat-label>
+              <mat-icon matPrefix>sell</mat-icon>
+              <input matInput formControlName="seller" maxlength="150"
+                     placeholder="Nombre del despachador..."
+                     [matAutocomplete]="sellerAuto"
+                     (input)="onSellerInput($any($event.target).value)" />
+              <mat-autocomplete #sellerAuto="matAutocomplete">
+                @for (s of sellerSuggestions(); track s) {
+                  <mat-option [value]="s">{{ s }}</mat-option>
+                }
+              </mat-autocomplete>
+              <mat-hint>Quien despacha el producto</mat-hint>
+            </mat-form-field>
+            <mat-form-field appearance="outline">
+              <mat-label>Médico Remitente *</mat-label>
+              <mat-icon matPrefix>medical_information</mat-icon>
+              <input matInput formControlName="referrer" maxlength="150"
+                     placeholder="Nombre del médico remitente..."
+                     [matAutocomplete]="referrerAuto"
+                     (input)="onReferrerInput($any($event.target).value)" />
+              <mat-autocomplete #referrerAuto="matAutocomplete">
+                @for (r of referrerSuggestions(); track r) {
+                  <mat-option [value]="r">{{ r }}</mat-option>
+                }
+              </mat-autocomplete>
+              <mat-hint>Médico que remite al paciente</mat-hint>
+            </mat-form-field>
+          </div>
+
           <div class="section-title" style="margin-top:0.75rem">
             <mat-icon>medical_services</mat-icon>
             <span>Procedimientos aplicados</span>
