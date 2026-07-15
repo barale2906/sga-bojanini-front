@@ -361,6 +361,10 @@ export class InventoryPageComponent implements OnInit {
     this.router.navigate(['/inventory/patient-records']);
   }
 
+  goToClinicalTemplates(): void {
+    this.router.navigate(['/inventory/clinical-templates']);
+  }
+
   openInitialEntriesImport(): void {
     this.dialog.open(InitialEntriesImportDialogComponent, {
       data: { warehouses: this.warehouses() },

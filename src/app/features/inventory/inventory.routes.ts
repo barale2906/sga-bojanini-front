@@ -16,4 +16,13 @@ export const inventoryRoutes: Routes = [
     canActivate: [permissionGuard],
     data: { title: 'Registros de Procedimientos', permission: 'registros_procedimientos.ver' },
   },
+  {
+    path: 'clinical-templates',
+    loadComponent: () =>
+      import('./clinical-templates/clinical-templates-page.component').then(
+        (m) => m.ClinicalTemplatesPageComponent,
+      ),
+    canActivate: [permissionGuard],
+    data: { title: 'Plantillas de Evolución Clínica', permission: 'plantillas_clinicas.ver' },
+  },
 ];

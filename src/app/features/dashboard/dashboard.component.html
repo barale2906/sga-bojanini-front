@@ -26,6 +26,51 @@
     <mat-icon class="welcome-icon">waving_hand</mat-icon>
   </div>
 
+  <!-- Accesos rápidos -->
+  <h3 class="section-title">
+    <mat-icon>bolt</mat-icon> Accesos Rápidos
+  </h3>
+  <div class="quick-access-grid">
+    <button
+      *sgaPermission="'movimientos.salida'"
+      class="quick-access-card"
+      (click)="openExitWizard()"
+    >
+      <mat-icon class="quick-access-card__icon">output</mat-icon>
+      <div class="quick-access-card__content">
+        <span class="quick-access-card__title">Cargar salida de inventario</span>
+        <span class="quick-access-card__desc">Registrar salida de productos del stock</span>
+      </div>
+      <mat-icon class="quick-access-card__arrow">chevron_right</mat-icon>
+    </button>
+
+    <button
+      *sgaPermission="'registros_procedimientos.crear'"
+      class="quick-access-card quick-access-card--sales"
+      (click)="openSaleDialog()"
+    >
+      <mat-icon class="quick-access-card__icon">point_of_sale</mat-icon>
+      <div class="quick-access-card__content">
+        <span class="quick-access-card__title">Registrar venta</span>
+        <span class="quick-access-card__desc">Venta de servicios y procedimientos sin movimiento de inventario</span>
+      </div>
+      <mat-icon class="quick-access-card__arrow">chevron_right</mat-icon>
+    </button>
+
+    <a
+      *sgaPermission="'registros_procedimientos.ver'"
+      class="quick-access-card quick-access-card--records"
+      routerLink="/inventory/patient-records"
+    >
+      <mat-icon class="quick-access-card__icon">folder_shared</mat-icon>
+      <div class="quick-access-card__content">
+        <span class="quick-access-card__title">Registros de pacientes</span>
+        <span class="quick-access-card__desc">Historial de procedimientos y atenciones registradas</span>
+      </div>
+      <mat-icon class="quick-access-card__arrow">chevron_right</mat-icon>
+    </a>
+  </div>
+
   <!-- Inventory KPIs -->
   @if (inventory()) {
     <h3 class="section-title">

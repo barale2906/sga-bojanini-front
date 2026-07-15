@@ -1,8 +1,7 @@
 import { Component, inject, signal, computed, OnInit, ViewChild } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import {
-  AbstractControl, FormArray, FormBuilder, FormGroup,
-  ReactiveFormsModule, Validators,
+  FormBuilder, ReactiveFormsModule, Validators,
 } from '@angular/forms';
 import { MatDialogModule, MAT_DIALOG_DATA, MatDialogRef, MatDialog } from '@angular/material/dialog';
 import { MatFormFieldModule } from '@angular/material/form-field';
@@ -13,19 +12,17 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { MatDividerModule } from '@angular/material/divider';
-import { MatDatepickerModule } from '@angular/material/datepicker';
-import { MatAutocompleteModule } from '@angular/material/autocomplete';
 import { DateAdapter, MAT_DATE_FORMATS } from '@angular/material/core';
-import { forkJoin, finalize, of, Subject } from 'rxjs';
-import { map, debounceTime, distinctUntilChanged, switchMap } from 'rxjs/operators';
+import { forkJoin, finalize } from 'rxjs';
 import { InventoryService, StockSummary, BatchDetail, CostCenter, MovementDocument } from '../inventory.service';
 import { MovementConfirmDialogComponent, MovementConfirmResult } from './movement-confirm-dialog.component';
 import { MovementPdfSignature } from '../../../shared/services/movement-pdf.service';
 import { WarehouseService, Warehouse } from '../../warehouse/warehouse.service';
 import { Product } from '../../catalog/catalog.service';
-import { MedicalServicesService, MedicalServiceNode, ProcedurePrice } from '../medical-services.service';
+import { MedicalServicesService } from '../medical-services.service';
 import { FormErrorsComponent } from '../../../shared/components/form-errors/form-errors.component';
 import { ProductSearchComponent } from '../../../shared/components/product-search/product-search.component';
+import { PatientSaleFormComponent } from '../../../shared/components/patient-sale-form/patient-sale-form.component';
 import { EsDateAdapter, ES_DATE_FORMATS } from '../../../shared/adapters/es-date.adapter';
 import { MovementPdfService } from '../../../shared/services/movement-pdf.service';
 
@@ -87,14 +84,14 @@ interface DispatchLine {
     CommonModule, ReactiveFormsModule, MatDialogModule, MatFormFieldModule,
     MatInputModule, MatSelectModule, MatButtonModule, MatIconModule,
     MatProgressSpinnerModule, MatTooltipModule, MatDividerModule,
-    MatDatepickerModule, MatAutocompleteModule,
-    FormErrorsComponent, ProductSearchComponent,
+    FormErrorsComponent, ProductSearchComponent, PatientSaleFormComponent,
   ],
   templateUrl: './exit-wizard-dialog.component.html',
   styleUrl:    './exit-wizard-dialog.component.scss',
 })
 export class ExitWizardDialogComponent implements OnInit {
-  @ViewChild('scanner') scannerRef?: ProductSearchComponent;
+  @ViewChild('scanner')        scannerRef?: ProductSearchComponent;
+  @ViewChild('patientFormRef') patientFormRef?: PatientSaleFormComponent;
 
   data: ExitWizardDialogData = inject(MAT_DIALOG_DATA);
   private ref    = inject(MatDialogRef<ExitWizardDialogComponent>);
@@ -117,36 +114,16 @@ export class ExitWizardDialogComponent implements OnInit {
   scannerChecking   = signal(false);
   scanError         = signal<string | null>(null);
 
-  // ── Step 2: Centro de costos y paciente ──────────────────────
+  // ── Step 2: Centro de costos ──────────────────────────────────
   centerForm = this.fb.group({
-    cost_center_id:      [null as number | null, Validators.required],
-    reason:              [''],
-    patient_document:    [null as string | null],
-    patient_external_id: [null as string | null],
-    patient_first_name:  [null as string | null],
-    patient_last_name:   [null as string | null],
-    service_date:        [new Date() as Date | null],
-    filter_service_id:   [null as number | null],
-    seller:              [null as string | null],
-    referrer:            [null as string | null],
+    cost_center_id: [null as number | null, Validators.required],
+    reason:         [''],
   });
-  procedureRows = this.fb.array<FormGroup>([]);
 
   costCenters        = signal<CostCenter[]>([]);
   loadingCostCenters = signal(false);
-  servicesTree       = signal<MedicalServiceNode[]>([]);
-  loadingTree        = signal(false);
-  rowPrices          = signal<(ProcedurePrice | null)[]>([]);
-  rowPricesLoading   = signal<boolean[]>([]);
-
-  selectedServiceId   = signal<number | null>(null);
-  sellerSuggestions  = signal<string[]>([]);
-  referrerSuggestions = signal<string[]>([]);
-  private _sellerSearch$   = new Subject<string>();
-  private _referrerSearch$ = new Subject<string>();
 
   // ── Computed / helpers ────────────────────────────────────────
-
   get selectedCostCenter(): CostCenter | null {
     const id = this.centerForm.get('cost_center_id')?.value;
     return this.costCenters().find(c => c.id === id) ?? null;
@@ -156,7 +133,6 @@ export class ExitWizardDialogComponent implements OnInit {
     return this.selectedCostCenter?.is_external === true;
   }
 
-  /** Vista previa de despacho por lote (FEFO), calculada en el cliente antes de confirmar. */
   dispatchPreview = computed((): DispatchLine[] => {
     const lines: DispatchLine[] = [];
     for (const item of this.cartItems()) {
@@ -176,12 +152,6 @@ export class ExitWizardDialogComponent implements OnInit {
       }
     }
     return lines;
-  });
-
-  selectedProcedures = computed((): MedicalServiceNode[] => {
-    const serviceId = this.selectedServiceId();
-    if (!serviceId) return [];
-    return this.servicesTree().find(s => s.id === serviceId)?.children ?? [];
   });
 
   get selectedWarehouseName(): string {
@@ -205,16 +175,7 @@ export class ExitWizardDialogComponent implements OnInit {
   get isStep2Valid(): boolean {
     if (!this.centerForm.get('cost_center_id')?.value) return false;
     if (this.isExternalCenter) {
-      const v = this.centerForm.value;
-      if (!v.patient_document?.trim() || !v.patient_external_id?.trim()) return false;
-      if (!v.patient_first_name?.trim() || !v.patient_last_name?.trim()) return false;
-      if (!v.service_date) return false;
-      if (!v.seller?.trim() || !v.referrer?.trim()) return false;
-      if (this.procedureRows.length === 0) return false;
-      return this.procedureRows.controls.every(row => {
-        const rv = (row as FormGroup).value;
-        return rv.procedure_id && rv.quantity >= 1 && rv.unit_price !== null && rv.unit_price >= 0 && rv.notes?.trim();
-      });
+      return this.patientFormRef?.isValid ?? false;
     }
     return true;
   }
@@ -222,10 +183,8 @@ export class ExitWizardDialogComponent implements OnInit {
   ngOnInit(): void {
     this.warehouseControl.valueChanges.subscribe(wId => {
       if (wId) {
-        // Recargar stock de todos los items del carrito con el nuevo almacén
         this.cartItems().forEach((_, i) => this._loadCartItemStock(i));
       } else {
-        // Limpiar info de stock si se quita el almacén
         this.cartItems.update(arr => arr.map(item => ({
           ...item,
           summary: null, fefo: [], checkingExpired: false, expiredOnly: false,
@@ -238,53 +197,7 @@ export class ExitWizardDialogComponent implements OnInit {
     this.data.inventorySvc.getCostCenters({ is_active: true })
       .pipe(finalize(() => this.loadingCostCenters.set(false)))
       .subscribe({ next: r => this.costCenters.set(r.data), error: () => {} });
-
-    this.centerForm.get('cost_center_id')!.valueChanges.subscribe(() => {
-      this.procedureRows.clear();
-      this.rowPrices.set([]);
-      this.rowPricesLoading.set([]);
-      this.selectedServiceId.set(null);
-      this.centerForm.patchValue(
-        { patient_document: null, patient_external_id: null, patient_first_name: null, patient_last_name: null, filter_service_id: null, seller: null, referrer: null },
-        { emitEvent: false },
-      );
-      if (this.isExternalCenter && !this.servicesTree().length) this._loadServicesTree();
-    });
-
-    this.centerForm.get('filter_service_id')!.valueChanges.subscribe(serviceId => {
-      this.procedureRows.clear();
-      this.rowPrices.set([]);
-      this.rowPricesLoading.set([]);
-      this.selectedServiceId.set(serviceId);
-    });
-
-    this._sellerSearch$.pipe(
-      debounceTime(300),
-      distinctUntilChanged(),
-      switchMap(text => text.trim().length >= 2
-        ? this.medSvc.getPatientProcedureRecords({ seller: text, per_page: 10 })
-        : of(null)),
-    ).subscribe(res => {
-      if (!res) { this.sellerSuggestions.set([]); return; }
-      const unique = [...new Set((res.data ?? []).map(m => m.seller).filter(Boolean) as string[])];
-      this.sellerSuggestions.set(unique);
-    });
-
-    this._referrerSearch$.pipe(
-      debounceTime(300),
-      distinctUntilChanged(),
-      switchMap(text => text.trim().length >= 2
-        ? this.medSvc.getPatientProcedureRecords({ referrer: text, per_page: 10 })
-        : of(null)),
-    ).subscribe(res => {
-      if (!res) { this.referrerSuggestions.set([]); return; }
-      const unique = [...new Set((res.data ?? []).map(m => m.referrer).filter(Boolean) as string[])];
-      this.referrerSuggestions.set(unique);
-    });
   }
-
-  onSellerInput(value: string): void  { this._sellerSearch$.next(value); }
-  onReferrerInput(value: string): void { this._referrerSearch$.next(value); }
 
   // ── Gestión del carrito ───────────────────────────────────────
 
@@ -295,7 +208,6 @@ export class ExitWizardDialogComponent implements OnInit {
     const existing = this.cartItems().findIndex(item => item.product.id === product.id);
 
     if (existing >= 0) {
-      // Producto ya en carrito: validar antes de acumular
       const item     = this.cartItems()[existing];
       const exitable = this.cartExitableQty(existing);
       const loading  = item.loadingStock || item.loadingFefo;
@@ -317,7 +229,6 @@ export class ExitWizardDialogComponent implements OnInit {
       return;
     }
 
-    // Producto nuevo: verificar stock ANTES de agregar al carrito
     this.scannerChecking.set(true);
     this._preCheckAndAdd(product);
   }
@@ -352,7 +263,6 @@ export class ExitWizardDialogComponent implements OnInit {
       return;
     }
 
-    // Producto simple: verificar lotes FEFO disponibles
     this.data.inventorySvc.getProductBatches(pId, true, Number(this.warehouseControl.value))
       .pipe(finalize(() => this.scannerChecking.set(false)))
       .subscribe({
@@ -363,7 +273,6 @@ export class ExitWizardDialogComponent implements OnInit {
             this.scannerRef?.clear();
             return;
           }
-          // Agregar al carrito con FEFO ya cargado; solo cargar el summary
           const newIdx = this.cartItems().length;
           this.cartItems.update(arr => [...arr, {
             product, quantity: 1,
@@ -382,10 +291,7 @@ export class ExitWizardDialogComponent implements OnInit {
       });
   }
 
-  /** Carga solo el resumen de stock (cuando los lotes FEFO ya fueron pre-cargados). */
   private _loadCartItemSummaryOnly(idx: number): void {
-    // Los lotes FEFO ya fueron verificados antes de agregar al carrito (vía escáner o búsqueda);
-    // no hay endpoint de stock por producto genérico, así que solo marcamos como cargado.
     this.cartItems.update(arr => {
       const u = [...arr]; if (u[idx]) u[idx] = { ...u[idx], loadingStock: false }; return u;
     });
@@ -446,7 +352,6 @@ export class ExitWizardDialogComponent implements OnInit {
       const u = [...arr];
       if (u[idx]) u[idx] = {
         ...u[idx], isKit,
-        // Para kits, loadingStock rastrea getKitAvailability; para simples no hay llamada de stock.
         loadingStock: isKit, loadingFefo: !isKit,
         summary: null, fefo: [], kitAvailable: null,
         checkingExpired: false, expiredOnly: false,
@@ -505,73 +410,12 @@ export class ExitWizardDialogComponent implements OnInit {
       });
   }
 
-  asGroup(ctrl: AbstractControl): FormGroup { return ctrl as FormGroup; }
-
-  // ── Filas de procedimientos ───────────────────────────────────
-
-  addProcedureRow(): void {
-    const row = this.fb.group({
-      procedure_id: [null as number | null, Validators.required],
-      quantity:     [1,                     [Validators.required, Validators.min(1)]],
-      unit_price:   [null as number | null, [Validators.required, Validators.min(0)]],
-      notes:        ['', Validators.required],
-    });
-    const idx = this.procedureRows.length;
-    row.get('procedure_id')!.valueChanges.subscribe(procId => {
-      if (procId) this._loadProcedurePrice(idx, Number(procId));
-    });
-    this.procedureRows.push(row);
-    this.rowPrices.update(arr => [...arr, null]);
-    this.rowPricesLoading.update(arr => [...arr, false]);
-  }
-
-  removeProcedureRow(i: number): void {
-    if (this.procedureRows.length <= 1) return;
-    this.procedureRows.removeAt(i);
-    this.rowPrices.update(arr => arr.filter((_, idx) => idx !== i));
-    this.rowPricesLoading.update(arr => arr.filter((_, idx) => idx !== i));
-  }
-
-  private _loadProcedurePrice(rowIdx: number, procedureId: number): void {
-    this.rowPricesLoading.update(arr => { const a = [...arr]; a[rowIdx] = true; return a; });
-    this.medSvc.getProcedurePrices(procedureId, { is_active: true })
-      .pipe(finalize(() => this.rowPricesLoading.update(arr => { const a = [...arr]; a[rowIdx] = false; return a; })))
-      .subscribe({
-        next: r => {
-          const valid = r.data.find(p => p.is_currently_valid) ?? r.data[0] ?? null;
-          this.rowPrices.update(arr => { const a = [...arr]; a[rowIdx] = valid; return a; });
-          if (valid) (this.procedureRows.at(rowIdx) as FormGroup)?.get('unit_price')?.setValue(valid.unit_price, { emitEvent: false });
-        },
-        error: () => this.rowPrices.update(arr => { const a = [...arr]; a[rowIdx] = null; return a; }),
-      });
-  }
-
-  rowProcedureTotal(i: number): number {
-    const row = this.procedureRows.at(i) as FormGroup;
-    return (Number(row?.get('quantity')?.value) || 0) * (Number(row?.get('unit_price')?.value) || 0);
-  }
-
-  get proceduresGrandTotal(): number {
-    return (this.procedureRows.value as any[]).reduce((sum, r) =>
-      sum + (Number(r.quantity) || 0) * (Number(r.unit_price) || 0), 0);
-  }
-
-  // ── Servicios médicos ─────────────────────────────────────────
-
-  private _loadServicesTree(): void {
-    this.loadingTree.set(true);
-    this.medSvc.getTree(true)
-      .pipe(finalize(() => this.loadingTree.set(false)))
-      .subscribe({ next: r => this.servicesTree.set(r.data), error: () => {} });
-  }
-
   // ── Navegación ────────────────────────────────────────────────
 
   nextStep(): void {
     if (!this.isStep1Valid) return;
     this.errors.set([]);
     this.step.set(2);
-    if (this.isExternalCenter && !this.servicesTree().length) this._loadServicesTree();
   }
 
   prevStep(): void { this.step.set(1); this.errors.set([]); }
@@ -586,7 +430,6 @@ export class ExitWizardDialogComponent implements OnInit {
     const wId = this.warehouseControl.value!;
     const cv  = this.centerForm.value;
 
-    // Nuevo formato: un único call con items[] en lugar de N llamadas separadas.
     const payload: Record<string, unknown> = {
       warehouse_id:   wId,
       cost_center_id: cv.cost_center_id,
@@ -597,25 +440,23 @@ export class ExitWizardDialogComponent implements OnInit {
       })),
     };
 
-    if (this.isExternalCenter) {
-      payload['patient_document']    = cv.patient_document;
-      payload['patient_external_id'] = cv.patient_external_id;
-      payload['seller']              = cv.seller;
-      payload['referrer']            = cv.referrer;
-      const firstProc = (this.procedureRows.at(0) as FormGroup)?.value;
-      if (firstProc?.procedure_id) payload['service_id'] = firstProc.procedure_id;
+    if (this.isExternalCenter && this.patientFormRef) {
+      const pd = this.patientFormRef.getValue();
+      payload['patient_document']    = pd.patient_document;
+      payload['patient_external_id'] = pd.patient_external_id;
+      payload['seller']              = pd.seller;
+      payload['referrer']            = pd.referrer;
+      if (pd.procedures[0]?.procedure_id) payload['service_id'] = pd.procedures[0].procedure_id;
     }
 
     this.data.inventorySvc.exit(payload).subscribe({
       next: (res) => {
-        // POST /movements/exit devuelve MovementDocumentResource
         const document: MovementDocument = res.data;
         const flatMovements = document.movements ?? [];
         const wh = this.data.warehouses.find(w => w.id === wId);
         const cc = this.costCenters().find(c => c.id === cv.cost_center_id);
-
-        // dispatchPreview tiene nombres de productos del carrito y fechas FEFO ya calculadas.
         const previewLines = this.dispatchPreview();
+
         this.exitSummaryData.set({
           doc_id:           document.id,
           doc_number:       document.document_number,
@@ -641,12 +482,10 @@ export class ExitWizardDialogComponent implements OnInit {
 
           if (needsSignature) {
             const ref = this.dialog.open(MovementConfirmDialogComponent, {
-              width: '560px',
-              maxWidth: '96vw',
-              disableClose: true,
+              width: '560px', maxWidth: '96vw', disableClose: true,
               data: {
-                document_id:   document.id,
-                movements:     flatMovements.map((m, i) => ({
+                document_id: document.id,
+                movements: flatMovements.map((m, i) => ({
                   id:               m.id,
                   product_name:     previewLines[i]?.product_name ?? m.product_name ?? null,
                   batch_lot_number: m.batch_lot_number ?? null,
@@ -670,24 +509,24 @@ export class ExitWizardDialogComponent implements OnInit {
           }
         };
 
-        if (this.isExternalCenter && this.procedureRows.length > 0) {
-          const serviceDate = this._toApiDate(cv.service_date!);
-          const recordCalls = this.procedureRows.controls.map(ctrl => {
-            const rv = (ctrl as FormGroup).value;
-            return this.medSvc.createPatientProcedureRecord({
+        if (this.isExternalCenter && this.patientFormRef) {
+          const pd          = this.patientFormRef.getValue();
+          const serviceDate = this._toApiDate(pd.service_date);
+          const recordCalls = pd.procedures.map(rv =>
+            this.medSvc.createPatientProcedureRecord({
               medical_service_id:  rv.procedure_id,
-              patient_external_id: cv.patient_external_id!,
-              patient_document:    cv.patient_document!,
-              patient_first_name:  cv.patient_first_name!,
-              patient_last_name:   cv.patient_last_name!,
+              patient_external_id: pd.patient_external_id,
+              patient_document:    pd.patient_document,
+              patient_first_name:  pd.patient_first_name,
+              patient_last_name:   pd.patient_last_name,
               quantity:            rv.quantity,
               unit_price:          rv.unit_price,
               service_date:        serviceDate,
               notes:               rv.notes || undefined,
-              seller:              cv.seller || undefined,
-              referrer:            cv.referrer || undefined,
-            });
-          });
+              seller:              pd.seller || undefined,
+              referrer:            pd.referrer || undefined,
+            })
+          );
           forkJoin(recordCalls).subscribe({
             next:  () => afterMovements(true),
             error: err => {
@@ -708,7 +547,7 @@ export class ExitWizardDialogComponent implements OnInit {
         if (err.status === 422)
           this.errors.set(Object.values(err.error?.errors || {}).flat() as string[]);
         else if (err.status === 409 && err.error?.error_code === 'EXPIRED_STOCK')
-          this.errors.set([err.error?.message || 'El producto solo tiene stock vencido en este almacén. Gestione el lote vencido mediante una devolución, un ajuste o una baja por vencimiento antes de continuar.']);
+          this.errors.set([err.error?.message || 'El producto solo tiene stock vencido en este almacén.']);
         else if (err.status === 409)
           this.errors.set([err.error?.message || 'Error de stock o negocio']);
         else

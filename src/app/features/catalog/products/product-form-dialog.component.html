@@ -251,47 +251,18 @@
           }
 
           @if (!loadingComponents()) {
-            <mat-form-field appearance="outline" class="w-full">
-              <mat-label>Filtrar productos disponibles</mat-label>
-              <mat-icon matPrefix>search</mat-icon>
-              <input matInput
-                     [value]="componentSearch()"
-                     (input)="componentSearch.set($any($event.target).value)"
-                     placeholder="Nombre o código…" />
-              @if (componentSearch()) {
-                <button matSuffix mat-icon-button type="button"
-                        (click)="componentSearch.set('')"
-                        matTooltip="Limpiar filtro">
-                  <mat-icon style="font-size:1rem;height:1rem;width:1rem">close</mat-icon>
-                </button>
-              }
-              <mat-hint class="small-hint">
-                {{ filteredSimpleProducts().length }}&nbsp;de&nbsp;{{ simpleProducts().length }}&nbsp;
-                producto{{ simpleProducts().length !== 1 ? 's' : '' }} disponible{{ simpleProducts().length !== 1 ? 's' : '' }}
-              </mat-hint>
-            </mat-form-field>
-
             <div formArrayName="components">
               @for (ctrl of componentsArray.controls; track $index) {
                 <div class="kit-row" [formGroupName]="$index">
 
-                  <mat-form-field appearance="outline" class="w-full">
-                    <mat-label>Producto *</mat-label>
-                    <mat-select formControlName="component_generic_id">
-                      @for (p of getRowOptions($index); track p.id) {
-                        <mat-option [value]="p.id">{{ p.name }} ({{ p.barcode }})</mat-option>
-                      }
-                      @if (getRowOptions($index).length === 0) {
-                        <mat-option disabled>Sin resultados para "{{ componentSearch() }}"</mat-option>
-                      }
-                    </mat-select>
-                    @if ($any(ctrl).get('component_generic_id')?.hasError('required') && $any(ctrl).get('component_generic_id')?.touched) {
-                      <mat-error>Selecciona un producto</mat-error>
-                    }
-                    @if ($any(ctrl).get('component_generic_id')?.value && componentSearch()) {
-                      <mat-hint>{{ getProductLabel($any(ctrl).get('component_generic_id')?.value) }}</mat-hint>
-                    }
-                  </mat-form-field>
+                  <app-product-search
+                    label="Producto"
+                    [required]="true"
+                    [activeOnly]="true"
+                    [productType]="'simple'"
+                    [selectedProduct]="rowSelectedProducts()[$index]"
+                    (productSelected)="onRowProductSelected($index, $event)">
+                  </app-product-search>
 
                   <mat-form-field appearance="outline" class="w-full">
                     <mat-label>Cant./kit *</mat-label>

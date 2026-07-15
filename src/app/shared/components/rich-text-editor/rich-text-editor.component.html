@@ -1,0 +1,17 @@
+<div class="rte-wrapper"
+     [class.rte-wrapper--focused]="isFocused()"
+     [class.rte-wrapper--disabled]="isDisabled()">
+  @if (label) {
+    <label class="rte-label" [class.rte-label--required]="required">{{ label }}</label>
+  }
+  <quill-editor
+    [ngModel]="content()"
+    (ngModelChange)="onContentChange($event)"
+    [modules]="modules"
+    [placeholder]="placeholder"
+    [readOnly]="isDisabled()"
+    [style]="{'min-height': minHeight}"
+    (onFocus)="onFocus()"
+    (onBlur)="onBlur()">
+  </quill-editor>
+</div>

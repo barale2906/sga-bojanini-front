@@ -62,8 +62,8 @@ function localDatetimeString(date = new Date()): string {
       </form>
     </mat-dialog-content>
     <mat-dialog-actions align="end">
-      <button mat-button [mat-dialog-close]="false">Cancelar</button>
-      <button mat-raised-button color="primary" (click)="save()" [disabled]="form.invalid || saving()">
+      <button mat-button [disabled]="closing()" (click)="cancel()">Cancelar</button>
+      <button mat-raised-button color="primary" (click)="save()" [disabled]="form.invalid || saving() || closing()">
         @if (saving()) { <mat-spinner diameter="18"></mat-spinner> } Registrar
       </button>
     </mat-dialog-actions>
@@ -83,15 +83,21 @@ export class ReadingFormDialogComponent {
   private ref = inject(MatDialogRef<ReadingFormDialogComponent>);
   private fb = inject(FormBuilder);
 
-  saving = signal(false);
-  errors = signal<string[]>([]);
-  alerts = signal<any[]>([]);
+  saving  = signal(false);
+  closing = signal(false);
+  errors  = signal<string[]>([]);
+  alerts  = signal<any[]>([]);
 
   form = this.fb.group({
     value: [null as number | null, [Validators.required]],
     // Hora LOCAL del navegador — no UTC — para que coincida con Colombia (UTC-5)
     recorded_at: [localDatetimeString(), Validators.required],
   });
+
+  cancel(): void {
+    if (this.closing()) return;
+    this.ref.close(false);
+  }
 
   save(): void {
     if (this.form.invalid || this.saving()) return;
@@ -112,6 +118,8 @@ export class ReadingFormDialogComponent {
           this.saving.set(false);
           if (r.data.alerts?.length) {
             this.alerts.set(r.data.alerts);
+            this.closing.set(true);
+            setTimeout(() => this.ref.close(true), 3000);
           } else {
             this.ref.close(true);
           }

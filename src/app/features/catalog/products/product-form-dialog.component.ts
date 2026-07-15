@@ -16,6 +16,7 @@ import { switchMap, map, of, forkJoin } from 'rxjs';
 import { CatalogService, Product, Category, UnitOfMeasure, ProductPresentation, ProductClassification } from '../catalog.service';
 import { FormErrorsComponent } from '../../../shared/components/form-errors/form-errors.component';
 import { VolumeCalculatorComponent } from '../../../shared/components/volume-calculator/volume-calculator.component';
+import { ProductSearchComponent } from '../../../shared/components/product-search/product-search.component';
 
 export interface ProductDialogData {
   product: Product | null;
@@ -37,6 +38,7 @@ export interface ProductDialogData {
     MatProgressSpinnerModule, MatTooltipModule, MatChipsModule,
     FormErrorsComponent,
     VolumeCalculatorComponent,
+    ProductSearchComponent,
   ],
   templateUrl: './product-form-dialog.component.html',
   styles: [`
@@ -167,15 +169,7 @@ export class ProductFormDialogComponent implements OnInit {
   });
 
   // ── BOM (components) ──────────────────────────────────────
-  simpleProducts   = signal<Product[]>([]);
-  componentSearch  = signal('');
-
-  filteredSimpleProducts = computed(() => {
-    const q = this.componentSearch().toLowerCase().trim();
-    return q
-      ? this.simpleProducts().filter(p => p.name.toLowerCase().includes(q) || p.barcode.toLowerCase().includes(q))
-      : this.simpleProducts();
-  });
+  rowSelectedProducts = signal<(Product | null)[]>([]);
 
   // ── Unidad base seleccionada ───────────────────────────────
   selectedBaseUnitAbbr = computed(() => {
@@ -220,18 +214,9 @@ export class ProductFormDialogComponent implements OnInit {
     return this.stepInv.get('components') as FormArray;
   }
 
-  getRowOptions(rowIndex: number): Product[] {
-    const filtered   = this.filteredSimpleProducts();
-    const selectedId = (this.componentsArray.at(rowIndex) as FormGroup).get('component_generic_id')?.value as number | null;
-    if (!selectedId || filtered.some(p => p.id === selectedId)) return filtered;
-    const selected = this.simpleProducts().find(p => p.id === selectedId);
-    return selected ? [selected, ...filtered] : filtered;
-  }
-
-  getProductLabel(id: number | null): string {
-    if (!id) return '';
-    const p = this.simpleProducts().find(p => p.id === id);
-    return p ? `${p.name} (${p.barcode})` : String(id);
+  onRowProductSelected(i: number, product: Product | null): void {
+    this.rowSelectedProducts.update(arr => { const a = [...arr]; a[i] = product; return a; });
+    (this.componentsArray.at(i) as FormGroup).get('component_generic_id')!.setValue(product?.id ?? null);
   }
 
   // ── Presentaciones — métodos ──────────────────────────────
@@ -271,16 +256,16 @@ export class ProductFormDialogComponent implements OnInit {
       component_generic_id: [null as number | null, Validators.required],
       quantity_per_kit:     [1, [Validators.required, Validators.min(1)]],
     }));
+    this.rowSelectedProducts.update(arr => [...arr, null]);
   }
 
   removeComponentRow(i: number): void {
     this.componentsArray.removeAt(i);
+    this.rowSelectedProducts.update(arr => arr.filter((_, idx) => idx !== i));
   }
 
   // ── Lifecycle ─────────────────────────────────────────────
   ngOnInit(): void {
-    this.simpleProducts.set(this.data.simpleProducts);
-
     // Sincronizar señal _typeSig
     this.stepTipo.get('product_type')!.valueChanges.subscribe(v => {
       this._typeSig.set(v || 'simple');
@@ -340,12 +325,15 @@ export class ProductFormDialogComponent implements OnInit {
       next: r => {
         this.loadingComponents.set(false);
         while (this.componentsArray.length) this.componentsArray.removeAt(0);
+        const selectedProducts: (Product | null)[] = [];
         r.data.forEach(c => {
           this.componentsArray.push(this.fb.group({
             component_generic_id: [c.component_generic_id, Validators.required],
             quantity_per_kit:     [c.quantity_per_kit, [Validators.required, Validators.min(1)]],
           }));
+          selectedProducts.push(c.component ? (c.component as Product) : null);
         });
+        this.rowSelectedProducts.set(selectedProducts);
       },
       error: () => {
         this.loadingComponents.set(false);

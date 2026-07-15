@@ -1,0 +1,94 @@
+.rte-wrapper {
+  border: 1px solid rgba(0, 0, 0, 0.38);
+  border-radius: 4px;
+  transition: border-color 0.2s, border-width 0.1s;
+  overflow: hidden;
+
+  &--focused {
+    border-color: var(--mat-primary-color, #6200ee);
+    border-width: 2px;
+  }
+
+  &--disabled {
+    opacity: 0.6;
+    pointer-events: none;
+  }
+}
+
+.rte-label {
+  display: block;
+  font-size: 12px;
+  color: rgba(0, 0, 0, 0.6);
+  padding: 6px 10px 0;
+
+  &--required::after {
+    content: ' *';
+    color: #d32f2f;
+  }
+}
+
+:host ::ng-deep {
+  quill-editor {
+    display: block;
+
+    .ql-toolbar.ql-snow {
+      border: none;
+      border-bottom: 1px solid rgba(0, 0, 0, 0.12);
+      padding: 4px 8px;
+      font-family: inherit;
+      background: rgba(0, 0, 0, 0.02);
+    }
+
+    .ql-container.ql-snow {
+      border: none;
+      font-family: inherit;
+      font-size: 14px;
+    }
+
+    .ql-editor {
+      padding: 10px 14px;
+      line-height: 1.6;
+
+      &.ql-blank::before {
+        color: rgba(0, 0, 0, 0.38);
+        font-style: normal;
+      }
+
+      p  { margin: 0 0 4px; }
+      ul, ol {
+        padding-left: 1.5em;
+        margin: 4px 0;
+      }
+    }
+  }
+}
+
+@media (prefers-color-scheme: dark) {
+  .rte-wrapper {
+    border-color: rgba(255, 255, 255, 0.38);
+    &--focused { border-color: #bb86fc; }
+  }
+
+  .rte-label { color: rgba(255, 255, 255, 0.6); }
+
+  :host ::ng-deep {
+    quill-editor {
+      .ql-toolbar.ql-snow {
+        border-bottom-color: rgba(255, 255, 255, 0.12);
+        background: rgba(255, 255, 255, 0.04);
+
+        .ql-stroke { stroke: rgba(255, 255, 255, 0.7); }
+        .ql-fill   { fill:   rgba(255, 255, 255, 0.7); }
+        .ql-picker-label { color: rgba(255, 255, 255, 0.7); }
+
+        button:hover .ql-stroke, .ql-active .ql-stroke { stroke: #bb86fc; }
+        button:hover .ql-fill,   .ql-active .ql-fill   { fill:   #bb86fc; }
+      }
+
+      .ql-editor {
+        color: rgba(255, 255, 255, 0.87);
+        &.ql-blank::before { color: rgba(255, 255, 255, 0.38); }
+      }
+    }
+  }
+}

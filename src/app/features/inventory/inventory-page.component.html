@@ -29,6 +29,9 @@
   <button *sgaPermission="'registros_procedimientos.ver'" mat-stroked-button (click)="goToPatientRecords()">
     <mat-icon>receipt_long</mat-icon> Registros Paciente
   </button>
+  <button *sgaPermission="'plantillas_clinicas.ver'" mat-stroked-button (click)="goToClinicalTemplates()">
+    <mat-icon>article</mat-icon> Plantillas Clínicas
+  </button>
 </div>
 
 <mat-tab-group color="primary" animationDuration="200ms">

@@ -1,0 +1,140 @@
+<div class="ct-page">
+
+  <div class="ct-header">
+    <div class="ct-header-title">
+      <mat-icon>article</mat-icon>
+      <div>
+        <h2>Plantillas de Evolución Clínica</h2>
+        <p>Configure las plantillas que se pre-cargan al registrar la evolución de un procedimiento.</p>
+      </div>
+    </div>
+    @if (!showForm()) {
+      <button mat-raised-button color="primary" (click)="openCreateForm()">
+        <mat-icon>add</mat-icon>
+        Nueva plantilla
+      </button>
+    }
+  </div>
+
+  <app-form-errors [errors]="errors()"></app-form-errors>
+
+  @if (successMsg()) {
+    <div class="ct-success-msg">
+      <mat-icon>check_circle</mat-icon>
+      {{ successMsg() }}
+    </div>
+  }
+
+  <!-- ── Formulario de creación / edición ── -->
+  @if (showForm()) {
+    <div class="ct-form-card">
+      <div class="ct-form-title">
+        <mat-icon>{{ isEditing ? 'edit' : 'add_circle' }}</mat-icon>
+        {{ isEditing ? 'Editar plantilla' : 'Nueva plantilla' }}
+      </div>
+
+      <form [formGroup]="form" class="ct-form-body">
+
+        <mat-form-field appearance="outline" class="ct-field-full">
+          <mat-label>Servicio / Procedimiento *</mat-label>
+          <mat-select formControlName="medical_service_id">
+            @if (loadingTree()) {
+              <mat-option disabled>Cargando servicios...</mat-option>
+            }
+            @for (svc of allServices(); track svc.id) {
+              <mat-option [value]="svc.id">{{ svc.label }}</mat-option>
+            }
+          </mat-select>
+          <mat-hint>Solo puede existir una plantilla activa por servicio o procedimiento.</mat-hint>
+        </mat-form-field>
+
+        <mat-form-field appearance="outline" class="ct-field-full">
+          <mat-label>Título de la plantilla *</mat-label>
+          <input matInput formControlName="title" maxlength="200"
+                 placeholder="Ej: Evolución de Curación Simple" />
+          <mat-hint align="end">{{ form.get('title')?.value?.length ?? 0 }}/200</mat-hint>
+        </mat-form-field>
+
+        <div class="ct-field-full">
+          <app-rich-text-editor
+            formControlName="content"
+            label="Contenido de la plantilla"
+            [required]="true"
+            minHeight="200px"
+            placeholder="Escriba el texto de la plantilla aquí...">
+          </app-rich-text-editor>
+          <span class="ct-field-hint">El contenido se pre-cargará en el editor al seleccionar este procedimiento.</span>
+        </div>
+
+        @if (isEditing) {
+          <mat-slide-toggle formControlName="is_active" color="primary">
+            Plantilla activa
+          </mat-slide-toggle>
+        }
+
+        <div class="ct-form-actions">
+          <button mat-button type="button" (click)="cancelForm()" [disabled]="saving()">
+            Cancelar
+          </button>
+          <button mat-raised-button color="primary" type="button"
+                  [disabled]="form.invalid || saving()"
+                  (click)="save()">
+            @if (saving()) { <mat-spinner diameter="18"></mat-spinner> }
+            {{ isEditing ? 'Guardar cambios' : 'Crear plantilla' }}
+          </button>
+        </div>
+      </form>
+    </div>
+  }
+
+  <!-- ── Listado de plantillas ── -->
+  <mat-divider style="margin: 1rem 0"></mat-divider>
+
+  @if (loading()) {
+    <div class="ct-loading">
+      <mat-spinner diameter="24"></mat-spinner>
+      <span>Cargando plantillas...</span>
+    </div>
+  } @else if (templates().length === 0) {
+    <div class="ct-empty">
+      <mat-icon>description</mat-icon>
+      <span>No hay plantillas configuradas. Cree la primera para comenzar.</span>
+    </div>
+  } @else {
+    <div class="ct-list">
+      @for (t of templates(); track t.id) {
+        <div class="ct-card" [class.ct-card--inactive]="!t.is_active">
+          <div class="ct-card-header">
+            <div class="ct-card-meta">
+              <span class="ct-card-title">{{ t.title }}</span>
+              <span class="ct-card-service">{{ t.medical_service_name }}</span>
+            </div>
+            <div class="ct-card-badges">
+              @if (!t.is_active) {
+                <span class="ct-badge ct-badge--inactive">Inactiva</span>
+              } @else {
+                <span class="ct-badge ct-badge--active">Activa</span>
+              }
+            </div>
+            <div class="ct-card-actions">
+              <button mat-icon-button matTooltip="Editar plantilla" (click)="openEditForm(t)">
+                <mat-icon>edit</mat-icon>
+              </button>
+              <button mat-icon-button color="warn" matTooltip="Eliminar plantilla"
+                      [disabled]="deleting() === t.id"
+                      (click)="delete(t)">
+                @if (deleting() === t.id) {
+                  <mat-spinner diameter="18"></mat-spinner>
+                } @else {
+                  <mat-icon>delete_outline</mat-icon>
+                }
+              </button>
+            </div>
+          </div>
+          <div class="ct-card-preview" [innerHTML]="t.content"></div>
+        </div>
+      }
+    </div>
+  }
+
+</div>

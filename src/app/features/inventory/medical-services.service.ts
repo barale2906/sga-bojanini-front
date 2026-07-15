@@ -98,6 +98,45 @@ export interface PatientProcedureRecordPayload {
   referrer?: string | null;
 }
 
+export interface ClinicalTemplate {
+  id: number;
+  medical_service_id: number;
+  medical_service_name: string;
+  title: string;
+  content: string;
+  is_active: boolean;
+}
+
+export interface ClinicalTemplatePayload {
+  medical_service_id?: number;
+  title: string;
+  content: string;
+  is_active?: boolean;
+}
+
+export interface ClinicalEvolution {
+  id: number;
+  patient_procedure_record_id: number;
+  content: string;
+  user_id: number;
+  user_name: string;
+  recorded_at: string;
+}
+
+export interface ClinicalEvolutionPayload {
+  content: string;
+  recorded_at?: string;
+}
+
+export interface ProcedureMedication {
+  generic_product_id: number;
+  product_name: string;
+  batch_id: number;
+  lot_number: string;
+  expiration_date: string;
+  quantity: number;
+}
+
 export interface MedicalServiceImportResult {
   total: number;
   success: number;
@@ -194,6 +233,59 @@ export class MedicalServicesService {
 
   deletePatientProcedureRecord(id: number): Observable<ApiResponse<void>> {
     return this.http.delete<ApiResponse<void>>(`${this.api}/patient-procedure-records/${id}`);
+  }
+
+  // ── Plantillas de evolución clínica ─────────────────────────
+
+  getTemplateForService(medicalServiceId: number): Observable<ApiResponse<ClinicalTemplate | null>> {
+    return this.http.get<ApiResponse<ClinicalTemplate | null>>(`${this.api}/clinical-templates/for-service/${medicalServiceId}`);
+  }
+
+  getClinicalTemplates(filter: { medical_service_id?: number; is_active?: boolean } = {}): Observable<ApiResponse<ClinicalTemplate[]>> {
+    let params = new HttpParams();
+    if (filter.medical_service_id !== undefined) params = params.set('medical_service_id', String(filter.medical_service_id));
+    if (filter.is_active !== undefined)          params = params.set('is_active', String(filter.is_active));
+    return this.http.get<ApiResponse<ClinicalTemplate[]>>(`${this.api}/clinical-templates`, { params });
+  }
+
+  getClinicalTemplate(id: number): Observable<ApiResponse<ClinicalTemplate>> {
+    return this.http.get<ApiResponse<ClinicalTemplate>>(`${this.api}/clinical-templates/${id}`);
+  }
+
+  createClinicalTemplate(payload: ClinicalTemplatePayload): Observable<ApiResponse<ClinicalTemplate>> {
+    return this.http.post<ApiResponse<ClinicalTemplate>>(`${this.api}/clinical-templates`, payload);
+  }
+
+  updateClinicalTemplate(id: number, payload: Omit<ClinicalTemplatePayload, 'medical_service_id'>): Observable<ApiResponse<ClinicalTemplate>> {
+    return this.http.put<ApiResponse<ClinicalTemplate>>(`${this.api}/clinical-templates/${id}`, payload);
+  }
+
+  deleteClinicalTemplate(id: number): Observable<ApiResponse<null>> {
+    return this.http.delete<ApiResponse<null>>(`${this.api}/clinical-templates/${id}`);
+  }
+
+  // ── Evoluciones clínicas ─────────────────────────────────────
+
+  getEvolutions(recordId: number): Observable<ApiResponse<ClinicalEvolution[]>> {
+    return this.http.get<ApiResponse<ClinicalEvolution[]>>(`${this.api}/patient-procedure-records/${recordId}/evolutions`);
+  }
+
+  createEvolution(recordId: number, payload: ClinicalEvolutionPayload): Observable<ApiResponse<ClinicalEvolution>> {
+    return this.http.post<ApiResponse<ClinicalEvolution>>(`${this.api}/patient-procedure-records/${recordId}/evolutions`, payload);
+  }
+
+  updateEvolution(recordId: number, evolutionId: number, payload: { content: string }): Observable<ApiResponse<ClinicalEvolution>> {
+    return this.http.put<ApiResponse<ClinicalEvolution>>(`${this.api}/patient-procedure-records/${recordId}/evolutions/${evolutionId}`, payload);
+  }
+
+  deleteEvolution(recordId: number, evolutionId: number): Observable<ApiResponse<null>> {
+    return this.http.delete<ApiResponse<null>>(`${this.api}/patient-procedure-records/${recordId}/evolutions/${evolutionId}`);
+  }
+
+  // ── Medicamentos aplicados ───────────────────────────────────
+
+  getProcedureMedications(recordId: number): Observable<ApiResponse<ProcedureMedication[]>> {
+    return this.http.get<ApiResponse<ProcedureMedication[]>>(`${this.api}/patient-procedure-records/${recordId}/medications`);
   }
 
   // ── Importación masiva ───────────────────────────────────────

@@ -1,0 +1,211 @@
+.patient-sale-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.patient-block-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.88rem;
+  font-weight: 700;
+  color: #553c9a;
+
+  mat-icon {
+    font-size: 1.1rem;
+    height: 1.1rem;
+    width: 1.1rem;
+    color: #6b46c1;
+  }
+}
+
+.patient-block-badge {
+  margin-left: auto;
+  background: #e9d8fd;
+  color: #553c9a;
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 0.1rem 0.5rem;
+  border-radius: 9999px;
+}
+
+.patient-fields {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.25rem 0.65rem;
+
+  mat-form-field { width: 100%; }
+
+  .field-full { grid-column: span 2; }
+}
+
+.section-title {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: #4a5568;
+
+  mat-icon {
+    font-size: 1rem;
+    height: 1rem;
+    width: 1rem;
+    color: #718096;
+  }
+}
+
+.full-width {
+  width: 100%;
+  display: block;
+  margin-bottom: 0.25rem;
+}
+
+.row-loading {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-size: 0.8rem;
+  color: #718096;
+  padding: 0.2rem 0;
+}
+
+// ── Procedure rows ─────────────────────────────────────────────
+.procedure-row-card {
+  border: 1px solid #d6bcfa;
+  border-radius: 8px;
+  padding: 0.65rem 0.9rem;
+  background: white;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  margin-bottom: 0.5rem;
+}
+
+.procedure-row-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.procedure-row-num {
+  font-size: 0.76rem;
+  font-weight: 700;
+  color: #553c9a;
+  background: #e9d8fd;
+  padding: 0.12rem 0.5rem;
+  border-radius: 9999px;
+}
+
+.procedure-row-fields {
+  display: grid;
+  grid-template-columns: 110px 1fr;
+  gap: 0.25rem 0.5rem;
+
+  .field-procedure { grid-column: span 2; }
+  .field-qty-sm    {}
+  .field-price     {}
+}
+
+.procedure-row-total {
+  text-align: right;
+  font-size: 0.8rem;
+  color: #718096;
+
+  strong { color: #553c9a; font-size: 0.92rem; }
+}
+
+.price-hint--ok { color: #276749 !important; }
+
+.add-row-btn {
+  width: 100%;
+  margin-top: 0.25rem;
+  font-size: 0.82rem;
+  border-style: dashed;
+  color: #718096;
+  border-color: #cbd5e0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.3rem;
+
+  &:hover { border-color: #3182ce; color: #2b6cb0; }
+  mat-icon { font-size: 1rem; height: 1rem; width: 1rem; }
+}
+
+.procedures-total-bar {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0.9rem;
+  background: #f3e8ff;
+  border: 1px solid #d6bcfa;
+  border-radius: 8px;
+  margin-top: 0.35rem;
+  font-size: 0.85rem;
+  color: #4a5568;
+
+  strong { font-size: 1rem; color: #553c9a; }
+}
+
+.empty-procedures {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.5rem 0.75rem;
+  border-radius: 7px;
+  font-size: 0.8rem;
+  background: #fff5f5;
+  color: #742a2a;
+
+  mat-icon { font-size: 1rem; height: 1rem; width: 1rem; flex-shrink: 0; color: #c53030; }
+}
+
+.select-service-hint {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.5rem 0.75rem;
+  border-radius: 7px;
+  font-size: 0.8rem;
+  background: #f0f9ff;
+  color: #2b6cb0;
+  border: 1px solid #bee3f8;
+
+  mat-icon { font-size: 1rem; height: 1rem; width: 1rem; flex-shrink: 0; color: #3182ce; }
+}
+
+// ── Evolución clínica (rich text) ─────────────────────────────
+.evolution-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.template-hint {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.78rem;
+  color: #276749;
+  background: #f0fff4;
+  border: 1px solid #c6f6d5;
+  border-radius: 6px;
+  padding: 0.3rem 0.65rem;
+
+  mat-icon {
+    font-size: 1rem;
+    height: 1rem;
+    width: 1rem;
+    color: #38a169;
+    flex-shrink: 0;
+  }
+}
+
+.evolution-error {
+  font-size: 0.75rem;
+  color: #c53030;
+  padding: 0 2px;
+}

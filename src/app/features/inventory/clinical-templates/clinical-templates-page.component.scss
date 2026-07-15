@@ -1,0 +1,248 @@
+.ct-page {
+  padding: 1.5rem;
+  max-width: 900px;
+  margin: 0 auto;
+}
+
+.ct-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1.25rem;
+}
+
+.ct-header-title {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+
+  mat-icon {
+    font-size: 2rem;
+    height: 2rem;
+    width: 2rem;
+    color: #553c9a;
+    margin-top: 2px;
+    flex-shrink: 0;
+  }
+
+  h2 {
+    margin: 0 0 0.2rem;
+    font-size: 1.2rem;
+    font-weight: 700;
+    color: #2d3748;
+  }
+
+  p {
+    margin: 0;
+    font-size: 0.84rem;
+    color: #718096;
+  }
+}
+
+.ct-success-msg {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: #f0fff4;
+  border: 1px solid #c6f6d5;
+  color: #276749;
+  border-radius: 8px;
+  padding: 0.6rem 1rem;
+  font-size: 0.87rem;
+  margin-bottom: 1rem;
+
+  mat-icon { font-size: 1.1rem; height: 1.1rem; width: 1.1rem; flex-shrink: 0; }
+}
+
+// ── Formulario ────────────────────────────────────────────────
+.ct-form-card {
+  background: white;
+  border: 1px solid #d6bcfa;
+  border-radius: 10px;
+  padding: 1.25rem 1.5rem;
+  margin-bottom: 1rem;
+}
+
+.ct-form-title {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #553c9a;
+  margin-bottom: 1rem;
+
+  mat-icon { font-size: 1.15rem; height: 1.15rem; width: 1.15rem; }
+}
+
+.ct-form-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.ct-field-full { width: 100%; }
+
+.ct-field-hint {
+  display: block;
+  font-size: 0.75rem;
+  color: #718096;
+  margin-top: 0.25rem;
+  padding: 0 2px;
+}
+
+.ct-form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  padding-top: 0.5rem;
+}
+
+// ── Listado ───────────────────────────────────────────────────
+.ct-loading {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  color: #718096;
+  font-size: 0.88rem;
+  padding: 1.5rem 0;
+}
+
+.ct-empty {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 1.5rem;
+  background: #f7fafc;
+  border: 1px dashed #cbd5e0;
+  border-radius: 8px;
+  color: #a0aec0;
+  font-size: 0.88rem;
+
+  mat-icon { font-size: 1.3rem; height: 1.3rem; width: 1.3rem; }
+}
+
+.ct-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.ct-card {
+  background: white;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  overflow: hidden;
+  transition: border-color 0.15s;
+
+  &:hover { border-color: #b794f4; }
+
+  &--inactive {
+    opacity: 0.7;
+    border-color: #e2e8f0;
+  }
+}
+
+.ct-card-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid #f0f4f8;
+  background: #f7fafc;
+}
+
+.ct-card-meta {
+  flex: 1;
+  min-width: 0;
+}
+
+.ct-card-title {
+  display: block;
+  font-size: 0.92rem;
+  font-weight: 700;
+  color: #2d3748;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.ct-card-service {
+  display: block;
+  font-size: 0.77rem;
+  color: #718096;
+  margin-top: 1px;
+}
+
+.ct-card-badges { flex-shrink: 0; }
+
+.ct-badge {
+  font-size: 0.7rem;
+  font-weight: 700;
+  padding: 0.15rem 0.5rem;
+  border-radius: 9999px;
+
+  &--active   { background: #c6f6d5; color: #276749; }
+  &--inactive { background: #fed7d7; color: #822727; }
+}
+
+.ct-card-actions { display: flex; gap: 0; flex-shrink: 0; }
+
+.ct-card-preview {
+  padding: 0.75rem 1.25rem;
+  font-size: 0.85rem;
+  color: #4a5568;
+  max-height: 120px;
+  overflow: hidden;
+  position: relative;
+
+  &::after {
+    content: '';
+    position: absolute;
+    bottom: 0; left: 0; right: 0;
+    height: 40px;
+    background: linear-gradient(transparent, white);
+  }
+
+  p  { margin: 0 0 4px; }
+  ul, ol { margin: 4px 0; padding-left: 1.5em; }
+}
+
+@media (prefers-color-scheme: dark) {
+  .ct-header-title {
+    h2 { color: rgba(255,255,255,0.9); }
+    p  { color: rgba(255,255,255,0.5); }
+  }
+
+  .ct-form-card {
+    background: #1e1e2e;
+    border-color: #553c9a;
+  }
+
+  .ct-card {
+    background: #1e1e2e;
+    border-color: #2d3748;
+
+    &:hover { border-color: #553c9a; }
+  }
+
+  .ct-card-header {
+    background: #151521;
+    border-bottom-color: #2d3748;
+  }
+
+  .ct-card-title  { color: rgba(255,255,255,0.9); }
+  .ct-card-service { color: rgba(255,255,255,0.5); }
+
+  .ct-card-preview {
+    color: rgba(255,255,255,0.7);
+    &::after { background: linear-gradient(transparent, #1e1e2e); }
+  }
+
+  .ct-empty {
+    background: #151521;
+    border-color: #2d3748;
+    color: rgba(255,255,255,0.4);
+  }
+}

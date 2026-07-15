@@ -1,0 +1,186 @@
+<form [formGroup]="patientForm" class="patient-sale-form">
+
+  <div class="patient-block-header">
+    <mat-icon>person</mat-icon>
+    <span>Datos del Paciente</span>
+    <span class="patient-block-badge">Centro externo</span>
+  </div>
+
+  <div class="patient-fields">
+    <mat-form-field appearance="outline">
+      <mat-label>Nombres *</mat-label>
+      <input matInput formControlName="patient_first_name" maxlength="100" placeholder="Carlos Andrés" />
+    </mat-form-field>
+    <mat-form-field appearance="outline">
+      <mat-label>Apellidos *</mat-label>
+      <input matInput formControlName="patient_last_name" maxlength="100" placeholder="Pérez Gómez" />
+    </mat-form-field>
+  </div>
+
+  <div class="patient-fields">
+    <mat-form-field appearance="outline">
+      <mat-label>N° Documento *</mat-label>
+      <input matInput formControlName="patient_document" maxlength="50" placeholder="1012345678" />
+      <mat-hint>Cédula o documento</mat-hint>
+    </mat-form-field>
+    <mat-form-field appearance="outline">
+      <mat-label>ID en Sistema Clínico *</mat-label>
+      <input matInput formControlName="patient_external_id" maxlength="100" placeholder="EXT-00892" />
+      <mat-hint>ID en el HIS/EMR</mat-hint>
+    </mat-form-field>
+    <mat-form-field appearance="outline" class="field-full">
+      <mat-label>Fecha de Atención *</mat-label>
+      <input matInput [matDatepicker]="serviceDatePicker" formControlName="service_date" />
+      <mat-datepicker-toggle matIconSuffix [for]="serviceDatePicker"></mat-datepicker-toggle>
+      <mat-datepicker #serviceDatePicker></mat-datepicker>
+    </mat-form-field>
+  </div>
+
+  <div class="patient-fields">
+    <mat-form-field appearance="outline">
+      <mat-label>Vendedor / Operador *</mat-label>
+      <mat-icon matPrefix>sell</mat-icon>
+      <input matInput formControlName="seller" maxlength="150"
+             placeholder="Nombre del despachador..."
+             [matAutocomplete]="sellerAuto"
+             (input)="onSellerInput($any($event.target).value)" />
+      <mat-autocomplete #sellerAuto="matAutocomplete">
+        @for (s of sellerSuggestions(); track s) {
+          <mat-option [value]="s">{{ s }}</mat-option>
+        }
+      </mat-autocomplete>
+      <mat-hint>Quien despacha el producto</mat-hint>
+    </mat-form-field>
+    <mat-form-field appearance="outline">
+      <mat-label>Médico Remitente *</mat-label>
+      <mat-icon matPrefix>medical_information</mat-icon>
+      <input matInput formControlName="referrer" maxlength="150"
+             placeholder="Nombre del médico remitente..."
+             [matAutocomplete]="referrerAuto"
+             (input)="onReferrerInput($any($event.target).value)" />
+      <mat-autocomplete #referrerAuto="matAutocomplete">
+        @for (r of referrerSuggestions(); track r) {
+          <mat-option [value]="r">{{ r }}</mat-option>
+        }
+      </mat-autocomplete>
+      <mat-hint>Médico que remite al paciente</mat-hint>
+    </mat-form-field>
+  </div>
+
+  <!-- Procedimientos -->
+  <div class="section-title" style="margin-top:0.75rem">
+    <mat-icon>medical_services</mat-icon>
+    <span>Procedimientos {{ mode === 'exit' ? 'aplicados' : 'a vender' }}</span>
+  </div>
+
+  @if (loadingTree()) {
+    <div class="row-loading">
+      <mat-spinner diameter="14"></mat-spinner>
+      <span>Cargando servicios médicos...</span>
+    </div>
+  }
+
+  @if (!loadingTree() && servicesTree().length > 0) {
+    <mat-form-field appearance="outline" class="full-width">
+      <mat-label>Servicio médico</mat-label>
+      <mat-select formControlName="filter_service_id">
+        <mat-option [value]="null">Seleccionar servicio...</mat-option>
+        @for (svc of servicesTree(); track svc.id) {
+          <mat-option [value]="svc.id">{{ svc.code }} — {{ svc.name }}</mat-option>
+        }
+      </mat-select>
+      <mat-hint>Filtra los procedimientos disponibles</mat-hint>
+    </mat-form-field>
+  }
+
+  @if (patientForm.get('filter_service_id')?.value && selectedProcedures().length > 0) {
+    @for (row of procedureRows.controls; track $index; let i = $index) {
+      <div class="procedure-row-card" [formGroup]="asGroup(row)">
+        <div class="procedure-row-header">
+          <span class="procedure-row-num">Procedimiento {{ i + 1 }}</span>
+          @if (procedureRows.length > 1) {
+            <button mat-icon-button type="button" color="warn"
+                    (click)="removeProcedureRow(i)" matTooltip="Quitar procedimiento">
+              <mat-icon>remove_circle_outline</mat-icon>
+            </button>
+          }
+        </div>
+        <div class="procedure-row-fields">
+          <mat-form-field appearance="outline" class="field-procedure">
+            <mat-label>Procedimiento *</mat-label>
+            <mat-select formControlName="procedure_id">
+              @for (proc of selectedProcedures(); track proc.id) {
+                <mat-option [value]="proc.id">{{ proc.code }} — {{ proc.name }}</mat-option>
+              }
+            </mat-select>
+          </mat-form-field>
+          <mat-form-field appearance="outline" class="field-qty-sm">
+            <mat-label>Cantidad *</mat-label>
+            <input matInput type="number" formControlName="quantity" min="1" />
+          </mat-form-field>
+          <mat-form-field appearance="outline" class="field-price">
+            <mat-label>$ Valor unitario *</mat-label>
+            <input matInput type="number" formControlName="unit_price" min="0" step="100" />
+            <span matTextPrefix>$&nbsp;</span>
+            @if (rowPricesLoading()[i]) {
+              <mat-hint>Cargando tarifa vigente...</mat-hint>
+            } @else if (rowPrices()[i]?.is_currently_valid) {
+              <mat-hint class="price-hint--ok">Tarifa vigente cargada</mat-hint>
+            }
+          </mat-form-field>
+        </div>
+        <div class="procedure-row-total">
+          Total: <strong>{{ rowProcedureTotal(i) | currency:'COP':'symbol':'1.0-0' }}</strong>
+        </div>
+
+        @if (mode === 'exit') {
+          <div class="evolution-field">
+            @if (rowTemplatesLoading()[i]) {
+              <div class="row-loading">
+                <mat-spinner diameter="14"></mat-spinner>
+                <span>Cargando plantilla de evolución...</span>
+              </div>
+            }
+            @if (!rowTemplatesLoading()[i] && rowTemplates()[i]) {
+              <div class="template-hint">
+                <mat-icon>auto_awesome</mat-icon>
+                <span>Plantilla cargada: <strong>{{ rowTemplates()[i]!.title }}</strong>. Puede editarla libremente.</span>
+              </div>
+            }
+            <app-rich-text-editor
+              formControlName="notes"
+              label="Evolución Clínica"
+              [required]="true"
+              placeholder="Describa la evolución clínica del paciente...">
+            </app-rich-text-editor>
+            @if (!_htmlHasText(asGroup(row).get('notes')?.value) && asGroup(row).get('notes')?.touched) {
+              <span class="evolution-error">La evolución clínica es obligatoria</span>
+            }
+          </div>
+        }
+
+      </div>
+    }
+    <button mat-stroked-button type="button" class="add-row-btn" (click)="addProcedureRow()">
+      <mat-icon>add</mat-icon>
+      Agregar procedimiento
+    </button>
+    @if (procedureRows.length > 0) {
+      <div class="procedures-total-bar">
+        <span>Total procedimientos:</span>
+        <strong>{{ proceduresGrandTotal | currency:'COP':'symbol':'1.0-0' }}</strong>
+      </div>
+    }
+  } @else if (patientForm.get('filter_service_id')?.value) {
+    <div class="empty-procedures">
+      <mat-icon>info</mat-icon>
+      <span>El servicio seleccionado no tiene procedimientos activos.</span>
+    </div>
+  } @else if (!loadingTree()) {
+    <div class="select-service-hint">
+      <mat-icon>arrow_upward</mat-icon>
+      <span>Selecciona un servicio médico para ver los procedimientos disponibles.</span>
+    </div>
+  }
+
+</form>

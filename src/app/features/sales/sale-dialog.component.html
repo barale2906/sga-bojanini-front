@@ -1,0 +1,47 @@
+<h2 mat-dialog-title class="sale-title">
+  @if (step() === 1) {
+    <mat-icon>point_of_sale</mat-icon>
+    Registrar Venta
+  } @else {
+    <mat-icon class="title-icon--success">check_circle</mat-icon>
+    Venta Registrada
+  }
+</h2>
+
+<mat-dialog-content class="sale-content">
+  <app-form-errors [errors]="errors()"></app-form-errors>
+
+  @if (step() === 1) {
+    <app-patient-sale-form mode="sale" #patientFormRef></app-patient-sale-form>
+  }
+
+  @if (step() === 2) {
+    <div class="confirm-success-banner">
+      <mat-icon>check_circle</mat-icon>
+      <div>
+        <div class="confirm-success-title">Venta registrada exitosamente</div>
+        <div class="confirm-success-sub">
+          {{ savedCount() }} procedimiento{{ savedCount() !== 1 ? 's' : '' }} guardado{{ savedCount() !== 1 ? 's' : '' }} correctamente.
+        </div>
+      </div>
+    </div>
+  }
+</mat-dialog-content>
+
+<mat-dialog-actions align="end">
+  @if (step() === 1) {
+    <button mat-button [mat-dialog-close]="false" [disabled]="saving()">Cancelar</button>
+    <button mat-raised-button color="primary"
+            [disabled]="!isValid || saving()"
+            (click)="save()">
+      @if (saving()) { <mat-spinner diameter="18"></mat-spinner> }
+      Registrar Venta
+    </button>
+  }
+  @if (step() === 2) {
+    <button mat-raised-button color="primary" (click)="closeDialog()">
+      <mat-icon>check</mat-icon>
+      Cerrar
+    </button>
+  }
+</mat-dialog-actions>

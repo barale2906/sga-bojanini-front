@@ -2,14 +2,23 @@ import { Component, inject, signal, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterModule } from '@angular/router';
 import { HttpClient } from '@angular/common/http';
+import { forkJoin } from 'rxjs';
 import { MatCardModule } from '@angular/material/card';
 import { MatIconModule } from '@angular/material/icon';
 import { MatButtonModule } from '@angular/material/button';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
+import { MatDialog, MatDialogModule } from '@angular/material/dialog';
+import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { environment } from '../../../environments/environment';
 import { ApiResponse } from '../../core/models/api-response.model';
 import { AuthService } from '../../core/services/auth.service';
+import { InventoryService } from '../inventory/inventory.service';
+import { WarehouseService, Warehouse } from '../warehouse/warehouse.service';
+import { CatalogService, Product } from '../catalog/catalog.service';
+import { ExitWizardDialogComponent } from '../inventory/movements/exit-wizard-dialog.component';
+import { SaleDialogComponent } from '../sales/sale-dialog.component';
 import { PageHeaderComponent } from '../../shared/components/page-header/page-header.component';
+import { PermissionDirective } from '../../shared/directives/permission.directive';
 
 interface DashboardInventory {
   total_products: number;
@@ -45,13 +54,21 @@ interface DashboardConditions {
     MatIconModule,
     MatButtonModule,
     MatProgressSpinnerModule,
+    MatDialogModule,
+    MatSnackBarModule,
     PageHeaderComponent,
+    PermissionDirective,
   ],
   templateUrl: './dashboard.component.html',
   styleUrl: './dashboard.component.scss',
 })
 export class DashboardComponent implements OnInit {
   private http = inject(HttpClient);
+  private dialog = inject(MatDialog);
+  private snack = inject(MatSnackBar);
+  private wSvc = inject(WarehouseService);
+  private cSvc = inject(CatalogService);
+  private invSvc = inject(InventoryService);
   auth = inject(AuthService);
 
   loading = signal(true);
@@ -59,10 +76,25 @@ export class DashboardComponent implements OnInit {
   purchasing = signal<DashboardPurchasing | null>(null);
   conditions = signal<DashboardConditions | null>(null);
 
+  private warehouses = signal<Warehouse[]>([]);
+  private products = signal<Product[]>([]);
+
   private api = environment.apiUrl;
 
   ngOnInit(): void {
     this.loadDashboard();
+    if (this.auth.hasPermission('movimientos.salida')) {
+      forkJoin([
+        this.wSvc.getWarehouses(),
+        this.cSvc.getProducts({ per_page: 200 }),
+      ]).subscribe({
+        next: ([wRes, pRes]) => {
+          this.warehouses.set(wRes.data);
+          this.products.set(pRes.data);
+        },
+        error: () => {},
+      });
+    }
   }
 
   loadDashboard(): void {
@@ -107,5 +139,29 @@ export class DashboardComponent implements OnInit {
       currency: 'COP',
       minimumFractionDigits: 0,
     }).format(value);
+  }
+
+  openSaleDialog(): void {
+    this.dialog.open(SaleDialogComponent, {
+      width: '95vw', maxWidth: '800px', maxHeight: '93vh',
+    }).afterClosed().subscribe(result => {
+      if (result?.ok) {
+        this.snack.open('Venta registrada exitosamente', 'OK', { duration: 4000 });
+      }
+    });
+  }
+
+  openExitWizard(): void {
+    this.dialog.open(ExitWizardDialogComponent, {
+      data: { warehouses: this.warehouses(), products: this.products(), inventorySvc: this.invSvc },
+      width: '95vw', maxWidth: '1020px', height: '93vh', maxHeight: '93vh',
+    }).afterClosed().subscribe(result => {
+      if (!result?.ok) return;
+      this.loadDashboard();
+      const msg = result.withRecords
+        ? 'Salida registrada con procedimientos del paciente'
+        : 'Salida de stock registrada';
+      this.snack.open(msg, 'OK', { duration: 4000 });
+    });
   }
 }
