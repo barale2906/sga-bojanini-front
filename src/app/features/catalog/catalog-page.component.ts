@@ -253,17 +253,65 @@ export class CatalogPageComponent implements OnInit {
     });
   }
 
-  /** Imprime la lista completa de barcodes aplicando los filtros de categoría y estado activos. */
+  /** Imprime la lista completa de barcodes con gráfica, aplicando los filtros activos. */
   printBarcodeList(): void {
-    const { category_id, is_active } = this.prodFilters.value;
+    const { search, category_id, product_type, is_active } = this.prodFilters.value;
     const win = window.open('', '_blank');
     if (!win) { this.snack.open('Permite ventanas emergentes para imprimir', 'OK', { duration: 4000 }); return; }
     win.document.write('<html><body style="font-family:sans-serif;text-align:center;padding:2rem">Cargando lista…</body></html>');
-    this.svc.getBarcodeListHtml({
-      active: is_active === 'false' ? '0' : '1',
+
+    this.svc.getProducts({
+      search: search || undefined,
       category_id: category_id ? Number(category_id) : undefined,
+      product_type: product_type || undefined,
+      is_active: is_active || undefined,
+      per_page: 9999,
     }).subscribe({
-      next: html => { win.document.open(); win.document.write(html); win.document.close(); },
+      next: r => {
+        const products = r.data ?? [];
+        const escape = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+        const items = products.map(p => `
+          <div class="bc-item">
+            <div class="bc-name">${escape(p.name)}</div>
+            <svg class="bc-svg" data-code="${escape(p.barcode)}"></svg>
+            <div class="bc-code">${escape(p.barcode)}</div>
+          </div>`).join('');
+
+        const html = `<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Listado Código de Barras</title>
+  <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"><\/script>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:sans-serif;padding:1.5rem}
+    h1{font-size:1.1rem;margin-bottom:1.2rem;text-align:center}
+    .grid{display:flex;flex-wrap:wrap;gap:0.75rem;justify-content:flex-start}
+    .bc-item{border:1px solid #ccc;border-radius:4px;padding:0.6rem;text-align:center;width:180px}
+    .bc-name{font-size:0.72rem;font-weight:600;margin-bottom:0.4rem;line-height:1.2;word-break:break-word}
+    .bc-svg{width:100%;height:auto}
+    .bc-code{font-size:0.7rem;color:#555;margin-top:0.25rem;font-family:monospace}
+    @media print{@page{margin:1cm}body{padding:0.5rem}}
+  </style>
+</head>
+<body>
+  <h1>Listado Código de Barras</h1>
+  <div class="grid">${items}</div>
+  <script>
+    document.querySelectorAll('svg.bc-svg').forEach(function(el){
+      var code = el.getAttribute('data-code');
+      try{ JsBarcode(el, code, {format:'CODE128',width:1.4,height:48,displayValue:false,margin:2}); }
+      catch(e){ console.warn('Barcode error',code,e); }
+    });
+    window.print();
+  <\/script>
+</body>
+</html>`;
+        win.document.open();
+        win.document.write(html);
+        win.document.close();
+      },
       error: () => { win.close(); this.snack.open('No se pudo obtener la lista de barcodes', 'OK', { duration: 4000 }); },
     });
   }
