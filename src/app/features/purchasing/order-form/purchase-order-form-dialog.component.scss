@@ -11,7 +11,7 @@
 }
 .item-row {
   display: flex; gap: 0.5rem; align-items: flex-start;
-  .item-product { flex: 3; } .item-pres { flex: 2; } .item-qty { width: 90px; } .item-price { width: 130px; } .item-tax { width: 80px; }
+  .item-product { flex: 2.5; } .item-variant { flex: 2; } .item-pres { flex: 2; } .item-qty { width: 90px; } .item-price { width: 130px; } .item-tax { width: 80px; }
 }
 
 .base-preview {

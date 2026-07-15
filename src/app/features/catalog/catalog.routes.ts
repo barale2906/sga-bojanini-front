@@ -10,6 +10,6 @@ export const catalogRoutes: Routes = [
     path: 'products/:id',
     loadComponent: () =>
       import('./products/product-detail-page.component').then((m) => m.ProductDetailPageComponent),
-    data: { permission: 'productos.ver' },
+    data: { permission: 'generic-products.ver' },
   },
 ];

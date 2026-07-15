@@ -10,14 +10,14 @@ export interface TaxBreakdownLine {
 }
 
 export interface PurchaseOrderItem {
-  id?: number; product_id: number; product_presentation_id: number;
+  id?: number; product_variant_id: number; product_presentation_id: number;
   quantity_requested: number; quantity_received?: number;
   unit_price: number | string;
   tax_rate?: number | string;
   tax_amount?: number | string;
   total_price?: number | string;
   notes?: string;
-  product?: { id: number; code: string; name: string };
+  product?: { id: number; barcode: string; name: string };
   presentation?: { id: number; name: string; factor_to_base: number };
   subtotal?: number;
 }
@@ -35,9 +35,9 @@ export interface PurchaseOrder {
 }
 
 export interface ReorderSuggestion {
-  product_id: number;
+  generic_product_id: number;
   product_name: string;
-  product_code: string;
+  product_barcode: string;
   current_stock: number;
   reorder_point: number;
   suggested_quantity: number;

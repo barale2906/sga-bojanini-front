@@ -24,6 +24,7 @@ export interface UnitOfMeasure {
   is_active: boolean;
 }
 
+/** Producto genérico — concepto clínico/logístico sin marca. Barcode auto-generado (6 dígitos). */
 export interface Product {
   id: number;
   category_id: number;
@@ -31,8 +32,7 @@ export interface Product {
   classification_id: number | null;
   product_type: 'simple' | 'kit';
   name: string;
-  code: string;
-  sku: string | null;
+  barcode: string;
   description: string | null;
   requires_cold_chain: boolean;
   reorder_point: number;
@@ -42,36 +42,43 @@ export interface Product {
   volume_cm3: number | null;
   weight_kg: number | null;
   concentration: string | null;
-  risk_level: string | null;
-  lab_brand: string | null;
   pharmaceutical_form: string | null;
-  commercial_presentation: string | null;
-  serie_reference: string | null;
-  useful_life: string | null;
   is_active: boolean;
   category?: Pick<Category, 'id' | 'name' | 'code'>;
   base_unit?: Pick<UnitOfMeasure, 'id' | 'name' | 'abbreviation'>;
   classification?: ProductClassification;
-  sanitary_registrations?: SanitaryRegistration[];
+  variants?: ProductVariant[];
   components?: KitComponent[];
   created_at?: string;
 }
 
+/** Variante de un genérico — instancia de marca/laboratorio. */
+export interface ProductVariant {
+  id: number;
+  generic_product_id: number;
+  lab_brand: string | null;
+  brand_sku: string | null;
+  commercial_presentation: string | null;
+  serie_reference: string | null;
+  useful_life: string | null;
+  risk_level: string | null;
+  is_active: boolean;
+  sanitary_registrations?: SanitaryRegistration[];
+}
+
 export interface KitComponent {
   id: number;
-  kit_product_id?: number;
-  component_product_id: number;
+  kit_generic_id?: number;
+  component_generic_id: number;
   quantity_per_kit: number;
   sort_order: number;
   notes?: string | null;
   is_active?: boolean;
-  component?: Pick<Product, 'id' | 'name' | 'code'>;
+  component?: Pick<Product, 'id' | 'name' | 'barcode'>;
 }
 
 export interface ProductPresentation {
   id: number;
-  /** @deprecated product_id ya no existe en presentaciones (modelo M:N) */
-  product_id?: number;
   parent_id: number | null;
   name: string;
   code: string;
@@ -79,7 +86,6 @@ export interface ProductPresentation {
   quantity_per_parent: number | null;
   factor_to_base: number;
   level: number;
-  /** Campo de la tabla pivot — presente solo en respuestas por-producto */
   is_purchase_default?: boolean;
   is_active: boolean;
   sort_order: number;
@@ -112,12 +118,13 @@ export interface SupplierProductPivot {
   is_preferred: boolean;
 }
 
-/** Producto con datos del pivot proveedor↔producto */
-export interface SupplierProduct extends Product {
+/** Variante con datos del pivot proveedor↔variante */
+export interface SupplierProduct extends ProductVariant {
+  generic?: Pick<Product, 'id' | 'name' | 'barcode' | 'category'>;
   pivot: SupplierProductPivot;
 }
 
-/** Proveedor con datos del pivot proveedor↔producto (vista desde el producto) */
+/** Proveedor con datos del pivot proveedor↔variante (vista desde la variante) */
 export interface ProductSupplier extends Supplier {
   pivot: SupplierProductPivot;
 }
@@ -154,14 +161,14 @@ export interface ImportResult {
 }
 
 export interface KitAvailability {
-  kit_product_id: number;
+  generic_product_id: number;
   warehouse_id: number;
   available_kits: number;
 }
 
 export interface KitExplosionLine {
-  component_product_id: number;
-  component_code: string;
+  component_generic_id: number;
+  component_barcode: string;
   component_name: string;
   quantity_base: number;
 }
@@ -182,7 +189,7 @@ export interface ProductClassification {
 
 export interface SanitaryRegistration {
   id: number;
-  product_id: number;
+  product_variant_id: number;
   registration_number: string;
   expiry_date: string;
   is_active: boolean;
@@ -252,7 +259,7 @@ export class CatalogService {
     return this.http.delete<ApiResponse<null>>(`${this.api}/units-of-measure/${id}`);
   }
 
-  // ── Productos ────────────────────────────────────────────────
+  // ── Productos genéricos ──────────────────────────────────────
 
   getProducts(filters: { search?: string; category_id?: number; product_type?: string; is_active?: string; per_page?: number } = {}): Observable<ApiResponse<Product[]>> {
     let params = new HttpParams();
@@ -261,31 +268,63 @@ export class CatalogService {
     if (filters.product_type) params = params.set('product_type', filters.product_type);
     if (filters.is_active !== undefined && filters.is_active !== '') params = params.set('is_active', filters.is_active);
     if (filters.per_page) params = params.set('per_page', String(filters.per_page));
-    return this.http.get<ApiResponse<Product[]>>(`${this.api}/products`, { params });
+    return this.http.get<ApiResponse<Product[]>>(`${this.api}/generic-products`, { params });
   }
 
   getProduct(id: number): Observable<ApiResponse<Product>> {
-    return this.http.get<ApiResponse<Product>>(`${this.api}/products/${id}`);
+    return this.http.get<ApiResponse<Product>>(`${this.api}/generic-products/${id}`);
   }
 
   createProduct(payload: any): Observable<ApiResponse<Product>> {
-    return this.http.post<ApiResponse<Product>>(`${this.api}/products`, payload);
+    return this.http.post<ApiResponse<Product>>(`${this.api}/generic-products`, payload);
   }
 
   updateProduct(id: number, payload: any): Observable<ApiResponse<Product>> {
-    return this.http.put<ApiResponse<Product>>(`${this.api}/products/${id}`, payload);
+    return this.http.put<ApiResponse<Product>>(`${this.api}/generic-products/${id}`, payload);
   }
 
   deleteProduct(id: number): Observable<ApiResponse<null>> {
-    return this.http.delete<ApiResponse<null>>(`${this.api}/products/${id}`);
+    return this.http.delete<ApiResponse<null>>(`${this.api}/generic-products/${id}`);
+  }
+
+  /** Busca un genérico por barcode escaneado (6 dígitos). */
+  getProductByBarcode(barcode: string): Observable<ApiResponse<Product>> {
+    return this.http.get<ApiResponse<Product>>(`${this.api}/generic-products/barcode/${barcode}`);
+  }
+
+  /** Devuelve el HTML listo para imprimir de la etiqueta de un genérico. */
+  getBarcodePrintHtml(id: number): Observable<string> {
+    return this.http.get(`${this.api}/generic-products/${id}/barcode/print`, { responseType: 'text' });
+  }
+
+  /** Devuelve el HTML listo para imprimir con la lista completa de barcodes. */
+  getBarcodeListHtml(filters: { active?: string; category_id?: number } = {}): Observable<string> {
+    let params = new HttpParams();
+    if (filters.active) params = params.set('active', filters.active);
+    if (filters.category_id) params = params.set('category_id', String(filters.category_id));
+    return this.http.get(`${this.api}/generic-products/barcodes/list`, { params, responseType: 'text' });
+  }
+
+  // ── Variantes ────────────────────────────────────────────────
+
+  getVariants(genericId: number): Observable<ApiResponse<ProductVariant[]>> {
+    return this.http.get<ApiResponse<ProductVariant[]>>(`${this.api}/generic-products/${genericId}/variants`);
+  }
+
+  createVariant(genericId: number, payload: Partial<ProductVariant>): Observable<ApiResponse<ProductVariant>> {
+    return this.http.post<ApiResponse<ProductVariant>>(`${this.api}/generic-products/${genericId}/variants`, payload);
+  }
+
+  updateVariant(genericId: number, variantId: number, payload: Partial<ProductVariant>): Observable<ApiResponse<ProductVariant>> {
+    return this.http.put<ApiResponse<ProductVariant>>(`${this.api}/generic-products/${genericId}/variants/${variantId}`, payload);
+  }
+
+  deleteVariant(genericId: number, variantId: number): Observable<ApiResponse<null>> {
+    return this.http.delete<ApiResponse<null>>(`${this.api}/generic-products/${genericId}/variants/${variantId}`);
   }
 
   // ── Presentaciones (catálogo global) ────────────────────────
 
-  /**
-   * Lista todas las presentaciones del catálogo global.
-   * GET /api/v1/presentations
-   */
   getCatalogPresentations(filters: { search?: string; is_active?: string } = {}): Observable<ApiResponse<ProductPresentation[]>> {
     let params = new HttpParams();
     if (filters.search) params = params.set('search', filters.search);
@@ -293,77 +332,45 @@ export class CatalogService {
     return this.http.get<ApiResponse<ProductPresentation[]>>(`${this.api}/presentations`, { params });
   }
 
-  /**
-   * Árbol global de presentaciones.
-   * GET /api/v1/presentations/tree
-   */
   getPresentationsTree(): Observable<ApiResponse<ProductPresentation[]>> {
     return this.http.get<ApiResponse<ProductPresentation[]>>(`${this.api}/presentations/tree`);
   }
 
-  /**
-   * Crea una presentación en el catálogo global (sin vincular a ningún producto).
-   * POST /api/v1/presentations
-   */
   createPresentation(payload: Partial<ProductPresentation>): Observable<ApiResponse<ProductPresentation>> {
     return this.http.post<ApiResponse<ProductPresentation>>(`${this.api}/presentations`, payload);
   }
 
-  /**
-   * Actualiza campos globales de una presentación del catálogo.
-   * PUT /api/v1/presentations/{id}
-   */
   updatePresentation(id: number, payload: Partial<ProductPresentation>): Observable<ApiResponse<ProductPresentation>> {
     return this.http.put<ApiResponse<ProductPresentation>>(`${this.api}/presentations/${id}`, payload);
   }
 
-  /**
-   * Elimina una presentación del catálogo global (la desvincula de TODOS los productos).
-   * DELETE /api/v1/presentations/{id}
-   */
   deletePresentation(id: number): Observable<ApiResponse<null>> {
     return this.http.delete<ApiResponse<null>>(`${this.api}/presentations/${id}`);
   }
 
-  // ── Presentaciones por producto ──────────────────────────────
+  // ── Presentaciones por genérico ──────────────────────────────
 
-  /**
-   * Lista las presentaciones asignadas a un producto específico.
-   * GET /api/v1/products/{productId}/presentations
-   */
   getPresentations(productId: number): Observable<ApiResponse<ProductPresentation[]>> {
-    return this.http.get<ApiResponse<ProductPresentation[]>>(`${this.api}/products/${productId}/presentations`);
+    return this.http.get<ApiResponse<ProductPresentation[]>>(`${this.api}/generic-products/${productId}/presentations`);
   }
 
-  /**
-   * Asigna (o actualiza la vinculación de) una presentación a un producto.
-   * POST /api/v1/products/{productId}/presentations/{presentationId}
-   */
   attachPresentation(
     productId: number,
     presentationId: number,
     payload: PresentationAttachPayload = {},
   ): Observable<ApiResponse<null>> {
     return this.http.post<ApiResponse<null>>(
-      `${this.api}/products/${productId}/presentations/${presentationId}`,
+      `${this.api}/generic-products/${productId}/presentations/${presentationId}`,
       payload,
     );
   }
 
-  /**
-   * Desvincula una presentación de un producto (no la elimina del catálogo global).
-   * DELETE /api/v1/products/{productId}/presentations/{presentationId}
-   */
   detachPresentation(productId: number, presentationId: number): Observable<ApiResponse<null>> {
     return this.http.delete<ApiResponse<null>>(
-      `${this.api}/products/${productId}/presentations/${presentationId}`,
+      `${this.api}/generic-products/${productId}/presentations/${presentationId}`,
     );
   }
 
-  /**
-   * Valida la coherencia de jerarquía antes de crear/editar una presentación.
-   * POST /api/v1/presentations/validate-hierarchy
-   */
   validatePresentationHierarchy(payload: {
     parent_id?: number | null;
     factor_to_base: number;
@@ -380,24 +387,24 @@ export class CatalogService {
   // ── Kit / BOM ────────────────────────────────────────────────
 
   getKitComponents(productId: number): Observable<ApiResponse<KitComponent[]>> {
-    return this.http.get<ApiResponse<KitComponent[]>>(`${this.api}/products/${productId}/kit-components`);
+    return this.http.get<ApiResponse<KitComponent[]>>(`${this.api}/generic-products/${productId}/kit-components`);
   }
 
   syncKitComponents(productId: number, components: Partial<KitComponent>[]): Observable<ApiResponse<KitComponent[]>> {
-    return this.http.put<ApiResponse<KitComponent[]>>(`${this.api}/products/${productId}/kit-components`, { components });
+    return this.http.put<ApiResponse<KitComponent[]>>(`${this.api}/generic-products/${productId}/kit-components`, { components });
   }
 
   deleteKitComponent(productId: number, componentId: number): Observable<ApiResponse<null>> {
-    return this.http.delete<ApiResponse<null>>(`${this.api}/products/${productId}/kit-components/${componentId}`);
+    return this.http.delete<ApiResponse<null>>(`${this.api}/generic-products/${productId}/kit-components/${componentId}`);
   }
 
   explodeKit(productId: number, quantityKits: number): Observable<ApiResponse<KitExplosionLine[]>> {
-    return this.http.post<ApiResponse<KitExplosionLine[]>>(`${this.api}/products/${productId}/kit-components/explode`, { quantity_kits: quantityKits });
+    return this.http.post<ApiResponse<KitExplosionLine[]>>(`${this.api}/generic-products/${productId}/kit-components/explode`, { quantity_kits: quantityKits });
   }
 
   getKitAvailability(productId: number, warehouseId: number): Observable<ApiResponse<KitAvailability>> {
     let params = new HttpParams().set('warehouse_id', String(warehouseId));
-    return this.http.get<ApiResponse<KitAvailability>>(`${this.api}/products/${productId}/kit-availability`, { params });
+    return this.http.get<ApiResponse<KitAvailability>>(`${this.api}/generic-products/${productId}/kit-availability`, { params });
   }
 
   // ── Proveedores ──────────────────────────────────────────────
@@ -426,37 +433,37 @@ export class CatalogService {
     return this.http.delete<ApiResponse<null>>(`${this.api}/suppliers/${id}`);
   }
 
-  // ── Productos del proveedor ──────────────────────────────────
+  // ── Variantes del proveedor ──────────────────────────────────
 
   getSupplierProducts(supplierId: number): Observable<ApiResponse<SupplierProduct[]>> {
-    return this.http.get<ApiResponse<SupplierProduct[]>>(`${this.api}/suppliers/${supplierId}/products`);
+    return this.http.get<ApiResponse<SupplierProduct[]>>(`${this.api}/suppliers/${supplierId}/variants`);
   }
 
-  getProductSuppliers(productId: number): Observable<ApiResponse<ProductSupplier[]>> {
-    return this.http.get<ApiResponse<ProductSupplier[]>>(`${this.api}/products/${productId}/suppliers`);
+  getProductSuppliers(variantId: number): Observable<ApiResponse<ProductSupplier[]>> {
+    return this.http.get<ApiResponse<ProductSupplier[]>>(`${this.api}/variants/${variantId}/suppliers`);
   }
 
-  assignSupplierProduct(supplierId: number, productId: number, payload: Partial<SupplierProductPivot> = {}): Observable<ApiResponse<SupplierProduct>> {
-    return this.http.post<ApiResponse<SupplierProduct>>(`${this.api}/suppliers/${supplierId}/products/${productId}`, payload);
+  assignSupplierProduct(supplierId: number, variantId: number, payload: Partial<SupplierProductPivot> = {}): Observable<ApiResponse<SupplierProduct>> {
+    return this.http.post<ApiResponse<SupplierProduct>>(`${this.api}/suppliers/${supplierId}/variants/${variantId}`, payload);
   }
 
   assignSupplierProductsByCategory(
     supplierId: number,
     payload: { category_id: number; lead_time_days?: number | null; unit_price?: number; is_preferred?: boolean },
   ): Observable<ApiResponse<SupplierCategoryAssignResult>> {
-    return this.http.post<ApiResponse<SupplierCategoryAssignResult>>(`${this.api}/suppliers/${supplierId}/products/by-category`, payload);
+    return this.http.post<ApiResponse<SupplierCategoryAssignResult>>(`${this.api}/suppliers/${supplierId}/variants/by-category`, payload);
   }
 
-  updateSupplierProductPivot(supplierId: number, productId: number, payload: Partial<SupplierProductPivot>): Observable<ApiResponse<SupplierProduct>> {
-    return this.http.put<ApiResponse<SupplierProduct>>(`${this.api}/suppliers/${supplierId}/products/${productId}`, payload);
+  updateSupplierProductPivot(supplierId: number, variantId: number, payload: Partial<SupplierProductPivot>): Observable<ApiResponse<SupplierProduct>> {
+    return this.http.put<ApiResponse<SupplierProduct>>(`${this.api}/suppliers/${supplierId}/variants/${variantId}`, payload);
   }
 
-  removeSupplierProduct(supplierId: number, productId: number): Observable<ApiResponse<null>> {
-    return this.http.delete<ApiResponse<null>>(`${this.api}/suppliers/${supplierId}/products/${productId}`);
+  removeSupplierProduct(supplierId: number, variantId: number): Observable<ApiResponse<null>> {
+    return this.http.delete<ApiResponse<null>>(`${this.api}/suppliers/${supplierId}/variants/${variantId}`);
   }
 
   removeSupplierProductsByCategory(supplierId: number, categoryId: number): Observable<ApiResponse<SupplierCategoryRemoveResult>> {
-    return this.http.delete<ApiResponse<SupplierCategoryRemoveResult>>(`${this.api}/suppliers/${supplierId}/products/by-category`, { body: { category_id: categoryId } });
+    return this.http.delete<ApiResponse<SupplierCategoryRemoveResult>>(`${this.api}/suppliers/${supplierId}/variants/by-category`, { body: { category_id: categoryId } });
   }
 
   // ── Clasificaciones de Producto ──────────────────────────────
@@ -484,24 +491,24 @@ export class CatalogService {
     return this.http.delete<ApiResponse<null>>(`${this.api}/product-classifications/${id}`);
   }
 
-  // ── Registros Sanitarios ─────────────────────────────────────
+  // ── Registros Sanitarios (por variante) ─────────────────────
 
-  getSanitaryRegistrations(productId: number, filters: { only_active?: boolean } = {}): Observable<ApiResponse<SanitaryRegistration[]>> {
+  getSanitaryRegistrations(variantId: number, filters: { only_active?: boolean } = {}): Observable<ApiResponse<SanitaryRegistration[]>> {
     let params = new HttpParams();
     if (filters.only_active) params = params.set('only_active', 'true');
-    return this.http.get<ApiResponse<SanitaryRegistration[]>>(`${this.api}/products/${productId}/sanitary-registrations`, { params });
+    return this.http.get<ApiResponse<SanitaryRegistration[]>>(`${this.api}/variants/${variantId}/sanitary-registrations`, { params });
   }
 
-  createSanitaryRegistration(productId: number, payload: Partial<SanitaryRegistration>): Observable<ApiResponse<SanitaryRegistration>> {
-    return this.http.post<ApiResponse<SanitaryRegistration>>(`${this.api}/products/${productId}/sanitary-registrations`, payload);
+  createSanitaryRegistration(variantId: number, payload: Partial<SanitaryRegistration>): Observable<ApiResponse<SanitaryRegistration>> {
+    return this.http.post<ApiResponse<SanitaryRegistration>>(`${this.api}/variants/${variantId}/sanitary-registrations`, payload);
   }
 
-  updateSanitaryRegistration(productId: number, regId: number, payload: Partial<SanitaryRegistration>): Observable<ApiResponse<SanitaryRegistration>> {
-    return this.http.put<ApiResponse<SanitaryRegistration>>(`${this.api}/products/${productId}/sanitary-registrations/${regId}`, payload);
+  updateSanitaryRegistration(variantId: number, regId: number, payload: Partial<SanitaryRegistration>): Observable<ApiResponse<SanitaryRegistration>> {
+    return this.http.put<ApiResponse<SanitaryRegistration>>(`${this.api}/variants/${variantId}/sanitary-registrations/${regId}`, payload);
   }
 
-  deleteSanitaryRegistration(productId: number, regId: number): Observable<ApiResponse<null>> {
-    return this.http.delete<ApiResponse<null>>(`${this.api}/products/${productId}/sanitary-registrations/${regId}`);
+  deleteSanitaryRegistration(variantId: number, regId: number): Observable<ApiResponse<null>> {
+    return this.http.delete<ApiResponse<null>>(`${this.api}/variants/${variantId}/sanitary-registrations/${regId}`);
   }
 
   // ── Importación masiva ───────────────────────────────────────

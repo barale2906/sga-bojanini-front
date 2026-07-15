@@ -9,21 +9,22 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatDividerModule } from '@angular/material/divider';
-import { forkJoin, finalize, of } from 'rxjs';
-import { map, catchError } from 'rxjs/operators';
-import { InventoryService, StockSummary, BatchDetail } from '../inventory.service';
+import { finalize } from 'rxjs';
+import { InventoryService, StockSummary, BatchDetail, MovementDocument } from '../inventory.service';
 import { MovementPdfService } from '../../../shared/services/movement-pdf.service';
 import { MovementConfirmDialogComponent, MovementConfirmResult } from './movement-confirm-dialog.component';
 import { MovementPdfSignature } from '../../../shared/services/movement-pdf.service';
 import { WarehouseService, Warehouse, Location } from '../../warehouse/warehouse.service';
-import { Product } from '../../catalog/catalog.service';
+import { CatalogService, Product, ProductVariant } from '../../catalog/catalog.service';
 import { FormErrorsComponent } from '../../../shared/components/form-errors/form-errors.component';
 import { ProductSearchComponent } from '../../../shared/components/product-search/product-search.component';
+import { MatTooltipModule } from '@angular/material/tooltip';
 
 export interface WarehouseTransferDialogData {
   warehouses: Warehouse[];
   products: Product[];
   inventorySvc: InventoryService;
+  catalogSvc: CatalogService;
 }
 
 @Component({
@@ -32,7 +33,8 @@ export interface WarehouseTransferDialogData {
   imports: [
     CommonModule, ReactiveFormsModule, MatDialogModule, MatFormFieldModule,
     MatInputModule, MatSelectModule, MatButtonModule, MatIconModule,
-    MatProgressSpinnerModule, MatDividerModule, FormErrorsComponent, ProductSearchComponent,
+    MatProgressSpinnerModule, MatDividerModule, MatTooltipModule,
+    FormErrorsComponent, ProductSearchComponent,
   ],
   templateUrl: './warehouse-transfer-dialog.component.html',
   styleUrl: './warehouse-transfer-dialog.component.scss',
@@ -57,10 +59,32 @@ export class WarehouseTransferDialogComponent implements OnInit {
   loadingStock  = signal(false);
 
   _selectedProductFull = signal<Product | null>(null);
+  /** ID del genérico seleccionado — usado para consultar stock/lotes (no va en el payload) */
+  _genericProductId    = signal<number | null>(null);
+  variants             = signal<ProductVariant[]>([]);
+  loadingVariants      = signal(false);
 
   onProductSelected(product: Product | null): void {
     this._selectedProductFull.set(product);
-    this.form.patchValue({ product_id: product?.id ?? null });
+    this._genericProductId.set(product?.id ?? null);
+    // Limpiar variante y stock al cambiar producto
+    this.form.patchValue({ product_variant_id: null });
+    this.variants.set([]);
+    this.stockSummary.set(null);
+    this.exitableLotes.set([]);
+    if (!product) return;
+    this.loadingVariants.set(true);
+    this.data.catalogSvc.getVariants(product.id).subscribe({
+      next: r => {
+        const activos = (r.data ?? []).filter(v => v.is_active);
+        this.variants.set(activos);
+        if (activos.length === 1) {
+          this.form.patchValue({ product_variant_id: activos[0].id });
+        }
+        this.loadingVariants.set(false);
+      },
+      error: () => this.loadingVariants.set(false),
+    });
   }
 
   /** Lotes vigentes (no vencidos) disponibles para transferir */
@@ -71,13 +95,13 @@ export class WarehouseTransferDialogComponent implements OnInit {
   expiredOnly   = signal(false);
 
   form = this.fb.group({
-    warehouse_from_id: [null as number | null, Validators.required],
-    location_from_id:  [null as number | null, Validators.required],
-    product_id:        [null as number | null, Validators.required],
-    warehouse_to_id:   [null as number | null, Validators.required],
-    location_to_id:    [null as number | null, Validators.required],
-    quantity:          [null as number | null, [Validators.required, Validators.min(1)]],
-    reason:            [''],
+    warehouse_from_id:  [null as number | null, Validators.required],
+    location_from_id:   [null as number | null, Validators.required],
+    product_variant_id: [null as number | null, Validators.required],
+    warehouse_to_id:    [null as number | null, Validators.required],
+    location_to_id:     [null as number | null, Validators.required],
+    quantity:           [null as number | null, [Validators.required, Validators.min(1)]],
+    reason:             [''],
   });
 
   ngOnInit(): void {
@@ -101,8 +125,12 @@ export class WarehouseTransferDialogComponent implements OnInit {
       if (wId) this._loadLocations(Number(wId), 'to');
     });
 
-    this.form.get('product_id')!.valueChanges.subscribe(() => this._loadStock());
-    this.form.get('warehouse_from_id')!.valueChanges.subscribe(() => this._loadStock());
+    this.form.get('product_variant_id')!.valueChanges.subscribe(() => this._loadStock());
+    this.form.get('warehouse_from_id')!.valueChanges.subscribe(() => {
+      this.stockSummary.set(null);
+      this.exitableLotes.set([]);
+      this._loadStock();
+    });
   }
 
   private _loadLocations(warehouseId: number, side: 'from' | 'to'): void {
@@ -129,16 +157,19 @@ export class WarehouseTransferDialogComponent implements OnInit {
   }
 
   private _loadStock(): void {
-    const wId = this.form.get('warehouse_from_id')?.value;
-    const pId = this.form.get('product_id')?.value;
+    const wId      = this.form.get('warehouse_from_id')?.value;
+    const variantId = this.form.get('product_variant_id')?.value;
+    const genericId = this._genericProductId();
     this.expiredOnly.set(false);
     this.exitableLotes.set([]);
-    if (!wId || !pId) { this.stockSummary.set(null); return; }
+    // Se requiere almacén + variante seleccionada para consultar stock
+    if (!wId || !variantId || !genericId) { this.stockSummary.set(null); return; }
 
     this.loadingStock.set(true);
     this.stockSummary.set(null);
 
-    this.data.inventorySvc.getStockSummary(Number(wId), Number(pId))
+    // getStockSummary y getProductBatches operan sobre el genérico (FEFO entre marcas)
+    this.data.inventorySvc.getStockSummary(Number(wId), Number(genericId))
       .pipe(finalize(() => this.loadingStock.set(false)))
       .subscribe({
         next: r => this.stockSummary.set(r.data),
@@ -146,23 +177,22 @@ export class WarehouseTransferDialogComponent implements OnInit {
       });
 
     this.loadingExitable.set(true);
-    this.data.inventorySvc.getProductBatches(Number(pId), true)
+    this.data.inventorySvc.getProductBatches(Number(genericId), true)
       .pipe(finalize(() => this.loadingExitable.set(false)))
       .subscribe({
         next: r => {
           const available = r.data.filter(b => b.status === 'active' && b.quantity_available > 0);
           this.exitableLotes.set(available);
-          // Si no hay lotes vigentes, verificar si el producto tiene stock vencido en este almacén
-          if (available.length === 0) this._checkExpiredOnly(Number(pId));
+          if (available.length === 0) this._checkExpiredOnly(Number(genericId));
         },
         error: () => this.exitableLotes.set([]),
       });
   }
 
   /** Verifica si un producto sin stock vigente tiene, en cambio, stock vencido en el almacén. */
-  private _checkExpiredOnly(productId: number): void {
+  private _checkExpiredOnly(genericId: number): void {
     this.checkingExpired.set(true);
-    this.data.inventorySvc.getProductBatches(productId)
+    this.data.inventorySvc.getProductBatches(genericId)
       .pipe(finalize(() => this.checkingExpired.set(false)))
       .subscribe({
         next: r => this.expiredOnly.set(r.data.some(b => b.quantity_available > 0)),
@@ -194,7 +224,7 @@ export class WarehouseTransferDialogComponent implements OnInit {
   get isReady(): boolean {
     const v = this.form.getRawValue();
     if (!v.warehouse_from_id || !v.location_from_id) return false;
-    if (!v.product_id) return false;
+    if (!this._genericProductId() || !v.product_variant_id) return false;
     if (!v.warehouse_to_id || !v.location_to_id) return false;
     if (!v.quantity || v.quantity < 1) return false;
     if (this.loadingStock() || this.loadingExitable() || this.checkingExpired()) return false;
@@ -209,67 +239,57 @@ export class WarehouseTransferDialogComponent implements OnInit {
     this.saving.set(true);
 
     const v = this.form.getRawValue();
+    // Nuevo formato con items[]
     const payload = {
-      product_id:        v.product_id,
       warehouse_from_id: v.warehouse_from_id,
       warehouse_to_id:   v.warehouse_to_id,
-      location_from_id:  v.location_from_id,
-      location_to_id:    v.location_to_id,
-      quantity:          v.quantity,
       reason:            v.reason || undefined,
+      items: [{
+        product_variant_id: v.product_variant_id,
+        location_from_id:   v.location_from_id,
+        location_to_id:     v.location_to_id,
+        quantity:           v.quantity,
+      }],
     };
 
     this.data.inventorySvc.transfer(payload).subscribe({
       next: res => {
-        // POST /movements/transfer devuelve data como array (un elemento por lote FEFO)
-        const movements = Array.isArray(res.data) ? res.data : [res.data];
-        const firstMov  = movements[0];
+        // POST /movements/transfer devuelve MovementDocumentResource
+        const document: MovementDocument = res.data;
+        const movements = document.movements ?? [];
         const wFrom = this.data.warehouses.find(w => w.id === v.warehouse_from_id);
         const wTo   = this.data.warehouses.find(w => w.id === v.warehouse_to_id);
 
         const printAndClose = (
-          expirations: (string | null)[],
           deliveredBy: MovementPdfSignature | null,
           receivedBy:  MovementPdfSignature | null,
         ) => {
           this.pdfSvc.generateAndPrint({
             movement_type:     'transfer',
-            doc_id:            firstMov.id,
-            date:              firstMov.created_at,
-            user_name:         firstMov.user_name,
+            doc_id:            document.id,
+            doc_number:        document.document_number,
+            date:              document.created_at,
+            user_name:         document.user_name,
             warehouse_name:    wFrom?.name ?? `Almacén ${v.warehouse_from_id}`,
             warehouse_to_name: wTo?.name   ?? `Almacén ${v.warehouse_to_id}`,
             reason:            v.reason || null,
-            lines: movements.map((m, i) => ({
-              product_name:    m.product_name,
-              lot_number:      m.batch_lot_number,
-              expiration_date: expirations[i],
+            lines: movements.map(m => ({
+              product_name:    m.product_name ?? '',
+              lot_number:      m.batch_lot_number ?? null,
+              expiration_date: m.batch_expiration_date ?? null,
               quantity:        m.quantity,
             })),
             delivered_by: deliveredBy,
             received_by:  receivedBy,
           });
+          this.saving.set(false);
           this.ref.close(true);
         };
 
-        const fetchExpirationsAndFinish = (
-          deliveredBy: MovementPdfSignature | null,
-          receivedBy:  MovementPdfSignature | null,
-        ) => {
-          forkJoin(movements.map(m =>
-            m.batch_id
-              ? this.data.inventorySvc.getBatchById(m.batch_id).pipe(map(b => b.data.expiration_date), catchError(() => of(null)))
-              : of(null)
-          )).subscribe(expirations => {
-            this.saving.set(false);
-            printAndClose(expirations, deliveredBy, receivedBy);
-          });
-        };
-
-        const needsSignature = movements.some(m => m.status === 'pending_signature');
+        const needsSignature = document.status === 'pending_signature';
 
         if (!needsSignature) {
-          fetchExpirationsAndFinish(null, null);
+          printAndClose(null, null);
           return;
         }
 
@@ -279,9 +299,10 @@ export class WarehouseTransferDialogComponent implements OnInit {
           maxWidth: '96vw',
           disableClose: true,
           data: {
+            document_id:   document.id,
             movements:     movements.map(m => ({
               id:               m.id,
-              product_name:     m.product_name,
+              product_name:     m.product_name ?? null,
               batch_lot_number: m.batch_lot_number ?? null,
               quantity:         m.quantity,
               movement_type:    m.movement_type ?? 'transfer',
@@ -293,7 +314,7 @@ export class WarehouseTransferDialogComponent implements OnInit {
 
         dialogRef.afterClosed().subscribe((result: MovementConfirmResult | { cancelled: true } | undefined) => {
           if (result && 'confirmed' in result) {
-            fetchExpirationsAndFinish(result.delivered_by, result.received_by);
+            printAndClose(result.delivered_by, result.received_by);
           } else {
             this.ref.close(false);
           }

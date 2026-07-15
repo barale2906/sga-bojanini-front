@@ -4,19 +4,25 @@ import { Observable } from 'rxjs';
 import { environment } from '../../../environments/environment';
 import { ApiResponse, PaginatedResponse } from '../../core/models/api-response.model';
 
+export interface VariantWithGeneric {
+  id: number;
+  lab_brand: string | null;
+  generic: { id: number; barcode: string; name: string } | null;
+}
+
 export interface Batch {
-  id: number; product_id: number; lot_number: string;
+  id: number; product_variant_id: number; lot_number: string;
   expiration_date: string | null; manufacturing_date: string | null;
   quantity_received: number; quantity_available: number;
   status: 'active' | 'expired' | 'depleted';
   notes: string | null; received_at: string; days_until_expiry: number | null;
-  product?: { id: number; code: string; name: string };
+  variant?: VariantWithGeneric | null;
 }
 
-/** Detalle de lote con ubicaciones físicas (respuesta de /products/{id}/batches y /batches/{id}) */
+/** Detalle de lote con ubicaciones físicas (respuesta de /generic-products/{id}/batches y /batches/{id}) */
 export interface BatchDetail {
   id: number;
-  product_id: number;
+  product_variant_id: number;
   lot_number: string;
   expiration_date: string | null;
   manufacturing_date: string | null;
@@ -25,7 +31,7 @@ export interface BatchDetail {
   status: 'active' | 'expired' | 'depleted';
   days_until_expiry: number | null;
   received_at: string;
-  product?: { id: number; code: string; name: string };
+  variant?: VariantWithGeneric | null;
   locations: BatchLocation[];
 }
 
@@ -39,7 +45,7 @@ export interface BatchLocation {
 
 /** Respuesta de GET /stock/summary */
 export interface StockSummary {
-  product_id:         number;
+  generic_product_id: number;
   warehouse_id:       number;
   total_quantity:     number;
   reserved_quantity:  number;
@@ -50,8 +56,8 @@ export interface StockSummary {
 }
 
 export interface StockItem {
-  product: { id: number; code: string; name: string };
-  warehouse: { id: number; name: string; code: string };
+  variant: VariantWithGeneric | null;
+  warehouse: { id: number; name: string; code: string } | null;
   total_quantity: number; reserved_quantity: number; available_quantity: number;
   last_movement_at: string | null;
 }
@@ -75,12 +81,41 @@ export interface MedicalService {
 }
 
 export interface MovementSignatureRecord {
-  id: number;
+  id?: number;
   role: 'delivered_by' | 'received_by';
   signer_name: string;
   signer_document: string;
   signed_at: string;
   signature_data?: string;
+}
+
+/**
+ * Documento de movimiento — agrupa una o varias líneas de producto bajo un único comprobante.
+ * Respuesta de POST /movements/exit|entry|transfer y GET /movement-documents/{id}.
+ */
+export interface MovementDocument {
+  id: number;
+  document_number: string;
+  document_type: string;
+  status: 'pending_signature' | 'confirmed';
+  warehouse_id: number;
+  warehouse_name: string | null;
+  warehouse_to_id: number | null;
+  warehouse_to_name: string | null;
+  cost_center_id: number | null;
+  cost_center?: { id: number; code: string; name: string; type: string } | null;
+  service_id: number | null;
+  medical_service?: { id: number; code: string; name: string } | null;
+  patient_document: string | null;
+  patient_external_id: string | null;
+  invoice_number: string | null;
+  entry_temperature: number | null;
+  reason: string | null;
+  user_id: number;
+  user_name: string;
+  created_at: string;
+  signatures?: MovementSignatureRecord[];
+  movements?: Movement[];
 }
 
 export interface ConfirmMovementPayload {
@@ -90,7 +125,8 @@ export interface ConfirmMovementPayload {
 
 export interface Movement {
   id: number;
-  product_id: number;
+  movement_document_id?: number | null;
+  product_variant_id: number;
   warehouse_id: number;
   warehouse_to_id?: number | null;
   warehouse_to_name?: string | null;
@@ -102,7 +138,10 @@ export interface Movement {
   reason: string | null;
   user_id: number;
   created_at: string;
-  product_name: string;
+  /** Nombre del genérico — presente en GET /movements/{id} (carga variant.genericProduct). Puede ser null en el listado. */
+  product_name?: string | null;
+  /** Marca/laboratorio de la variante — nuevo campo en el modelo genérico+variante. */
+  variant_lab_brand?: string | null;
   batch_lot_number: string | null;
   batch_expiration_date: string | null;
   user_name: string;
@@ -116,7 +155,7 @@ export interface Movement {
   referrer?: string | null;
   cost_center?: { id: number; code: string; name: string; type: string };
   medical_service?: { id: number; code: string; name: string };
-  product?: { id: number; code: string; name: string };
+  product?: { id: number; barcode: string; name: string };
   warehouse?: { id: number; name: string };
 }
 
@@ -151,13 +190,14 @@ export class InventoryService {
   private api = environment.apiUrl;
 
   // Batches
-  getBatches(f: { product_id?: number; status?: string; warehouse_id?: number; per_page?: number; page?: number } = {}): Observable<PaginatedResponse<Batch>> {
+  getBatches(f: { product_variant_id?: number; generic_product_id?: number; status?: string; warehouse_id?: number; per_page?: number; page?: number } = {}): Observable<PaginatedResponse<Batch>> {
     let p = new HttpParams();
-    if (f.product_id) p = p.set('product_id', String(f.product_id));
-    if (f.status) p = p.set('status', f.status);
-    if (f.warehouse_id) p = p.set('warehouse_id', String(f.warehouse_id));
-    if (f.per_page) p = p.set('per_page', String(f.per_page));
-    if (f.page) p = p.set('page', String(f.page));
+    if (f.product_variant_id)  p = p.set('product_variant_id',  String(f.product_variant_id));
+    if (f.generic_product_id)  p = p.set('generic_product_id',  String(f.generic_product_id));
+    if (f.status)              p = p.set('status', f.status);
+    if (f.warehouse_id)        p = p.set('warehouse_id',         String(f.warehouse_id));
+    if (f.per_page)            p = p.set('per_page',             String(f.per_page));
+    if (f.page)                p = p.set('page',                 String(f.page));
     return this.http.get<PaginatedResponse<Batch>>(`${this.api}/batches`, { params: p });
   }
 
@@ -186,14 +226,14 @@ export class InventoryService {
     let params = new HttpParams();
     if (availableForExit) params = params.set('available_for_exit', '1');
     if (warehouseId) params = params.set('warehouse_id', String(warehouseId));
-    return this.http.get<ApiResponse<BatchDetail[]>>(`${this.api}/products/${productId}/batches`, { params });
+    return this.http.get<ApiResponse<BatchDetail[]>>(`${this.api}/generic-products/${productId}/batches`, { params });
   }
 
   // Stock
-  getStock(f: { warehouse_id?: number; product_id?: number; per_page?: number; page?: number } = {}): Observable<PaginatedResponse<StockItem>> {
+  getStock(f: { warehouse_id?: number; generic_product_id?: number; per_page?: number; page?: number } = {}): Observable<PaginatedResponse<StockItem>> {
     let p = new HttpParams();
     if (f.warehouse_id) p = p.set('warehouse_id', String(f.warehouse_id));
-    if (f.product_id) p = p.set('product_id', String(f.product_id));
+    if (f.generic_product_id) p = p.set('generic_product_id', String(f.generic_product_id));
     if (f.per_page) p = p.set('per_page', String(f.per_page));
     if (f.page) p = p.set('page', String(f.page));
     return this.http.get<PaginatedResponse<StockItem>>(`${this.api}/stock`, { params: p });
@@ -203,20 +243,20 @@ export class InventoryService {
     return this.http.get<ApiResponse<StockItem[]>>(`${this.api}/stock/low`);
   }
 
-  /** Paso 2 — Resumen de stock por producto y almacén */
-  getStockSummary(warehouseId: number, productId: number): Observable<ApiResponse<StockSummary>> {
+  /** Paso 2 — Resumen de stock por genérico y almacén */
+  getStockSummary(warehouseId: number, genericProductId: number): Observable<ApiResponse<StockSummary>> {
     const params = new HttpParams()
-      .set('warehouse_id', String(warehouseId))
-      .set('product_id', String(productId));
+      .set('warehouse_id',       String(warehouseId))
+      .set('generic_product_id', String(genericProductId));
     return this.http.get<ApiResponse<StockSummary>>(`${this.api}/stock/summary`, { params });
   }
 
   /** Kits armables a partir del stock de componentes en un almacén. */
-  getKitAvailability(kitProductId: number, warehouseId: number): Observable<ApiResponse<{ kit_product_id: number; warehouse_id: number; available_kits: number }>> {
+  getKitAvailability(kitGenericId: number, warehouseId: number): Observable<ApiResponse<{ generic_product_id: number; warehouse_id: number; available_kits: number }>> {
     const params = new HttpParams()
-      .set('kit_product_id', String(kitProductId))
+      .set('kit_generic_id', String(kitGenericId))
       .set('warehouse_id',   String(warehouseId));
-    return this.http.get<ApiResponse<{ kit_product_id: number; warehouse_id: number; available_kits: number }>>(`${this.api}/stock/kit-availability`, { params });
+    return this.http.get<ApiResponse<{ generic_product_id: number; warehouse_id: number; available_kits: number }>>(`${this.api}/stock/kit-availability`, { params });
   }
 
   // Movements
@@ -224,10 +264,16 @@ export class InventoryService {
     return this.http.get<ApiResponse<Movement>>(`${this.api}/movements/${id}`);
   }
 
+  /** Devuelve el comprobante completo con todas sus líneas y firmas. Usar para reimpresión. */
+  getMovementDocument(id: number): Observable<ApiResponse<MovementDocument>> {
+    return this.http.get<ApiResponse<MovementDocument>>(`${this.api}/movement-documents/${id}`);
+  }
+
   getMovements(f: {
     warehouse_id?: number;
     warehouse_to_id?: number;
-    product_id?: number;
+    product_variant_id?: number;
+    generic_product_id?: number;
     movement_type?: string;
     cost_center_id?: number;
     cost_center_type?: 'internal' | 'external';
@@ -240,9 +286,10 @@ export class InventoryService {
     page?: number;
   } = {}): Observable<PaginatedResponse<Movement>> {
     let p = new HttpParams();
-    if (f.warehouse_id)     p = p.set('warehouse_id',     String(f.warehouse_id));
-    if (f.warehouse_to_id)  p = p.set('warehouse_to_id',  String(f.warehouse_to_id));
-    if (f.product_id)       p = p.set('product_id',       String(f.product_id));
+    if (f.warehouse_id)        p = p.set('warehouse_id',        String(f.warehouse_id));
+    if (f.warehouse_to_id)     p = p.set('warehouse_to_id',     String(f.warehouse_to_id));
+    if (f.product_variant_id)  p = p.set('product_variant_id',  String(f.product_variant_id));
+    if (f.generic_product_id)  p = p.set('generic_product_id',  String(f.generic_product_id));
     if (f.movement_type)    p = p.set('movement_type',    f.movement_type);
     if (f.cost_center_id)   p = p.set('cost_center_id',   String(f.cost_center_id));
     if (f.cost_center_type) p = p.set('cost_center_type', f.cost_center_type);
@@ -287,16 +334,19 @@ export class InventoryService {
     return this.http.post<ApiResponse<any>>(`${this.api}/movements/loss`, payload);
   }
 
-  confirmMovement(id: number, payload: ConfirmMovementPayload): Observable<ApiResponse<Movement>> {
-    return this.http.post<ApiResponse<Movement>>(`${this.api}/movements/${id}/confirm`, payload);
+  /** Confirma un documento de movimiento (id = movement_document.id). */
+  confirmMovement(id: number, payload: ConfirmMovementPayload): Observable<ApiResponse<MovementDocument>> {
+    return this.http.post<ApiResponse<MovementDocument>>(`${this.api}/movement-documents/${id}/confirm`, payload);
   }
 
+  /** Cancela un documento pendiente de firma (id = movement_document.id). */
   cancelPendingMovement(id: number): Observable<ApiResponse<null>> {
-    return this.http.delete<ApiResponse<null>>(`${this.api}/movements/${id}/pending`);
+    return this.http.delete<ApiResponse<null>>(`${this.api}/movement-documents/${id}/pending`);
   }
 
+  /** Obtiene una firma específica de un documento (id = movement_document.id). */
   getMovementSignature(id: number, role: 'delivered_by' | 'received_by'): Observable<ApiResponse<MovementSignatureRecord>> {
-    return this.http.get<ApiResponse<MovementSignatureRecord>>(`${this.api}/movements/${id}/signature/${role}`);
+    return this.http.get<ApiResponse<MovementSignatureRecord>>(`${this.api}/movement-documents/${id}/signature/${role}`);
   }
 
   getCostCenters(f: { is_active?: boolean } = {}): Observable<ApiResponse<CostCenter[]>> {

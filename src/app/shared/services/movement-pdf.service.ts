@@ -18,6 +18,8 @@ export interface MovementPdfSignature {
 export interface MovementPdfData {
   movement_type:     string;
   doc_id:            number;
+  /** Número legible del comprobante, ej. "SAL-2026-000001". Si se indica, se muestra en lugar de #doc_id. */
+  doc_number?:       string | null;
   date:              string;
   user_name:         string;
   warehouse_name:    string;
@@ -160,7 +162,7 @@ export class MovementPdfService {
     </div>
     <div>
       <div class="doc-title">${this._esc(title)}</div>
-      <div class="doc-num">N&deg; ${d.doc_id} &nbsp;&middot;&nbsp; ${date}</div>
+      <div class="doc-num">${d.doc_number ? this._esc(d.doc_number) : 'N&deg; ' + d.doc_id} &nbsp;&middot;&nbsp; ${date}</div>
     </div>
   </div>
 

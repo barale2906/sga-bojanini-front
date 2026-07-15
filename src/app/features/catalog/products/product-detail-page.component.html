@@ -1,6 +1,6 @@
 <app-page-header
   [title]="product()?.name || 'Producto'"
-  [subtitle]="product()?.code || ''"
+  [subtitle]="product()?.barcode || ''"
   icon="inventory_2">
 </app-page-header>
 
@@ -17,7 +17,10 @@
     @if (!p.is_active) { <span class="badge badge--off">Inactivo</span> }
     <span class="cat-label">{{ p.category?.name }}</span>
     <span class="unit-label">Unidad base: <strong>{{ p.base_unit?.abbreviation }}</strong></span>
-    <button mat-icon-button (click)="back()" matTooltip="Volver al catálogo" style="margin-left:auto">
+    <button *sgaPermission="'generic-products.barcode'" mat-stroked-button (click)="printBarcode()" matTooltip="Imprimir etiqueta de código de barras" style="margin-left:auto">
+      <mat-icon>qr_code</mat-icon> Imprimir etiqueta
+    </button>
+    <button mat-icon-button (click)="back()" matTooltip="Volver al catálogo">
       <mat-icon>arrow_back</mat-icon>
     </button>
   </div>
@@ -29,8 +32,7 @@
       <div class="tab-body">
         <div class="info-grid">
           <div class="info-item"><span class="label">Nombre</span><span class="val">{{ p.name }}</span></div>
-          <div class="info-item"><span class="label">Código</span><span class="val"><code class="code-tag">{{ p.code }}</code></span></div>
-          <div class="info-item"><span class="label">SKU</span><span class="val">{{ p.sku || '—' }}</span></div>
+          <div class="info-item"><span class="label">Código barras</span><span class="val"><code class="code-tag">{{ p.barcode }}</code></span></div>
           <div class="info-item"><span class="label">Categoría</span><span class="val">{{ p.category?.name || '—' }}</span></div>
           <div class="info-item"><span class="label">Unidad base</span><span class="val">{{ p.base_unit?.name }} ({{ p.base_unit?.abbreviation }})</span></div>
           @if (p.product_type === 'simple') {
@@ -59,46 +61,16 @@
                   {{ p.classification.name }}
                 </span>
               </div>
-              @if (p.lab_brand) {
-                <div class="info-item">
-                  <span class="label">Laboratorio / Marca</span>
-                  <span class="val">{{ p.lab_brand }}</span>
-                </div>
-              }
               @if (p.concentration) {
                 <div class="info-item">
                   <span class="label">Concentración</span>
                   <span class="val">{{ p.concentration }}</span>
                 </div>
               }
-              @if (p.risk_level) {
-                <div class="info-item">
-                  <span class="label">Nivel de Riesgo</span>
-                  <span class="val">{{ p.risk_level }}</span>
-                </div>
-              }
               @if (p.pharmaceutical_form) {
                 <div class="info-item">
                   <span class="label">Forma Farmacéutica</span>
                   <span class="val">{{ p.pharmaceutical_form }}</span>
-                </div>
-              }
-              @if (p.commercial_presentation) {
-                <div class="info-item">
-                  <span class="label">Pres. Comercial</span>
-                  <span class="val">{{ p.commercial_presentation }}</span>
-                </div>
-              }
-              @if (p.serie_reference) {
-                <div class="info-item">
-                  <span class="label">Serie / Referencia</span>
-                  <span class="val">{{ p.serie_reference }}</span>
-                </div>
-              }
-              @if (p.useful_life) {
-                <div class="info-item">
-                  <span class="label">Vida Útil</span>
-                  <span class="val">{{ p.useful_life }}</span>
                 </div>
               }
             </div>
@@ -136,7 +108,7 @@
                 <span>{{ presentations().length }} presentación(es) configurada(s)</span>
               }
             </span>
-            <button *sgaPermission="'productos.editar'" mat-raised-button color="primary"
+            <button *sgaPermission="'generic-products.editar'" mat-raised-button color="primary"
                     (click)="openPresentationForm()">
               <mat-icon>add</mat-icon> Nuevo Empaque
             </button>
@@ -225,11 +197,11 @@
               <ng-container matColumnDef="actions">
                 <th mat-header-cell *matHeaderCellDef class="act">Acciones</th>
                 <td mat-cell *matCellDef="let pr" class="act">
-                  <button *sgaPermission="'productos.editar'" mat-icon-button color="primary"
+                  <button *sgaPermission="'generic-products.editar'" mat-icon-button color="primary"
                           (click)="openPresentationForm(pr)" matTooltip="Editar empaque">
                     <mat-icon>edit</mat-icon>
                   </button>
-                  <button *sgaPermission="'productos.editar'" mat-icon-button color="warn"
+                  <button *sgaPermission="'generic-products.editar'" mat-icon-button color="warn"
                           (click)="deletePresentation(pr)" matTooltip="Desvincular empaque del producto">
                     <mat-icon>link_off</mat-icon>
                   </button>
@@ -279,9 +251,9 @@
                 <div class="bom-row" [formGroupName]="$index">
                   <mat-form-field appearance="outline" class="bom-product">
                     <mat-label>Componente *</mat-label>
-                    <mat-select formControlName="component_product_id">
+                    <mat-select formControlName="component_generic_id">
                       @for (sp of availableComponents(); track sp.id) {
-                        <mat-option [value]="sp.id">{{ sp.name }} ({{ sp.code }})</mat-option>
+                        <mat-option [value]="sp.id">{{ sp.name }} ({{ sp.barcode }})</mat-option>
                       }
                     </mat-select>
                   </mat-form-field>
@@ -293,7 +265,7 @@
                     <mat-label>Orden</mat-label>
                     <input matInput type="number" min="0" formControlName="sort_order" />
                   </mat-form-field>
-                  <button *sgaPermission="'productos.editar'" mat-icon-button color="warn" type="button"
+                  <button *sgaPermission="'generic-products.editar'" mat-icon-button color="warn" type="button"
                           (click)="deleteKitComponent($index)" matTooltip="Eliminar componente">
                     <mat-icon>remove_circle_outline</mat-icon>
                   </button>
@@ -305,7 +277,7 @@
               <button mat-stroked-button type="button" (click)="addBomRow()">
                 <mat-icon>add</mat-icon> Agregar componente
               </button>
-              <button *sgaPermission="'productos.editar'" mat-raised-button color="primary" type="button"
+              <button *sgaPermission="'generic-products.editar'" mat-raised-button color="primary" type="button"
                       (click)="saveBom()" [disabled]="bomForm.invalid || savingBom()">
                 @if (savingBom()) { <mat-spinner diameter="18" style="display:inline-block;margin-right:6px"></mat-spinner> }
                 Guardar receta
@@ -316,89 +288,147 @@
       </mat-tab>
     }
 
-    <!-- ── TAB: Registros Sanitarios (solo si la clasificación lo requiere) ── -->
-    @if (p.classification?.has_sanitary_registration) {
-      <mat-tab label="Reg. Sanitarios">
-        <div class="tab-body">
+    <!-- ── TAB: Variantes (marcas / laboratorios) ── -->
+    <mat-tab label="Variantes">
+      <div class="tab-body">
+        <p class="section-hint">
+          Cada variante representa una marca o laboratorio específico del genérico.
+          Las entradas de inventario se asocian a una variante concreta; las salidas operan sobre el genérico (FEFO entre marcas).
+        </p>
 
-          <div class="tab-toolbar">
-            <span class="toolbar-hint">
-              @if (sanitaryRegistrations().length === 0) {
-                <strong style="color:#c05621">Sin registros sanitarios configurados.</strong>
-              } @else {
-                {{ sanitaryRegistrations().length }} registro(s) sanitario(s)
-              }
-            </span>
-            <button *sgaPermission="'productos.editar'" mat-raised-button color="primary"
-                    (click)="openSanitaryRegForm()">
-              <mat-icon>add</mat-icon> Nuevo Registro
-            </button>
-          </div>
-
-          <div class="table-wrap mat-elevation-z1">
-            <table mat-table [dataSource]="sanitaryRegistrations()">
-
-              <ng-container matColumnDef="registration_number">
-                <th mat-header-cell *matHeaderCellDef>Número de Registro</th>
-                <td mat-cell *matCellDef="let r">
-                  <code class="code-tag">{{ r.registration_number }}</code>
-                </td>
-              </ng-container>
-
-              <ng-container matColumnDef="expiry_date">
-                <th mat-header-cell *matHeaderCellDef>Vence</th>
-                <td mat-cell *matCellDef="let r">
-                  {{ r.expiry_date | date:'dd/MM/yyyy' }}
-                </td>
-              </ng-container>
-
-              <ng-container matColumnDef="is_expired">
-                <th mat-header-cell *matHeaderCellDef>Vigencia</th>
-                <td mat-cell *matCellDef="let r">
-                  @if (r.is_expired) {
-                    <span class="badge badge--off">Vencido</span>
-                  } @else {
-                    <span class="badge badge--on">Vigente</span>
-                  }
-                </td>
-              </ng-container>
-
-              <ng-container matColumnDef="is_active">
-                <th mat-header-cell *matHeaderCellDef>Estado</th>
-                <td mat-cell *matCellDef="let r">
-                  <span class="badge" [class.badge--on]="r.is_active" [class.badge--off]="!r.is_active">
-                    {{ r.is_active ? 'Activo' : 'Inactivo' }}
-                  </span>
-                </td>
-              </ng-container>
-
-              <ng-container matColumnDef="actions">
-                <th mat-header-cell *matHeaderCellDef class="act">Acciones</th>
-                <td mat-cell *matCellDef="let r" class="act">
-                  <button *sgaPermission="'productos.editar'" mat-icon-button color="primary"
-                          (click)="openSanitaryRegForm(r)" matTooltip="Editar registro">
-                    <mat-icon>edit</mat-icon>
-                  </button>
-                  <button *sgaPermission="'productos.editar'" mat-icon-button color="warn"
-                          (click)="deleteSanitaryReg(r)" matTooltip="Eliminar registro">
-                    <mat-icon>delete</mat-icon>
-                  </button>
-                </td>
-              </ng-container>
-
-              <tr mat-header-row *matHeaderRowDef="regCols"></tr>
-              <tr mat-row *matRowDef="let row; columns: regCols;"></tr>
-              <tr class="mat-row" *matNoDataRow>
-                <td class="no-data" [attr.colspan]="regCols.length">
-                  Sin registros sanitarios. Agrega uno con el botón superior.
-                </td>
-              </tr>
-            </table>
-          </div>
-
+        <div class="tab-toolbar">
+          <span class="toolbar-hint">
+            @if (variants().length === 0) {
+              <strong style="color:#c05621">Sin variantes configuradas — no se podrán registrar entradas.</strong>
+            } @else {
+              {{ variants().length }} variante(s) registrada(s)
+            }
+          </span>
+          <button *sgaPermission="'product-variants.crear'" mat-raised-button color="primary"
+                  (click)="openVariantForm()">
+            <mat-icon>add</mat-icon> Nueva Variante
+          </button>
         </div>
-      </mat-tab>
-    }
+
+        @for (variant of variants(); track variant.id) {
+          <div class="variant-card mat-elevation-z1">
+            <div class="variant-header">
+              <span class="variant-title">
+                <mat-icon>science</mat-icon>
+                {{ variant.lab_brand || 'Sin marca' }}
+                @if (variant.brand_sku) { <code class="code-tag">{{ variant.brand_sku }}</code> }
+              </span>
+              <span class="badge" [class.badge--on]="variant.is_active" [class.badge--off]="!variant.is_active">
+                {{ variant.is_active ? 'Activa' : 'Inactiva' }}
+              </span>
+              <button *sgaPermission="'product-variants.editar'" mat-icon-button color="primary"
+                      (click)="openVariantForm(variant)" matTooltip="Editar variante">
+                <mat-icon>edit</mat-icon>
+              </button>
+              <button *sgaPermission="'product-variants.eliminar'" mat-icon-button color="warn"
+                      (click)="deleteVariant(variant)" matTooltip="Eliminar variante">
+                <mat-icon>delete</mat-icon>
+              </button>
+            </div>
+
+            <div class="info-grid variant-details">
+              @if (variant.risk_level) {
+                <div class="info-item"><span class="label">Nivel de riesgo</span><span class="val">{{ variant.risk_level }}</span></div>
+              }
+              @if (variant.commercial_presentation) {
+                <div class="info-item"><span class="label">Pres. comercial</span><span class="val">{{ variant.commercial_presentation }}</span></div>
+              }
+              @if (variant.serie_reference) {
+                <div class="info-item"><span class="label">Serie / Referencia</span><span class="val">{{ variant.serie_reference }}</span></div>
+              }
+              @if (variant.useful_life) {
+                <div class="info-item"><span class="label">Vida útil</span><span class="val">{{ variant.useful_life }}</span></div>
+              }
+            </div>
+
+            @if (p.classification?.has_sanitary_registration) {
+              <div class="variant-regs">
+                <div class="variant-regs-header">
+                  <span class="section-title" style="font-size:0.85rem">
+                    <mat-icon style="font-size:1rem;height:1rem;width:1rem">verified</mat-icon>
+                    Registros Sanitarios
+                  </span>
+                  <button *sgaPermission="'generic-products.editar'" mat-stroked-button
+                          (click)="openSanitaryRegForm(variant)">
+                    <mat-icon>add</mat-icon> Agregar
+                  </button>
+                </div>
+
+                @if ((variant.sanitary_registrations?.length ?? 0) > 0) {
+                  <div class="table-wrap">
+                    <table mat-table [dataSource]="variant.sanitary_registrations ?? []">
+
+                      <ng-container matColumnDef="registration_number">
+                        <th mat-header-cell *matHeaderCellDef>Número</th>
+                        <td mat-cell *matCellDef="let r"><code class="code-tag">{{ r.registration_number }}</code></td>
+                      </ng-container>
+
+                      <ng-container matColumnDef="expiry_date">
+                        <th mat-header-cell *matHeaderCellDef>Vence</th>
+                        <td mat-cell *matCellDef="let r">{{ r.expiry_date | date:'dd/MM/yyyy' }}</td>
+                      </ng-container>
+
+                      <ng-container matColumnDef="is_expired">
+                        <th mat-header-cell *matHeaderCellDef>Vigencia</th>
+                        <td mat-cell *matCellDef="let r">
+                          @if (r.is_expired) {
+                            <span class="badge badge--off">Vencido</span>
+                          } @else {
+                            <span class="badge badge--on">Vigente</span>
+                          }
+                        </td>
+                      </ng-container>
+
+                      <ng-container matColumnDef="is_active">
+                        <th mat-header-cell *matHeaderCellDef>Estado</th>
+                        <td mat-cell *matCellDef="let r">
+                          <span class="badge" [class.badge--on]="r.is_active" [class.badge--off]="!r.is_active">
+                            {{ r.is_active ? 'Activo' : 'Inactivo' }}
+                          </span>
+                        </td>
+                      </ng-container>
+
+                      <ng-container matColumnDef="actions">
+                        <th mat-header-cell *matHeaderCellDef class="act">Acciones</th>
+                        <td mat-cell *matCellDef="let r" class="act">
+                          <button *sgaPermission="'generic-products.editar'" mat-icon-button color="primary"
+                                  (click)="openSanitaryRegForm(variant, r)" matTooltip="Editar registro">
+                            <mat-icon>edit</mat-icon>
+                          </button>
+                          <button *sgaPermission="'generic-products.editar'" mat-icon-button color="warn"
+                                  (click)="deleteSanitaryReg(variant, r)" matTooltip="Eliminar registro">
+                            <mat-icon>delete</mat-icon>
+                          </button>
+                        </td>
+                      </ng-container>
+
+                      <tr mat-header-row *matHeaderRowDef="regCols"></tr>
+                      <tr mat-row *matRowDef="let row; columns: regCols;"></tr>
+                    </table>
+                  </div>
+                } @else {
+                  <p class="no-regs-hint">Sin registros sanitarios para esta variante.</p>
+                }
+              </div>
+            }
+          </div>
+        }
+
+        @if (variants().length === 0) {
+          <div class="empty-state">
+            <mat-icon style="font-size:2.5rem;height:2.5rem;width:2.5rem;display:block;margin:0 auto 0.5rem">science</mat-icon>
+            <p>Sin variantes configuradas.</p>
+            <small>Crea al menos una variante para poder registrar entradas de inventario.</small>
+          </div>
+        }
+
+      </div>
+    </mat-tab>
 
   </mat-tab-group>
 }

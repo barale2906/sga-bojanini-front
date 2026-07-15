@@ -278,7 +278,7 @@ export class PurchasingPageComponent implements OnInit {
         purchasingSvc: this.svc,
         catalogSvc: this.cSvc,
         prefillSupplierId: group.supplier?.id ?? null,
-        prefillItems: group.items.map(s => ({ product_id: s.product_id, suggested_quantity: s.suggested_quantity })),
+        prefillItems: group.items.map(s => ({ product_variant_id: s.generic_product_id, suggested_quantity: s.suggested_quantity })),
         orderLabel: total > 1 ? `Orden ${index + 1} de ${total}${group.supplier ? ' — ' + group.supplier.name : ''}` : null,
       },
       width: '900px', maxWidth: '95vw', maxHeight: '90vh',
@@ -288,8 +288,8 @@ export class PurchasingPageComponent implements OnInit {
         this.snack.open(msg, 'OK', { duration: 3000 });
         this.loadOrders();
         // Eliminar inmediatamente los productos gestionados de la lista
-        const orderedIds = new Set(group.items.map(s => s.product_id));
-        this.suggestions.update(list => list.filter(s => !orderedIds.has(s.product_id)));
+        const orderedIds = new Set(group.items.map(s => s.generic_product_id));
+        this.suggestions.update(list => list.filter(s => !orderedIds.has(s.generic_product_id)));
         group.items.forEach(s => this.selectedSugg.deselect(s));
         // Recargar desde el backend para sincronizar estado real
         this.loadSuggestions();

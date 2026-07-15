@@ -86,7 +86,7 @@ export const routes: Routes = [
         loadChildren: () =>
           import('./features/catalog/catalog.routes').then((m) => m.catalogRoutes),
         canActivate: [permissionGuard],
-        data: { permission: 'productos.ver' },
+        data: { permission: 'generic-products.ver' },
       },
 
       // Inventario (Fase 4)

@@ -128,11 +128,11 @@ export class IntegrationPageComponent implements OnInit {
 
   onConsItemProductSelected(i: number, product: Product | null): void {
     this.consItemSelectedProducts.update(arr => { const a = [...arr]; a[i] = product; return a; });
-    this.consItems.at(i).patchValue({ product_id: product?.id ?? null });
+    this.consItems.at(i).patchValue({ generic_product_id: product?.id ?? null });
   }
 
   addConsItem(): void {
-    this.consItems.push(this.fb.group({ product_id: [null, Validators.required], quantity: [1, [Validators.required, Validators.min(1)]] }));
+    this.consItems.push(this.fb.group({ generic_product_id: [null, Validators.required], quantity: [1, [Validators.required, Validators.min(1)]] }));
     this.consItemSelectedProducts.update(arr => [...arr, null]);
   }
 

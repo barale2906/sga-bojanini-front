@@ -20,7 +20,7 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { DateAdapter, MAT_DATE_FORMATS } from '@angular/material/core';
 import { MatDialog } from '@angular/material/dialog';
 import { MatSnackBar } from '@angular/material/snack-bar';
-import { InventoryService, Batch, StockItem, Movement, MovementSignatureRecord } from './inventory.service';
+import { InventoryService, Batch, StockItem, Movement, MovementSignatureRecord, MovementDocument } from './inventory.service';
 import { MovementPdfService, MovementPdfSignature } from '../../shared/services/movement-pdf.service';
 import { WarehouseService, Warehouse, Location } from '../warehouse/warehouse.service';
 import { CatalogService, Product } from '../catalog/catalog.service';
@@ -41,6 +41,7 @@ import { EsDateAdapter, ES_DATE_FORMATS } from '../../shared/adapters/es-date.ad
 
 interface MovementRow {
   id: number | null;
+  movement_document_id: number | null;
   movement_type: string;
   product_name: string;
   lot_number: string | null;
@@ -106,7 +107,7 @@ export class InventoryPageComponent implements OnInit {
   batchMeta = signal<PaginationMeta>({ current_page: 1, last_page: 1, per_page: 25, total: 0 });
   expiringBatches = signal<Batch[]>([]);
   batchCols = ['actions', 'lot_number', 'product', 'status', 'quantity', 'expiration_date', 'days'];
-  batchFilters = this.fb.group({ status: [''], warehouse_id: [''], product_id: [''] });
+  batchFilters = this.fb.group({ status: [''], warehouse_id: [''], generic_product_id: [''] });
   batchFilterProduct = signal<Product | null>(null);
 
   // Stock
@@ -114,7 +115,7 @@ export class InventoryPageComponent implements OnInit {
   stockMeta = signal<PaginationMeta>({ current_page: 1, last_page: 1, per_page: 25, total: 0 });
   lowStock = signal<StockItem[]>([]);
   stockCols = ['product', 'warehouse', 'available', 'total', 'last_movement'];
-  stockFilters = this.fb.group({ warehouse_id: [''], product_id: [''] });
+  stockFilters = this.fb.group({ warehouse_id: [''], generic_product_id: [''] });
 
   // Movements
   moveDisplayRows = signal<MovementRow[]>([]);
@@ -123,7 +124,7 @@ export class InventoryPageComponent implements OnInit {
   moveFilters = this.fb.group({
     movement_type: [''],
     warehouse_id: [''],
-    product_id: [''],
+    generic_product_id: [''],
     date_from: [null as Date | null],
     date_to: [null as Date | null],
   });
@@ -159,17 +160,17 @@ export class InventoryPageComponent implements OnInit {
 
   onBatchFilterProduct(p: Product | null): void {
     this.batchFilterProduct.set(p);
-    this.batchFilters.patchValue({ product_id: p ? String(p.id) : '' });
+    this.batchFilters.patchValue({ generic_product_id: p ? String(p.id) : '' });
   }
 
   onStockFilterProduct(p: Product | null): void {
     this.stockFilterProduct.set(p);
-    this.stockFilters.patchValue({ product_id: p ? String(p.id) : '' });
+    this.stockFilters.patchValue({ generic_product_id: p ? String(p.id) : '' });
   }
 
   onMoveFilterProduct(p: Product | null): void {
     this.moveFilterProduct.set(p);
-    this.moveFilters.patchValue({ product_id: p ? String(p.id) : '' });
+    this.moveFilters.patchValue({ generic_product_id: p ? String(p.id) : '' });
   }
   loadingPdf = signal<number | null>(null);
 
@@ -249,8 +250,8 @@ export class InventoryPageComponent implements OnInit {
   }
 
   loadBatches(page = 1): void {
-    const { status, warehouse_id, product_id } = this.batchFilters.value;
-    this.svc.getBatches({ status: status || undefined, warehouse_id: warehouse_id ? Number(warehouse_id) : undefined, product_id: product_id ? Number(product_id) : undefined, page, per_page: this.batchMeta().per_page }).subscribe({
+    const { status, warehouse_id, generic_product_id } = this.batchFilters.value;
+    this.svc.getBatches({ status: status || undefined, warehouse_id: warehouse_id ? Number(warehouse_id) : undefined, generic_product_id: generic_product_id ? Number(generic_product_id) : undefined, page, per_page: this.batchMeta().per_page }).subscribe({
       next: r => { this.batches.set(r.data ?? []); this.batchMeta.set(r.meta); },
       error: () => {},
     });
@@ -261,9 +262,9 @@ export class InventoryPageComponent implements OnInit {
   }
 
   loadStock(page = 1): void {
-    const { warehouse_id, product_id } = this.stockFilters.value;
+    const { warehouse_id, generic_product_id } = this.stockFilters.value;
     this.loading.set(true);
-    this.svc.getStock({ warehouse_id: warehouse_id ? Number(warehouse_id) : undefined, product_id: product_id ? Number(product_id) : undefined, page, per_page: this.stockMeta().per_page }).subscribe({
+    this.svc.getStock({ warehouse_id: warehouse_id ? Number(warehouse_id) : undefined, generic_product_id: generic_product_id ? Number(generic_product_id) : undefined, page, per_page: this.stockMeta().per_page }).subscribe({
       next: r => { this.stock.set((r.data ?? []).filter(s => s.available_quantity > 0)); this.stockMeta.set(r.meta); this.loading.set(false); },
       error: () => this.loading.set(false),
     });
@@ -274,11 +275,11 @@ export class InventoryPageComponent implements OnInit {
   }
 
   loadMovements(page = 1): void {
-    const { movement_type, warehouse_id, product_id, date_from, date_to } = this.moveFilters.value;
+    const { movement_type, warehouse_id, generic_product_id, date_from, date_to } = this.moveFilters.value;
     this.svc.getMovements({
-      movement_type: movement_type || undefined,
-      warehouse_id:  warehouse_id  ? Number(warehouse_id)  : undefined,
-      product_id:    product_id    ? Number(product_id)    : undefined,
+      movement_type:      movement_type      || undefined,
+      warehouse_id:       warehouse_id       ? Number(warehouse_id)       : undefined,
+      generic_product_id: generic_product_id ? Number(generic_product_id) : undefined,
       date_from:     date_from     ? this.toApiDate(date_from)  : undefined,
       date_to:       date_to       ? this.toApiDate(date_to)    : undefined,
       page,
@@ -287,11 +288,15 @@ export class InventoryPageComponent implements OnInit {
       next: r => {
         const rows: MovementRow[] = (r.data ?? []).map(m => ({
           id: m.id,
+          movement_document_id: m.movement_document_id ?? null,
           movement_type: m.movement_type,
-          product_name: m.product_name || m.product?.name || '—',
+          // product_name ya no siempre viene en el listado (nuevo modelo genérico+variante);
+          // variant_lab_brand es el fallback cuando el backend no carga el genérico completo.
+          product_name: m.product_name || m.product?.name || m.variant_lab_brand || '—',
           lot_number: m.batch_lot_number ?? null,
           expiration_date: m.batch_expiration_date ?? null,
-          warehouse_name: this.getWarehouseName(m.warehouse_id),
+          // m.warehouse?.name evita la race condition con el forkJoin de almacenes en ngOnInit.
+          warehouse_name: m.warehouse?.name ?? this.getWarehouseName(m.warehouse_id),
           warehouse_to_name: m.warehouse_to_name ?? (m.warehouse_to_id ? this.getWarehouseName(m.warehouse_to_id) : null),
           quantity: m.quantity,
           user_name: m.user_name || '—',
@@ -329,7 +334,7 @@ export class InventoryPageComponent implements OnInit {
 
   private _openTransferDialog(): void {
     this.dialog.open(WarehouseTransferDialogComponent, {
-      data: { warehouses: this.warehouses(), products: this.products(), inventorySvc: this.svc },
+      data: { warehouses: this.warehouses(), products: this.products(), inventorySvc: this.svc, catalogSvc: this.cSvc },
       width: '720px', maxWidth: '96vw', maxHeight: '94vh',
     }).afterClosed().subscribe(result => {
       if (!result) return;
@@ -370,39 +375,75 @@ export class InventoryPageComponent implements OnInit {
   printMovement(row: MovementRow): void {
     if (!row.id || this.loadingPdf() !== null) return;
     this.loadingPdf.set(row.id);
+
+    const toSig = (rec: MovementSignatureRecord): MovementPdfSignature => ({
+      signer_name:     rec.signer_name,
+      signer_document: rec.signer_document,
+      signature_data:  rec.signature_data ?? '',
+      signed_at:       rec.signed_at,
+    });
+
+    // Camino principal: obtener el documento completo (todos los productos + firmas)
+    if (row.movement_document_id) {
+      this.svc.getMovementDocument(row.movement_document_id).subscribe({
+        next: docRes => {
+          const doc: MovementDocument = docRes.data;
+          const sigs  = doc.signatures ?? [];
+          const deliv = sigs.find(s => s.role === 'delivered_by') ?? null;
+          const recv  = sigs.find(s => s.role === 'received_by')  ?? null;
+          this.loadingPdf.set(null);
+          this.movPdfSvc.generateAndPrint({
+            movement_type:     doc.document_type,
+            doc_id:            doc.id,
+            doc_number:        doc.document_number,
+            date:              doc.created_at,
+            user_name:         doc.user_name,
+            warehouse_name:    doc.warehouse_name ?? row.warehouse_name,
+            warehouse_to_name: doc.warehouse_to_name,
+            reason:            doc.reason,
+            cost_center_name:  doc.cost_center?.name ?? null,
+            lines: (doc.movements ?? []).map(m => ({
+              product_name:    m.product_name ?? '',
+              lot_number:      m.batch_lot_number ?? null,
+              expiration_date: m.batch_expiration_date ?? null,
+              quantity:        m.quantity,
+            })),
+            delivered_by: deliv ? toSig(deliv) : null,
+            received_by:  recv  ? toSig(recv)  : null,
+          });
+        },
+        error: () => {
+          this.loadingPdf.set(null);
+          this.snack.open('No se pudo cargar el comprobante para imprimir', 'OK', { duration: 3000 });
+        },
+      });
+      return;
+    }
+
+    // Fallback: movimiento sin documento (ajustes/bajas/devoluciones sin movement_document_id)
     this.svc.getMovement(row.id).subscribe({
       next: res => {
         const m = res.data;
-
-        const expiry$ = m.batch_id
-          ? this.svc.getBatchById(m.batch_id).pipe(map(b => b.data.expiration_date), catchError(() => of(null)))
-          : of(null);
-
         const hasSignatures = m.status === 'confirmed' && m.signatures && m.signatures.length > 0;
-
-        const toSig = (rec: MovementSignatureRecord | null): MovementPdfSignature | null =>
-          rec ? { signer_name: rec.signer_name, signer_document: rec.signer_document, signature_data: rec.signature_data ?? '', signed_at: rec.signed_at } : null;
-
         const deliveredSig$ = hasSignatures
-          ? this.svc.getMovementSignature(m.id, 'delivered_by').pipe(map(r => toSig(r.data)), catchError(() => of(null)))
+          ? this.svc.getMovementSignature(m.movement_document_id ?? m.id, 'delivered_by').pipe(map(r => toSig(r.data)), catchError(() => of(null)))
           : of(null);
-
         const receivedSig$ = hasSignatures
-          ? this.svc.getMovementSignature(m.id, 'received_by').pipe(map(r => toSig(r.data)), catchError(() => of(null)))
+          ? this.svc.getMovementSignature(m.movement_document_id ?? m.id, 'received_by').pipe(map(r => toSig(r.data)), catchError(() => of(null)))
           : of(null);
 
-        forkJoin([expiry$, deliveredSig$, receivedSig$]).subscribe(([expiration_date, deliveredBy, receivedBy]) => {
+        forkJoin([deliveredSig$, receivedSig$]).subscribe(([deliveredBy, receivedBy]) => {
           this.loadingPdf.set(null);
           this.movPdfSvc.generateAndPrint({
             movement_type:     m.movement_type,
-            doc_id:            m.id,
+            doc_id:            m.movement_document_id ?? m.id,
             date:              m.created_at,
             user_name:         m.user_name,
             warehouse_name:    row.warehouse_name,
             warehouse_to_name: row.warehouse_to_name,
             reason:            m.reason,
             cost_center_name:  m.cost_center?.name ?? null,
-            lines: [{ product_name: m.product_name, lot_number: m.batch_lot_number, expiration_date, quantity: m.quantity }],
+            lines: [{ product_name: m.product_name || m.variant_lab_brand || row.product_name || '', lot_number: m.batch_lot_number, expiration_date: m.batch_expiration_date, quantity: m.quantity }],
             delivered_by: deliveredBy,
             received_by:  receivedBy,
           });

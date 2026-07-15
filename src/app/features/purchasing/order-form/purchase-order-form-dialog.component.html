@@ -39,7 +39,7 @@
       @for (item of items.controls; track $index) {
         <div [formGroupName]="$index" class="item-block">
           <div class="item-row">
-            <!-- Producto -->
+            <!-- Producto genérico -->
             <div class="item-product">
               <app-product-search
                 label="Producto"
@@ -49,11 +49,31 @@
               </app-product-search>
             </div>
 
+            <!-- Variante (marca / laboratorio) -->
+            <mat-form-field appearance="outline" class="item-variant">
+              <mat-label>Marca / Variante *</mat-label>
+              @if (loadingVariantsMap()[$index]) {
+                <mat-spinner matPrefix diameter="14" style="margin:0 6px 0 4px"></mat-spinner>
+              }
+              <mat-select formControlName="product_variant_id"
+                          (selectionChange)="onVariantChange($index, $event.value)">
+                @for (v of variantsMap()[$index] ?? []; track v.id) {
+                  <mat-option [value]="v.id">
+                    {{ v.lab_brand || 'Sin marca' }}
+                    @if (v.brand_sku) { <span style="color:#718096;font-size:0.83em"> — {{ v.brand_sku }}</span> }
+                  </mat-option>
+                }
+                @if (!loadingVariantsMap()[$index] && (variantsMap()[$index]?.length ?? 0) === 0 && rowSelectedProducts()[$index]) {
+                  <mat-option disabled>Sin variantes — configúralas en Catálogo</mat-option>
+                }
+              </mat-select>
+            </mat-form-field>
+
             <!-- Presentación (empaque de compra) -->
             <mat-form-field appearance="outline" class="item-pres">
               <mat-label>Presentación / empaque *</mat-label>
               <mat-select formControlName="product_presentation_id">
-                @if (getItemPresentations($index).length === 0 && $any(item).get('product_id')?.value) {
+                @if (getItemPresentations($index).length === 0 && $any(item).get('product_variant_id')?.value) {
                   <mat-option disabled>Sin presentaciones configuradas</mat-option>
                 }
                 @for (pr of getAvailablePresentations($index); track pr.id) {
@@ -64,7 +84,7 @@
                   </mat-option>
                 }
               </mat-select>
-              @if ($any(item).get('product_id')?.value && getItemPresentations($index).length === 0) {
+              @if ($any(item).get('product_variant_id')?.value && getItemPresentations($index).length === 0) {
                 <mat-hint style="color:#c05621">Configure presentaciones en Catálogo</mat-hint>
               }
             </mat-form-field>
@@ -109,7 +129,7 @@
           }
 
           <!-- Aviso sin presentaciones -->
-          @if ($any(item).get('product_id')?.value && getItemPresentations($index).length === 0) {
+          @if ($any(item).get('product_variant_id')?.value && getItemPresentations($index).length === 0) {
             <div class="no-pres-alert">
               <mat-icon>warning</mat-icon>
               Este producto no tiene presentaciones de empaque. Configúralas en

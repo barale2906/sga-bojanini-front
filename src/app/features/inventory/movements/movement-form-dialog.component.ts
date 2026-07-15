@@ -10,14 +10,13 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { MatDividerModule } from '@angular/material/divider';
-import { forkJoin, finalize, of } from 'rxjs';
-import { map, catchError } from 'rxjs/operators';
+import { forkJoin, finalize } from 'rxjs';
 import { InventoryService, StockSummary, BatchDetail, BatchLocation, CostCenter, MedicalService } from '../inventory.service';
 import { MovementPdfService } from '../../../shared/services/movement-pdf.service';
 import { MovementConfirmDialogComponent, MovementConfirmResult } from './movement-confirm-dialog.component';
 import { MovementPdfSignature } from '../../../shared/services/movement-pdf.service';
 import { WarehouseService, Warehouse, Location, LocationCapacity, Zone } from '../../warehouse/warehouse.service';
-import { CatalogService, Product, ProductPresentation, ProductClassification } from '../../catalog/catalog.service';
+import { CatalogService, Product, ProductPresentation, ProductClassification, ProductVariant } from '../../catalog/catalog.service';
 import { PurchasingService, PurchaseOrder, PurchaseOrderItem } from '../../purchasing/purchasing.service';
 import { FormErrorsComponent } from '../../../shared/components/form-errors/form-errors.component';
 import { ProductSearchComponent } from '../../../shared/components/product-search/product-search.component';
@@ -79,6 +78,10 @@ export class MovementFormDialogComponent implements OnInit {
 
   // ── Producto seleccionado (objeto completo para el buscador y para cálculos) ──
   _selectedProductFull = signal<Product | null>(null);
+
+  // ── Variantes del genérico seleccionado (para entry/transfer/adjustment/return/loss) ──
+  variants        = signal<ProductVariant[]>([]);
+  loadingVariants = signal(false);
 
   // ── Detalle de producto (clasificación + INVIMA) ─────────────
   productDetail        = signal<Product | null>(null);
@@ -279,8 +282,9 @@ export class MovementFormDialogComponent implements OnInit {
   }
 
   get hasActiveReg(): boolean {
-    const regs = this.productDetail()?.sanitary_registrations;
-    return !!(regs?.some(r => r.is_active && !r.is_expired));
+    const variants = this.productDetail()?.variants;
+    if (!variants?.length) return false;
+    return variants.some(v => v.sanitary_registrations?.some(r => r.is_active && !r.is_expired));
   }
 
   get poPendingQty(): number {
@@ -292,6 +296,8 @@ export class MovementFormDialogComponent implements OnInit {
   get isFormReady(): boolean {
     const v = this.form.value;
     if (!v.product_id || !v.warehouse_id) return false;
+    // Todos los tipos excepto salida requieren selección de variante
+    if (!this.isExit && !v.product_variant_id) return false;
 
     if (this.isEntry) {
       if (this.useDistribution()) return !this.entryRows.invalid && this.entryRows.length > 0;
@@ -355,6 +361,7 @@ export class MovementFormDialogComponent implements OnInit {
 
   form = this.fb.group({
     product_id:               [null as number | null, Validators.required],
+    product_variant_id:       [null as number | null],
     warehouse_id:             [null as number | null, Validators.required],
     zone_id:                  [null as number | null],
     location_id:              [null as number | null],
@@ -412,11 +419,13 @@ export class MovementFormDialogComponent implements OnInit {
       }
     });
 
-    // Producto → presentaciones + detalle completo + FEFO
+    // Producto → presentaciones + variantes + detalle completo + FEFO
     this.form.get('product_id')!.valueChanges.subscribe(pId => {
       this.singleLocCapacity.set(null);
       this.destLocCapacity.set(null);
       this.productDetail.set(null);
+      this.variants.set([]);
+      this.form.patchValue({ product_variant_id: null }, { emitEvent: false });
       if (this.isLoss) {
         this.form.patchValue({ batch_id: null, location_id: null }, { emitEvent: false });
         this.lossBatches.set([]);
@@ -433,6 +442,22 @@ export class MovementFormDialogComponent implements OnInit {
           },
           error: () => {},
         });
+        // Para entrada y otros tipos que necesitan variante, cargar las variantes del genérico
+        if (!this.isExit) {
+          this.loadingVariants.set(true);
+          this.cSvc.getVariants(Number(pId)).subscribe({
+            next: r => {
+              const active = r.data.filter(v => v.is_active);
+              this.variants.set(active);
+              // Auto-seleccionar si solo hay una variante activa
+              if (active.length === 1) {
+                this.form.patchValue({ product_variant_id: active[0].id }, { emitEvent: false });
+              }
+              this.loadingVariants.set(false);
+            },
+            error: () => { this.variants.set([]); this.loadingVariants.set(false); },
+          });
+        }
         if (this.isEntry) {
           this.loadingProductDetail.set(true);
           this.cSvc.getProduct(Number(pId)).subscribe({
@@ -508,10 +533,10 @@ export class MovementFormDialogComponent implements OnInit {
       const qty = pendingQty > 0 ? pendingQty : item.quantity_requested;
 
       this.form.patchValue({ warehouse_id: order.warehouse_id });
-      this.form.patchValue({ product_id: item.product_id });
+      this.form.patchValue({ product_id: item.product?.id });
 
       // Sincronizar el buscador con el producto de la OC
-      const product = this.data.products.find(p => p.id === item.product_id) ?? null;
+      const product = this.data.products.find(p => p.id === item.product?.id) ?? null;
       this._selectedProductFull.set(product);
 
       if (item.product_presentation_id) {
@@ -595,10 +620,10 @@ export class MovementFormDialogComponent implements OnInit {
     const pendingQty = item.quantity_requested - (item.quantity_received ?? 0);
     const qty = pendingQty > 0 ? pendingQty : item.quantity_requested;
 
-    this.form.patchValue({ product_id: item.product_id });
+    this.form.patchValue({ product_id: item.product?.id });
 
     // Sincronizar el buscador con el producto de la OC
-    const product = this.data.products.find(p => p.id === item.product_id) ?? null;
+    const product = this.data.products.find(p => p.id === item.product?.id) ?? null;
     this._selectedProductFull.set(product);
 
     if (item.product_presentation_id) {
@@ -902,11 +927,10 @@ export class MovementFormDialogComponent implements OnInit {
     this.saving.set(true);
     const v = this.form.value;
 
-    const basePayload: Record<string, unknown> = {
-      product_id:   v.product_id,
-      warehouse_id: v.warehouse_id,
-      reason:       v.reason || undefined,
-    };
+    // Salida usa generic_product_id; todos los demás usan product_variant_id
+    const basePayload: Record<string, unknown> = this.isExit
+      ? { generic_product_id: v.product_id, warehouse_id: v.warehouse_id, reason: v.reason || undefined }
+      : { product_variant_id: v.product_variant_id, warehouse_id: v.warehouse_id, reason: v.reason || undefined };
 
     // Adjuntar referencia OC si hay una vinculada
     const linkedPo   = this._linkedPo;
@@ -916,34 +940,47 @@ export class MovementFormDialogComponent implements OnInit {
 
     // ── ENTRADA ─────────────────────────────────────────────────
     if (this.isEntry) {
-      const lotInfo = {
+      // Campos comunes del lote (por ítem)
+      const lotInfo: Record<string, unknown> = {
+        product_variant_id: v.product_variant_id,
         lot_number:         v.lot_number         || undefined,
         expiration_date:    v.expiration_date     || undefined,
         manufacturing_date: v.manufacturing_date  || undefined,
-        invoice_number:     v.invoice_number      || undefined,
-        entry_temperature:  v.entry_temperature   != null ? v.entry_temperature : undefined,
         notes:              v.notes               || undefined,
       };
 
+      // Campos de cabecera del documento (top-level)
+      const entryHeader: Record<string, unknown> = {
+        warehouse_id:      v.warehouse_id,
+        invoice_number:    v.invoice_number   || undefined,
+        entry_temperature: v.entry_temperature != null ? v.entry_temperature : undefined,
+        reason:            v.reason           || undefined,
+      };
+      if (basePayload['purchase_order_id'])      entryHeader['purchase_order_id']      = basePayload['purchase_order_id'];
+      if (basePayload['purchase_order_item_id']) entryHeader['purchase_order_item_id'] = basePayload['purchase_order_item_id'];
+
       if (this.useDistribution()) {
-        const calls = (this.entryRows.value as any[]).map((row: any) =>
-          this.data.inventorySvc.entry({ ...basePayload, ...lotInfo, location_id: row.location_id, quantity_base: Number(row.quantity_base) })
-        );
-        forkJoin(calls).subscribe({
+        const items = (this.entryRows.value as any[]).map((row: any) => ({
+          ...lotInfo,
+          location_id:  row.location_id,
+          quantity_base: Number(row.quantity_base),
+        }));
+        this.data.inventorySvc.entry({ ...entryHeader, items }).subscribe({
           next: () => this._notifyPoReceive(v, () => this.ref.close(true)),
           error: err => this._handleError(err),
         });
         return;
       }
 
-      const entryPayload: Record<string, unknown> = { ...basePayload, ...lotInfo, location_id: v.location_id || undefined };
+      const item: Record<string, unknown> = { ...lotInfo, location_id: v.location_id || undefined };
       if (this.usePresentationMode() && v.product_presentation_id) {
-        entryPayload['product_presentation_id'] = v.product_presentation_id as any;
-        entryPayload['quantity_in_presentation'] = v.quantity_in_presentation as any;
+        item['product_presentation_id'] = v.product_presentation_id;
+        item['quantity_in_presentation'] = v.quantity_in_presentation;
       } else {
-        entryPayload['quantity_base'] = (v.quantity_base || v.quantity) as any;
+        item['quantity_base'] = v.quantity_base || v.quantity;
       }
-      this.data.inventorySvc.entry(entryPayload).subscribe({
+
+      this.data.inventorySvc.entry({ ...entryHeader, items: [item] }).subscribe({
         next: () => this._notifyPoReceive(v, () => this.ref.close(true)),
         error: err => this._handleError(err),
       });
@@ -953,26 +990,34 @@ export class MovementFormDialogComponent implements OnInit {
     // ── TRANSFERENCIA ────────────────────────────────────────────
     if (this.isTransfer) {
       if (this.useDistribution()) {
-        const calls = (this.transferRows.value as any[]).map((row: any) =>
-          this.data.inventorySvc.transfer({ ...basePayload, location_from_id: v.location_from_id, location_to_id: row.location_to_id, quantity: Number(row.quantity) })
-        );
-        forkJoin(calls).subscribe({
-          next: results => {
-            const allMovements = results.flatMap(r => Array.isArray(r.data) ? r.data : [r.data]);
-            this._afterMovements(allMovements, null, 'transfer');
-          },
-          error: err => this._handleError(err),
-        });
+        const transferItems = (this.transferRows.value as any[]).map((row: any) => ({
+          product_variant_id: v.product_variant_id,
+          location_from_id:   v.location_from_id,
+          location_to_id:     row.location_to_id,
+          quantity:           Number(row.quantity),
+        }));
+        this.data.inventorySvc.transfer({ warehouse_from_id: v.warehouse_id, warehouse_to_id: v.warehouse_id, reason: v.reason || undefined, items: transferItems })
+          .subscribe({
+            next: res => {
+              const doc = res.data;
+              this._afterMovements(doc?.movements ?? [doc], null, 'transfer');
+            },
+            error: err => this._handleError(err),
+          });
         return;
       }
-      this.data.inventorySvc.transfer({ ...basePayload, location_from_id: v.location_from_id, location_to_id: v.location_to_id, quantity: v.quantity })
-        .subscribe({
-          next: res => {
-            const movements = Array.isArray(res.data) ? res.data : [res.data];
-            this._afterMovements(movements, null, 'transfer');
-          },
-          error: err => this._handleError(err),
-        });
+      this.data.inventorySvc.transfer({
+        warehouse_from_id: v.warehouse_id,
+        warehouse_to_id:   v.warehouse_id,
+        reason:            v.reason || undefined,
+        items: [{ product_variant_id: v.product_variant_id, location_from_id: v.location_from_id, location_to_id: v.location_to_id, quantity: v.quantity }],
+      }).subscribe({
+        next: res => {
+          const doc = res.data;
+          this._afterMovements(doc?.movements ?? [doc], null, 'transfer');
+        },
+        error: err => this._handleError(err),
+      });
       return;
     }
 
@@ -1055,12 +1100,16 @@ export class MovementFormDialogComponent implements OnInit {
       return;
     }
 
+    // movement_document_id identifica el documento (endpoint nuevo: /movement-documents/{id}/confirm)
+    const documentId = movements[0]?.movement_document_id ?? movements[0]?.id;
+
     this.saving.set(false);
     const ref = this.dialog.open(MovementConfirmDialogComponent, {
       width: '560px',
       maxWidth: '96vw',
       disableClose: true,
       data: {
+        document_id:   documentId,
         movements:     movements.map(m => ({
           id:               m.id,
           product_name:     m.product_name,
@@ -1092,30 +1141,25 @@ export class MovementFormDialogComponent implements OnInit {
     deliveredBy: MovementPdfSignature | null,
     receivedBy:  MovementPdfSignature | null,
   ): void {
-    const expiry$ = movement.batch_id
-      ? this.data.inventorySvc.getBatchById(movement.batch_id).pipe(map(b => b.data.expiration_date), catchError(() => of(null)))
-      : of(null);
-
-    expiry$.subscribe(expiration_date => {
-      const wh   = this.data.warehouses.find(w => w.id === movement.warehouse_id);
-      const whTo = movement.warehouse_to_id
-        ? this.data.warehouses.find(w => w.id === movement.warehouse_to_id)
-        : null;
-      this.pdfSvc.generateAndPrint({
-        movement_type:     type,
-        doc_id:            movement.id,
-        date:              movement.created_at,
-        user_name:         movement.user_name,
-        warehouse_name:    wh?.name ?? `Almacén ${movement.warehouse_id}`,
-        warehouse_to_name: whTo?.name ?? null,
-        reason:            movement.reason,
-        cost_center_name:  movement.cost_center?.name ?? null,
-        lines: [{ product_name: movement.product_name, lot_number: movement.batch_lot_number, expiration_date, quantity: movement.quantity }],
-        delivered_by:      deliveredBy,
-        received_by:       receivedBy,
-      });
-      this.ref.close(true);
+    const wh   = this.data.warehouses.find(w => w.id === movement.warehouse_id);
+    const whTo = movement.warehouse_to_id
+      ? this.data.warehouses.find(w => w.id === movement.warehouse_to_id)
+      : null;
+    this.pdfSvc.generateAndPrint({
+      movement_type:     type,
+      doc_id:            movement.movement_document_id ?? movement.id,
+      date:              movement.created_at,
+      user_name:         movement.user_name,
+      warehouse_name:    wh?.name ?? `Almacén ${movement.warehouse_id}`,
+      warehouse_to_name: whTo?.name ?? null,
+      reason:            movement.reason,
+      cost_center_name:  movement.cost_center?.name ?? null,
+      lines: [{ product_name: movement.product_name, lot_number: movement.batch_lot_number, expiration_date: movement.batch_expiration_date ?? null, quantity: movement.quantity }],
+      delivered_by:      deliveredBy,
+      received_by:       receivedBy,
     });
+    this.saving.set(false);
+    this.ref.close(true);
   }
 
   private _handleError(err: any): void {

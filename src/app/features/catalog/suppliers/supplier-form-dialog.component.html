@@ -247,7 +247,7 @@
                         }
                       </div>
                       <span class="product-name">{{ p.name }}</span>
-                      <code class="code-tag">{{ p.code }}</code>
+                      <code class="code-tag">{{ p.barcode }}</code>
                       <span class="product-cat" style="margin-left:auto">
                         {{ p.category?.name ?? getCategoryName(p.category_id) }}
                       </span>
@@ -364,7 +364,7 @@
                             }
                           </div>
                           <span class="product-name" style="flex:1">{{ p.name }}</span>
-                          <code class="code-tag">{{ p.code }}</code>
+                          <code class="code-tag">{{ p.barcode }}</code>
                         </div>
                       }
                     </div>

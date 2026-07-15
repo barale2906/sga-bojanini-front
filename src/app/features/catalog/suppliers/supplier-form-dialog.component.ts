@@ -270,7 +270,7 @@ export class SupplierFormDialogComponent implements OnInit {
     );
     if (!q) return available;
     return available.filter(p =>
-      p.name.toLowerCase().includes(q) || p.code.toLowerCase().includes(q),
+      p.name.toLowerCase().includes(q) || p.barcode.toLowerCase().includes(q),
     );
   });
 
@@ -310,10 +310,10 @@ export class SupplierFormDialogComponent implements OnInit {
       next: r => {
         const wp: WorkingProduct[] = r.data.map(sp => ({
           productId:    sp.id,
-          name:         sp.name,
-          code:         sp.code,
-          sku:          sp.sku,
-          categoryName: sp.category?.name ?? this.getCategoryName(sp.category_id),
+          name:         sp.generic?.name ?? '',
+          code:         sp.generic?.barcode ?? '',
+          sku:          sp.brand_sku,
+          categoryName: sp.generic?.category?.name ?? this.getCategoryName(sp.generic?.category?.id ?? 0),
           pivot: {
             supplier_sku:            sp.pivot.supplier_sku,
             product_presentation_id: sp.pivot.product_presentation_id,
@@ -344,8 +344,8 @@ export class SupplierFormDialogComponent implements OnInit {
     this.workingProducts.update(prev => [...prev, {
       productId:    id,
       name:         product.name,
-      code:         product.code,
-      sku:          product.sku,
+      code:         product.barcode,
+      sku:          null,
       categoryName: product.category?.name ?? this.getCategoryName(product.category_id),
       pivot: {
         supplier_sku:            v.supplier_sku            ?? null,
@@ -422,8 +422,8 @@ export class SupplierFormDialogComponent implements OnInit {
       .map(p => ({
         productId:    p.id,
         name:         p.name,
-        code:         p.code,
-        sku:          p.sku,
+        code:         p.barcode,
+        sku:          null,
         categoryName: p.category?.name ?? this.getCategoryName(p.category_id),
         pivot:        { ...pivotDefaults },
         isNew:        true,

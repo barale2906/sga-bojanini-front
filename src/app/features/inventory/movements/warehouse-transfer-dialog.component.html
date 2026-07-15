@@ -49,11 +49,37 @@
     </div>
 
     <app-product-search
-      label="Producto"
+      label="Producto genérico"
       [required]="true"
       [selectedProduct]="_selectedProductFull()"
       (productSelected)="onProductSelected($event)">
     </app-product-search>
+
+    <!-- Selector de variante (marca / laboratorio) -->
+    @if (_selectedProductFull()) {
+      <mat-form-field appearance="outline" class="w-full">
+        <mat-label>Marca / Variante *</mat-label>
+        @if (loadingVariants()) {
+          <mat-spinner matPrefix diameter="16" style="margin:0 6px 0 4px"></mat-spinner>
+        } @else {
+          <mat-icon matPrefix>science</mat-icon>
+        }
+        <mat-select formControlName="product_variant_id">
+          @for (v of variants(); track v.id) {
+            <mat-option [value]="v.id">
+              {{ v.lab_brand || 'Sin marca' }}
+              @if (v.brand_sku) { <span style="color:#718096"> — {{ v.brand_sku }}</span> }
+            </mat-option>
+          }
+          @if (!loadingVariants() && variants().length === 0) {
+            <mat-option disabled>Sin variantes activas para este producto</mat-option>
+          }
+        </mat-select>
+        @if (!loadingVariants() && variants().length === 0 && _selectedProductFull()) {
+          <mat-hint style="color:#c05621">Crea variantes en Catálogo → Detalle del producto</mat-hint>
+        }
+      </mat-form-field>
+    }
 
     <!-- Stock disponible -->
     @if (loadingStock() || loadingExitable()) {

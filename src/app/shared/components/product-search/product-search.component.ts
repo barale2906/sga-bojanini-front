@@ -29,6 +29,8 @@ export class ProductSearchComponent implements OnInit, OnChanges, OnDestroy {
   @Input() label = 'Producto';
   @Input() required = false;
   @Input() disabled = false;
+  @Input() activeOnly = true;
+  @Input() productType?: 'simple' | 'kit';
   @Input() selectedProduct: Product | null = null;
   @Output() productSelected = new EventEmitter<Product | null>();
 
@@ -46,7 +48,7 @@ export class ProductSearchComponent implements OnInit, OnChanges, OnDestroy {
   displayFn = (value: Product | string | null): string => {
     if (!value) return '';
     if (typeof value === 'string') return value;
-    return `${value.code} — ${value.name}`;
+    return `${value.barcode} — ${value.name}`;
   };
 
   ngOnInit(): void {
@@ -128,7 +130,12 @@ export class ProductSearchComponent implements OnInit, OnChanges, OnDestroy {
   private _search(term: string, immediate = false): void {
     this.loading.set(true);
     this.searched.set(false);
-    this.cSvc.getProducts({ search: term, per_page: 20 })
+    this.cSvc.getProducts({
+      search:       term,
+      per_page:     20,
+      is_active:    this.activeOnly ? '1' : undefined,
+      product_type: this.productType,
+    })
       .pipe(
         finalize(() => this.loading.set(false)),
         takeUntil(this.destroy$),

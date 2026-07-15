@@ -13,7 +13,7 @@ import { MatTooltipModule } from '@angular/material/tooltip';
 import { forkJoin, of } from 'rxjs';
 import { catchError } from 'rxjs/operators';
 import { PurchasingService } from '../purchasing.service';
-import { CatalogService, Product, ProductPresentation, ProductSupplier, Supplier } from '../../catalog/catalog.service';
+import { CatalogService, Product, ProductPresentation, ProductSupplier, ProductVariant, Supplier } from '../../catalog/catalog.service';
 import { FormErrorsComponent } from '../../../shared/components/form-errors/form-errors.component';
 import { ProductSearchComponent } from '../../../shared/components/product-search/product-search.component';
 
@@ -35,11 +35,49 @@ export class PurchaseOrderFormDialogComponent implements OnInit {
   filteredSuppliers   = signal<Supplier[]>([]);
   productSuppliersMap = signal<Record<number, ProductSupplier[]>>({});
   rowSelectedProducts = signal<(Product | null)[]>([]);
+  /** Variantes activas disponibles por fila (cargadas al elegir un genérico) */
+  variantsMap         = signal<Record<number, ProductVariant[]>>({});
+  loadingVariantsMap  = signal<Record<number, boolean>>({});
+  /** ID del genérico seleccionado por fila (para cargar presentaciones y stock) */
+  rowGenericIds       = signal<(number | null)[]>([]);
 
   onRowProductSelected(i: number, product: Product | null): void {
     this.rowSelectedProducts.update(arr => { const a = [...arr]; a[i] = product; return a; });
-    this.items.at(i).patchValue({ product_id: product?.id ?? null });
-    if (product?.id) this.onProductChange(i, product.id);
+    this.rowGenericIds.update(arr => { const a = [...arr]; a[i] = product?.id ?? null; return a; });
+    // Limpiar variante y presentación al cambiar el genérico
+    this.items.at(i).patchValue({ product_variant_id: null, product_presentation_id: null });
+    this.variantsMap.update(m => ({ ...m, [i]: [] }));
+    this.presentationsMap.update(m => ({ ...m, [i]: [] }));
+    if (!product) return;
+    // Cargar presentaciones del genérico
+    this.onProductChange(i, product.id);
+    // Cargar variantes activas del genérico
+    this.loadingVariantsMap.update(m => ({ ...m, [i]: true }));
+    (this.data.catalogSvc as CatalogService).getVariants(product.id).subscribe({
+      next: r => {
+        const activos = (r.data ?? []).filter((v: ProductVariant) => v.is_active);
+        this.variantsMap.update(m => ({ ...m, [i]: activos }));
+        this.loadingVariantsMap.update(m => ({ ...m, [i]: false }));
+        if (activos.length === 1) {
+          this.items.at(i).patchValue({ product_variant_id: activos[0].id });
+          this.onVariantChange(i, activos[0].id);
+        }
+      },
+      error: () => this.loadingVariantsMap.update(m => ({ ...m, [i]: false })),
+    });
+  }
+
+  onVariantChange(i: number, variantId: number | null): void {
+    if (!variantId) return;
+    // Cargar proveedores de esta variante específica
+    (this.data.catalogSvc as CatalogService).getProductSuppliers(variantId).pipe(
+      catchError(() => of({ success: true, message: '', data: [] as ProductSupplier[] }))
+    ).subscribe(r => {
+      this.productSuppliersMap.update(m => ({ ...m, [variantId]: r.data ?? [] }));
+      this.recomputeFilteredSuppliers();
+      const currentSuppId = this.form.get('supplier_id')?.value as number | null;
+      if (currentSuppId) this.fillPricesFromSupplier(currentSuppId);
+    });
   }
 
   form = this.fb.group({
@@ -59,10 +97,10 @@ export class PurchaseOrderFormDialogComponent implements OnInit {
     if (this.isEditMode) {
       this.loadExistingOrder();
     } else {
-      const prefill: Array<{ product_id: number; suggested_quantity: number }> = this.data.prefillItems ?? [];
+      const prefill: Array<{ product_variant_id: number; suggested_quantity: number }> = this.data.prefillItems ?? [];
       if (prefill.length > 0) {
-        prefill.forEach((p, i) => this.addPrefillItem(p.product_id, p.suggested_quantity, i));
-        this.loadProductSuppliersForPrefill(prefill.map(p => p.product_id));
+        prefill.forEach((p, i) => this.addPrefillItem(p.product_variant_id, p.suggested_quantity, i));
+        this.loadProductSuppliersForPrefill(prefill.map(p => p.product_variant_id));
       } else {
         this.addItem();
       }
@@ -79,23 +117,33 @@ export class PurchaseOrderFormDialogComponent implements OnInit {
     });
     (order.items ?? []).forEach((item: any, i: number) => {
       this.items.push(this.fb.group({
-        product_id: [item.product_id, Validators.required],
+        product_variant_id: [item.product_variant_id, Validators.required],
         product_presentation_id: [item.product_presentation_id, Validators.required],
         quantity: [item.quantity_requested, [Validators.required, Validators.min(1)]],
         unit_price: [Number(item.unit_price), [Validators.required, Validators.min(0)]],
         tax_rate: [item.tax_rate != null ? Number(item.tax_rate) : null, [Validators.min(0), Validators.max(100)]],
         notes: [item.notes || ''],
       }));
-      // Sincronizar buscador con producto existente
-      const product = (this.data.products as Product[] ?? []).find(p => p.id === item.product_id) ?? null;
+      this.variantsMap.update(m => ({ ...m, [i]: [] }));
+      // El product del item es el producto genérico (product?.id = generic_id)
+      const product = (this.data.products as Product[] ?? []).find(p => p.id === item.product?.id) ?? null;
+      const genericId = item.product?.id ?? null;
       this.rowSelectedProducts.update(arr => { const a = [...arr]; a[i] = product; return a; });
-      this.data.catalogSvc.getPresentations(item.product_id).subscribe({
-        next: (r: any) => this.presentationsMap.update(m => ({ ...m, [i]: r.data ?? [] })),
-        error: () => {},
-      });
+      this.rowGenericIds.update(arr => { const a = [...arr]; a[i] = genericId; return a; });
+      if (genericId) {
+        this.data.catalogSvc.getPresentations(genericId).subscribe({
+          next: (r: any) => this.presentationsMap.update(m => ({ ...m, [i]: r.data ?? [] })),
+          error: () => {},
+        });
+        (this.data.catalogSvc as CatalogService).getVariants(genericId).subscribe({
+          next: r => this.variantsMap.update(m => ({ ...m, [i]: (r.data ?? []).filter((v: ProductVariant) => v.is_active) })),
+          error: () => {},
+        });
+      }
     });
     if ((order.items ?? []).length > 0) {
-      this.loadProductSuppliersForPrefill((order.items as any[]).map((i: any) => i.product_id));
+      const variantIds = (order.items as any[]).map((i: any) => i.product_variant_id).filter(Boolean);
+      if (variantIds.length) this.loadProductSuppliersForPrefill(variantIds);
     }
   }
 
@@ -120,7 +168,7 @@ export class PurchaseOrderFormDialogComponent implements OnInit {
 
   private recomputeFilteredSuppliers(): void {
     const productIds = this.items.controls
-      .map(c => c.get('product_id')?.value as number)
+      .map(c => c.get('product_variant_id')?.value as number)
       .filter(id => !!id);
     const map = this.productSuppliersMap();
     const loaded = productIds.filter(id => map[id] !== undefined);
@@ -161,7 +209,7 @@ export class PurchaseOrderFormDialogComponent implements OnInit {
   private fillPricesFromSupplier(supplierId: number): void {
     const map = this.productSuppliersMap();
     this.items.controls.forEach(ctrl => {
-      const productId = ctrl.get('product_id')?.value as number;
+      const productId = ctrl.get('product_variant_id')?.value as number;
       if (!productId) return;
       const supplierData = (map[productId] ?? []).find(s => s.id === supplierId);
       if (!supplierData) return;
@@ -189,8 +237,9 @@ export class PurchaseOrderFormDialogComponent implements OnInit {
   // ── Gestión de ítems ─────────────────────────────────────────
 
   addItem(): void {
+    const i = this.items.length;
     this.items.push(this.fb.group({
-      product_id: [null as number | null, Validators.required],
+      product_variant_id: [null as number | null, Validators.required],
       product_presentation_id: [null as number | null, Validators.required],
       quantity: [1, [Validators.required, Validators.min(1)]],
       unit_price: [0, [Validators.required, Validators.min(0)]],
@@ -198,30 +247,43 @@ export class PurchaseOrderFormDialogComponent implements OnInit {
       notes: [''],
     }));
     this.rowSelectedProducts.update(arr => [...arr, null]);
+    this.rowGenericIds.update(arr => [...arr, null]);
+    this.variantsMap.update(m => ({ ...m, [i]: [] }));
   }
 
-  private addPrefillItem(productId: number, qty: number, index: number): void {
+  private addPrefillItem(genericId: number, qty: number, index: number): void {
     this.items.push(this.fb.group({
-      product_id: [productId, Validators.required],
+      product_variant_id: [null as number | null, Validators.required],
       product_presentation_id: [null as number | null, Validators.required],
       quantity: [qty, [Validators.required, Validators.min(1)]],
       unit_price: [0, [Validators.required, Validators.min(0)]],
       tax_rate: [null as number | null, [Validators.min(0), Validators.max(100)]],
       notes: [''],
     }));
-    // Sincronizar el buscador con el producto pre-cargado
-    const product = (this.data.products as Product[] ?? []).find(p => p.id === productId) ?? null;
+    const product = (this.data.products as Product[] ?? []).find(p => p.id === genericId) ?? null;
     this.rowSelectedProducts.update(arr => { const a = [...arr]; a[index] = product; return a; });
-    this.data.catalogSvc.getPresentations(productId).subscribe({
+    this.rowGenericIds.update(arr => { const a = [...arr]; a[index] = genericId; return a; });
+    this.variantsMap.update(m => ({ ...m, [index]: [] }));
+    // Cargar presentaciones
+    this.data.catalogSvc.getPresentations(genericId).subscribe({
       next: (r: any) => {
         const presentations: ProductPresentation[] = r.data ?? [];
         this.presentationsMap.update(m => ({ ...m, [index]: presentations }));
-        // Solo aplicar presentación por defecto si no fue asignada ya desde el pivot del proveedor
         if (!this.items.at(index).get('product_presentation_id')?.value) {
           const defaultPres = presentations.find((p: ProductPresentation) => p.is_purchase_default) ?? presentations[0];
-          if (defaultPres) {
-            this.items.at(index).patchValue({ product_presentation_id: defaultPres.id });
-          }
+          if (defaultPres) this.items.at(index).patchValue({ product_presentation_id: defaultPres.id });
+        }
+      },
+      error: () => {},
+    });
+    // Cargar variantes
+    (this.data.catalogSvc as CatalogService).getVariants(genericId).subscribe({
+      next: r => {
+        const activos = (r.data ?? []).filter((v: ProductVariant) => v.is_active);
+        this.variantsMap.update(m => ({ ...m, [index]: activos }));
+        if (activos.length === 1) {
+          this.items.at(index).patchValue({ product_variant_id: activos[0].id });
+          this.onVariantChange(index, activos[0].id);
         }
       },
       error: () => {},
@@ -232,28 +294,29 @@ export class PurchaseOrderFormDialogComponent implements OnInit {
     if (this.items.length > 1) {
       this.items.removeAt(i);
       this.rowSelectedProducts.update(arr => arr.filter((_, idx) => idx !== i));
+      this.rowGenericIds.update(arr => arr.filter((_, idx) => idx !== i));
+      // Re-indexar los mapas
+      const rebuildMap = <T>(old: Record<number, T>) =>
+        Object.fromEntries(Object.entries(old).filter(([k]) => Number(k) !== i).map(([k, v]) => [Number(k) > i ? Number(k) - 1 : k, v]));
+      this.presentationsMap.update(rebuildMap);
+      this.variantsMap.update(rebuildMap);
     }
   }
 
-  onProductChange(i: number, productId: number): void {
-    if (!productId) return;
+  onProductChange(i: number, genericProductId: number): void {
+    if (!genericProductId) return;
     this.items.at(i).patchValue({ product_presentation_id: null, unit_price: 0 });
-
-    // Cargar presentaciones
-    this.data.catalogSvc.getPresentations(productId).subscribe({
-      next: (r: any) => this.presentationsMap.update(m => ({ ...m, [i]: r.data ?? [] })),
+    // Cargar presentaciones del genérico
+    this.data.catalogSvc.getPresentations(genericProductId).subscribe({
+      next: (r: any) => {
+        const presentations: ProductPresentation[] = r.data ?? [];
+        this.presentationsMap.update(m => ({ ...m, [i]: presentations }));
+        if (!this.items.at(i).get('product_presentation_id')?.value) {
+          const defaultPres = presentations.find(p => p.is_purchase_default) ?? presentations[0];
+          if (defaultPres) this.items.at(i).patchValue({ product_presentation_id: defaultPres.id });
+        }
+      },
       error: () => {},
-    });
-
-    // Cargar proveedores del producto y recomputar filtro
-    (this.data.catalogSvc as CatalogService).getProductSuppliers(productId).pipe(
-      catchError(() => of({ success: true, message: '', data: [] as ProductSupplier[] }))
-    ).subscribe(r => {
-      this.productSuppliersMap.update(m => ({ ...m, [productId]: r.data ?? [] }));
-      this.recomputeFilteredSuppliers();
-      // Si ya hay un proveedor seleccionado, rellenar precio para este nuevo ítem
-      const currentSuppId = this.form.get('supplier_id')?.value as number | null;
-      if (currentSuppId) this.fillPricesFromSupplier(currentSuppId);
     });
   }
 
@@ -266,13 +329,13 @@ export class PurchaseOrderFormDialogComponent implements OnInit {
   /** Presentaciones disponibles para el ítem i, excluyendo las ya usadas por otros ítems del mismo producto */
   getAvailablePresentations(i: number): ProductPresentation[] {
     const all = this.presentationsMap()[i] || [];
-    const productId = this.items.at(i).get('product_id')?.value as number;
+    const productId = this.items.at(i).get('product_variant_id')?.value as number;
     if (!productId) return all;
 
     const usedPresIds = new Set(
       this.items.controls
         .filter((_, j) => j !== i)
-        .filter(ctrl => ctrl.get('product_id')?.value === productId)
+        .filter(ctrl => ctrl.get('product_variant_id')?.value === productId)
         .map(ctrl => ctrl.get('product_presentation_id')?.value)
         .filter(id => !!id)
     );
@@ -282,12 +345,12 @@ export class PurchaseOrderFormDialogComponent implements OnInit {
 
   get hasDuplicates(): boolean {
     return this.items.controls.some((ctrl, i) => {
-      const pid = ctrl.get('product_id')?.value;
+      const pid = ctrl.get('product_variant_id')?.value;
       const prid = ctrl.get('product_presentation_id')?.value;
       if (!pid || !prid) return false;
       return this.items.controls.some((c2, j) =>
         j !== i &&
-        c2.get('product_id')?.value === pid &&
+        c2.get('product_variant_id')?.value === pid &&
         c2.get('product_presentation_id')?.value === prid
       );
     });
@@ -301,7 +364,7 @@ export class PurchaseOrderFormDialogComponent implements OnInit {
     if (!presId || !qty || qty < 1) return null;
     const pres = presentations.find(p => p.id === presId);
     if (!pres) return null;
-    const productId = item.get('product_id')?.value;
+    const productId = item.get('product_variant_id')?.value;
     const product = (this.data.products as any[]).find((p: any) => p.id === productId);
     const unit = product?.base_unit?.abbreviation || 'uds. base';
     return { value: qty * pres.factor_to_base, unit };

@@ -90,7 +90,7 @@
       </div>
     }
 
-    <!-- ── Producto ── -->
+    <!-- ── Producto (genérico) ── -->
     <div class="span2">
       <app-product-search
         label="Producto"
@@ -99,6 +99,31 @@
         (productSelected)="onProductSelected($event)">
       </app-product-search>
     </div>
+
+    <!-- ── Variante (requerida para todos los tipos excepto salida) ── -->
+    @if (!isExit && form.get('product_id')?.value) {
+      @if (loadingVariants()) {
+        <div class="span2 cap-loading">
+          <mat-spinner diameter="14"></mat-spinner>
+          <span>Cargando variantes...</span>
+        </div>
+      } @else {
+        <mat-form-field appearance="outline" class="span2">
+          <mat-label>Marca / Variante *</mat-label>
+          <mat-select formControlName="product_variant_id">
+            @for (v of variants(); track v.id) {
+              <mat-option [value]="v.id">
+                {{ v.lab_brand || 'Sin marca' }}
+                @if (v.brand_sku) { — {{ v.brand_sku }} }
+              </mat-option>
+            }
+          </mat-select>
+          @if (!variants().length) {
+            <mat-hint>Este genérico no tiene variantes activas. Cree una desde el catálogo.</mat-hint>
+          }
+        </mat-form-field>
+      }
+    }
 
     <!-- ── Panel de clasificación + INVIMA (solo entrada) ── -->
     @if (isEntry) {
@@ -116,9 +141,6 @@
               <span class="class-badge class-badge--{{ pd.classification.code.toLowerCase() }}">
                 {{ pd.classification.code }} — {{ pd.classification.name }}
               </span>
-              @if (pd.lab_brand) {
-                <span class="class-field"><strong>Lab./Marca:</strong> {{ pd.lab_brand }}</span>
-              }
             </div>
             <div class="class-fields-row">
               @if (pd.classification.has_concentration && pd.concentration) {
@@ -126,18 +148,6 @@
               }
               @if (pd.classification.has_pharma_fields && pd.pharmaceutical_form) {
                 <span class="class-field"><strong>Forma farm.:</strong> {{ pd.pharmaceutical_form }}</span>
-              }
-              @if (pd.classification.has_pharma_fields && pd.commercial_presentation) {
-                <span class="class-field"><strong>Pres. comercial:</strong> {{ pd.commercial_presentation }}</span>
-              }
-              @if (pd.classification.has_device_fields && pd.serie_reference) {
-                <span class="class-field"><strong>Serie/Ref.:</strong> {{ pd.serie_reference }}</span>
-              }
-              @if (pd.classification.has_device_fields && pd.useful_life) {
-                <span class="class-field"><strong>Vida útil:</strong> {{ pd.useful_life }}</span>
-              }
-              @if (pd.classification.has_risk_level && pd.risk_level) {
-                <span class="class-field"><strong>Nivel de riesgo:</strong> {{ pd.risk_level }}</span>
               }
             </div>
           </div>
@@ -154,8 +164,9 @@
                 <span class="invima-badge invima-badge--warn">⚠ Sin registro activo</span>
               }
             </div>
-            @if (pd.sanitary_registrations?.length) {
-              @for (reg of pd.sanitary_registrations; track reg.id) {
+            @let selVariant = variants().find(v => v.id === form.get('product_variant_id')?.value);
+            @if (selVariant?.sanitary_registrations?.length) {
+              @for (reg of selVariant!.sanitary_registrations!; track reg.id) {
                 <div class="invima-reg" [class.invima-reg--expired]="reg.is_expired">
                   <mat-icon class="invima-reg-icon">{{ reg.is_expired ? 'warning' : 'verified' }}</mat-icon>
                   <span class="invima-reg-num">{{ reg.registration_number }}</span>
@@ -170,7 +181,7 @@
                 </div>
               }
             } @else {
-              <div class="invima-empty">Sin registros sanitarios configurados para este producto.</div>
+              <div class="invima-empty">Sin registros sanitarios para la variante seleccionada.</div>
             }
           </div>
         }

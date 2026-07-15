@@ -242,6 +242,32 @@ export class CatalogPageComponent implements OnInit {
     this.router.navigate(['/catalog/products', prod.id]);
   }
 
+  /** Abre la etiqueta de barcode del producto en ventana nueva y lanza la impresión. */
+  printProductBarcode(prod: Product): void {
+    const win = window.open('', '_blank', 'width=520,height=420');
+    if (!win) { this.snack.open('Permite ventanas emergentes para imprimir', 'OK', { duration: 4000 }); return; }
+    win.document.write('<html><body style="font-family:sans-serif;text-align:center;padding:2rem">Cargando etiqueta…</body></html>');
+    this.svc.getBarcodePrintHtml(prod.id).subscribe({
+      next: html => { win.document.open(); win.document.write(html); win.document.close(); },
+      error: () => { win.close(); this.snack.open('No se pudo obtener la etiqueta', 'OK', { duration: 4000 }); },
+    });
+  }
+
+  /** Imprime la lista completa de barcodes aplicando los filtros de categoría y estado activos. */
+  printBarcodeList(): void {
+    const { category_id, is_active } = this.prodFilters.value;
+    const win = window.open('', '_blank');
+    if (!win) { this.snack.open('Permite ventanas emergentes para imprimir', 'OK', { duration: 4000 }); return; }
+    win.document.write('<html><body style="font-family:sans-serif;text-align:center;padding:2rem">Cargando lista…</body></html>');
+    this.svc.getBarcodeListHtml({
+      active: is_active === 'false' ? '0' : '1',
+      category_id: category_id ? Number(category_id) : undefined,
+    }).subscribe({
+      next: html => { win.document.open(); win.document.write(html); win.document.close(); },
+      error: () => { win.close(); this.snack.open('No se pudo obtener la lista de barcodes', 'OK', { duration: 4000 }); },
+    });
+  }
+
   deleteProduct(prod: Product): void {
     this.dialog.open(ConfirmDialogComponent, {
       data: { title: 'Eliminar producto', message: `¿Eliminar "${prod.name}"?`, confirmColor: 'warn' }, width: '420px',

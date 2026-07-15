@@ -49,31 +49,13 @@
     <mat-step [stepControl]="stepIdent" label="Identificación">
       <form [formGroup]="stepIdent" class="step-body">
 
-        <div class="row-2">
-          <mat-form-field appearance="outline" class="w-full">
-            <mat-label>Nombre *</mat-label>
-            <input matInput formControlName="name" placeholder="Ej. Guante nitrilo talla S" />
-            @if (stepIdent.get('name')?.hasError('required') && stepIdent.get('name')?.touched) {
-              <mat-error>El nombre es requerido</mat-error>
-            }
-            @if (fe()['name']) { <mat-error>{{ fe()['name'][0] }}</mat-error> }
-          </mat-form-field>
-
-          <mat-form-field appearance="outline" class="w-full">
-            <mat-label>Código *</mat-label>
-            <input matInput formControlName="code" placeholder="Ej. GUA-NIT-S"
-                   style="text-transform:uppercase" />
-            @if (stepIdent.get('code')?.hasError('required') && stepIdent.get('code')?.touched) {
-              <mat-error>El código es requerido</mat-error>
-            }
-            @if (fe()['code']) { <mat-error>{{ fe()['code'][0] }}</mat-error> }
-          </mat-form-field>
-        </div>
-
         <mat-form-field appearance="outline" class="w-full">
-          <mat-label>SKU</mat-label>
-          <input matInput formControlName="sku" placeholder="Código SKU opcional (único en el sistema)" />
-          @if (fe()['sku']) { <mat-error>{{ fe()['sku'][0] }}</mat-error> }
+          <mat-label>Nombre *</mat-label>
+          <input matInput formControlName="name" placeholder="Ej. Guante nitrilo talla S" />
+          @if (stepIdent.get('name')?.hasError('required') && stepIdent.get('name')?.touched) {
+            <mat-error>El nombre es requerido</mat-error>
+          }
+          @if (fe()['name']) { <mat-error>{{ fe()['name'][0] }}</mat-error> }
         </mat-form-field>
 
         <mat-form-field appearance="outline" class="w-full">
@@ -131,19 +113,6 @@
 
         @if (selectedClassification()) {
 
-          <!-- Laboratorio / Marca -->
-          @if (showLabBrand()) {
-            <mat-form-field appearance="outline" class="w-full">
-              <mat-label>Laboratorio / Marca *</mat-label>
-              <input matInput formControlName="lab_brand"
-                     placeholder="Ej. Genfar, Philips Healthcare..." />
-              @if (stepClassif.get('lab_brand')?.hasError('required') && stepClassif.get('lab_brand')?.touched) {
-                <mat-error>Laboratorio / Marca es requerido para esta clasificación</mat-error>
-              }
-              @if (fe()['lab_brand']) { <mat-error>{{ fe()['lab_brand'][0] }}</mat-error> }
-            </mat-form-field>
-          }
-
           <!-- Concentración (Medicamentos) -->
           @if (showConcentration()) {
             <mat-form-field appearance="outline" class="w-full">
@@ -154,49 +123,21 @@
             </mat-form-field>
           }
 
-          <!-- Nivel de Riesgo (Dispositivos Médicos) -->
-          @if (showRiskLevel()) {
+          <!-- Campos farmacéuticos (Medicamentos) -->
+          @if (showPharmaFields()) {
             <mat-form-field appearance="outline" class="w-full">
-              <mat-label>Nivel de Riesgo</mat-label>
-              <input matInput formControlName="risk_level"
-                     placeholder="Ej. Clase I, Clase IIA, Clase IIB" />
-              @if (fe()['risk_level']) { <mat-error>{{ fe()['risk_level'][0] }}</mat-error> }
+              <mat-label>Forma Farmacéutica</mat-label>
+              <input matInput formControlName="pharmaceutical_form"
+                     placeholder="Ej. Tableta, Cápsula, Jarabe" />
+              @if (fe()['pharmaceutical_form']) { <mat-error>{{ fe()['pharmaceutical_form'][0] }}</mat-error> }
             </mat-form-field>
           }
 
-          <!-- Campos farmacéuticos (Medicamentos) -->
-          @if (showPharmaFields()) {
-            <div class="row-2">
-              <mat-form-field appearance="outline" class="w-full">
-                <mat-label>Forma Farmacéutica</mat-label>
-                <input matInput formControlName="pharmaceutical_form"
-                       placeholder="Ej. Tableta, Cápsula, Jarabe" />
-                @if (fe()['pharmaceutical_form']) { <mat-error>{{ fe()['pharmaceutical_form'][0] }}</mat-error> }
-              </mat-form-field>
-              <mat-form-field appearance="outline" class="w-full">
-                <mat-label>Presentación Comercial</mat-label>
-                <input matInput formControlName="commercial_presentation"
-                       placeholder="Ej. Caja x 100 Tab" />
-                @if (fe()['commercial_presentation']) { <mat-error>{{ fe()['commercial_presentation'][0] }}</mat-error> }
-              </mat-form-field>
-            </div>
-          }
-
-          <!-- Campos de dispositivo médico -->
-          @if (showDeviceFields()) {
-            <div class="row-2">
-              <mat-form-field appearance="outline" class="w-full">
-                <mat-label>Serie / Referencia</mat-label>
-                <input matInput formControlName="serie_reference"
-                       placeholder="Ej. SRP-1000X" />
-                @if (fe()['serie_reference']) { <mat-error>{{ fe()['serie_reference'][0] }}</mat-error> }
-              </mat-form-field>
-              <mat-form-field appearance="outline" class="w-full">
-                <mat-label>Vida Útil</mat-label>
-                <input matInput formControlName="useful_life"
-                       placeholder="Ej. 10 años, Uso único" />
-                @if (fe()['useful_life']) { <mat-error>{{ fe()['useful_life'][0] }}</mat-error> }
-              </mat-form-field>
+          @if (showLabBrand() || showRiskLevel() || showDeviceFields()) {
+            <div class="info-hint">
+              <mat-icon>info</mat-icon>
+              Laboratorio/Marca, Nivel de Riesgo, Presentación Comercial, Serie y Vida Útil
+              se configuran por variante desde el detalle del producto.
             </div>
           }
 
@@ -204,7 +145,7 @@
             <div class="info-hint">
               <mat-icon>info</mat-icon>
               Esta clasificación requiere <strong>&nbsp;Registros Sanitarios</strong>.
-              Podrás gestionarlos desde el detalle del producto una vez guardado.
+              Se gestionan por variante desde el detalle del producto.
             </div>
           }
         }
@@ -336,19 +277,19 @@
 
                   <mat-form-field appearance="outline" class="w-full">
                     <mat-label>Producto *</mat-label>
-                    <mat-select formControlName="component_product_id">
+                    <mat-select formControlName="component_generic_id">
                       @for (p of getRowOptions($index); track p.id) {
-                        <mat-option [value]="p.id">{{ p.name }} ({{ p.code }})</mat-option>
+                        <mat-option [value]="p.id">{{ p.name }} ({{ p.barcode }})</mat-option>
                       }
                       @if (getRowOptions($index).length === 0) {
                         <mat-option disabled>Sin resultados para "{{ componentSearch() }}"</mat-option>
                       }
                     </mat-select>
-                    @if ($any(ctrl).get('component_product_id')?.hasError('required') && $any(ctrl).get('component_product_id')?.touched) {
+                    @if ($any(ctrl).get('component_generic_id')?.hasError('required') && $any(ctrl).get('component_generic_id')?.touched) {
                       <mat-error>Selecciona un producto</mat-error>
                     }
-                    @if ($any(ctrl).get('component_product_id')?.value && componentSearch()) {
-                      <mat-hint>{{ getProductLabel($any(ctrl).get('component_product_id')?.value) }}</mat-hint>
+                    @if ($any(ctrl).get('component_generic_id')?.value && componentSearch()) {
+                      <mat-hint>{{ getProductLabel($any(ctrl).get('component_generic_id')?.value) }}</mat-hint>
                     }
                   </mat-form-field>
 
@@ -533,16 +474,6 @@
             <span>{{ stepIdent.get('name')?.value || '—' }}</span>
           </div>
           <div class="summary-row">
-            <span class="slabel">Código</span>
-            <span class="code-tag">{{ stepIdent.get('code')?.value || '—' }}</span>
-          </div>
-          @if (stepIdent.get('sku')?.value) {
-            <div class="summary-row">
-              <span class="slabel">SKU</span>
-              <span class="code-tag">{{ stepIdent.get('sku')?.value }}</span>
-            </div>
-          }
-          <div class="summary-row">
             <span class="slabel">Categoría</span>
             <span>{{ getCategoryName(stepIdent.get('category_id')?.value) }}</span>
           </div>
@@ -551,51 +482,17 @@
               <span class="slabel">Clasificación</span>
               <span><strong>{{ selectedClassification()!.code }}</strong> — {{ selectedClassification()!.name }}</span>
             </div>
-            @if (showLabBrand() && stepClassif.get('lab_brand')?.value) {
-              <div class="summary-row">
-                <span class="slabel">Lab / Marca</span>
-                <span>{{ stepClassif.get('lab_brand')?.value }}</span>
-              </div>
-            }
             @if (showConcentration() && stepClassif.get('concentration')?.value) {
               <div class="summary-row">
                 <span class="slabel">Concentración</span>
                 <span>{{ stepClassif.get('concentration')?.value }}</span>
               </div>
             }
-            @if (showRiskLevel() && stepClassif.get('risk_level')?.value) {
+            @if (showPharmaFields() && stepClassif.get('pharmaceutical_form')?.value) {
               <div class="summary-row">
-                <span class="slabel">Nivel Riesgo</span>
-                <span>{{ stepClassif.get('risk_level')?.value }}</span>
+                <span class="slabel">Forma Farmacéutica</span>
+                <span>{{ stepClassif.get('pharmaceutical_form')?.value }}</span>
               </div>
-            }
-            @if (showPharmaFields()) {
-              @if (stepClassif.get('pharmaceutical_form')?.value) {
-                <div class="summary-row">
-                  <span class="slabel">Forma Farmacéutica</span>
-                  <span>{{ stepClassif.get('pharmaceutical_form')?.value }}</span>
-                </div>
-              }
-              @if (stepClassif.get('commercial_presentation')?.value) {
-                <div class="summary-row">
-                  <span class="slabel">Pres. Comercial</span>
-                  <span>{{ stepClassif.get('commercial_presentation')?.value }}</span>
-                </div>
-              }
-            }
-            @if (showDeviceFields()) {
-              @if (stepClassif.get('serie_reference')?.value) {
-                <div class="summary-row">
-                  <span class="slabel">Serie / Ref.</span>
-                  <span>{{ stepClassif.get('serie_reference')?.value }}</span>
-                </div>
-              }
-              @if (stepClassif.get('useful_life')?.value) {
-                <div class="summary-row">
-                  <span class="slabel">Vida Útil</span>
-                  <span>{{ stepClassif.get('useful_life')?.value }}</span>
-                </div>
-              }
             }
             @if (showSanitaryReg()) {
               <div class="summary-row">

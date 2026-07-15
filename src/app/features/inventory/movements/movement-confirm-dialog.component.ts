@@ -8,7 +8,6 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatDividerModule } from '@angular/material/divider';
-import { forkJoin } from 'rxjs';
 import { InventoryService, Movement } from '../inventory.service';
 import { AuthService } from '../../../core/services/auth.service';
 import { MovementPdfSignature } from '../../../shared/services/movement-pdf.service';
@@ -22,6 +21,8 @@ export interface MovementConfirmResult {
 }
 
 export interface MovementConfirmDialogData {
+  /** ID del movement_document (no del movimiento individual). */
+  document_id:   number;
   movements:     Pick<Movement, 'id' | 'product_name' | 'batch_lot_number' | 'quantity' | 'movement_type'>[];
   warehouseName: string;
   inventorySvc:  InventoryService;
@@ -52,7 +53,7 @@ export class MovementConfirmDialogComponent implements OnInit {
   data: MovementConfirmDialogData = inject(MAT_DIALOG_DATA);
   private ref     = inject(MatDialogRef<MovementConfirmDialogComponent>);
   private fb      = inject(FormBuilder);
-  private authSvc = inject(AuthService);
+  protected authSvc = inject(AuthService);
 
   @ViewChild('deliveredPad') deliveredPad!: SignatureCapturePadComponent;
   @ViewChild('receivedPad')  receivedPad!:  SignatureCapturePadComponent;
@@ -121,9 +122,7 @@ export class MovementConfirmDialogComponent implements OnInit {
       },
     };
 
-    forkJoin(
-      this.data.movements.map(m => this.data.inventorySvc.confirmMovement(m.id, payload))
-    ).subscribe({
+    this.data.inventorySvc.confirmMovement(this.data.document_id, payload).subscribe({
       next: () => {
         this.confirming.set(false);
         this.confirmed.set(true);
@@ -143,9 +142,7 @@ export class MovementConfirmDialogComponent implements OnInit {
   cancelMovements(): void {
     if (this.cancelling()) return;
     this.cancelling.set(true);
-    forkJoin(
-      this.data.movements.map(m => this.data.inventorySvc.cancelPendingMovement(m.id))
-    ).subscribe({
+    this.data.inventorySvc.cancelPendingMovement(this.data.document_id).subscribe({
       next:  () => { this.cancelling.set(false); this.ref.close({ cancelled: true }); },
       error: () => { this.cancelling.set(false); this.ref.close({ cancelled: true }); },
     });

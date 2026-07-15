@@ -30,10 +30,10 @@
     @for (p of results(); track p.id) {
       <mat-option [value]="p" class="product-option">
         <div class="product-option-inner">
-          <span class="product-option-code">{{ p.code }}</span>
+          <span class="product-option-code">{{ p.barcode }}</span>
           <span class="product-option-name">{{ p.name }}</span>
-          @if (p.sku) {
-            <span class="product-option-sku">SKU: {{ p.sku }}</span>
+          @if (p.product_type === 'kit') {
+            <span class="product-option-type product-option-type--kit">Kit</span>
           }
         </div>
       </mat-option>

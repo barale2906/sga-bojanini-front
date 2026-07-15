@@ -124,3 +124,43 @@
     .conv-result { flex: 1.5; color: #2d3748; }
   }
 }
+
+// ── Variantes ──────────────────────────────────────────────────
+.variant-card {
+  border: 1px solid #E2E8F0; border-radius: 8px;
+  margin-bottom: 1.25rem; overflow: hidden;
+
+  .variant-header {
+    display: flex; align-items: center; gap: 0.5rem;
+    padding: 0.65rem 1rem;
+    background: #F7FAFC; border-bottom: 1px solid #E2E8F0;
+    .variant-title {
+      display: flex; align-items: center; gap: 0.4rem;
+      font-weight: 600; font-size: 0.92rem; flex: 1;
+    }
+  }
+
+  .variant-details {
+    padding: 0.75rem 1rem 0.25rem;
+  }
+
+  .variant-regs {
+    padding: 0.75rem 1rem;
+    border-top: 1px solid #EDF2F7;
+    .variant-regs-header {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: 0.5rem;
+    }
+  }
+}
+
+.no-regs-hint {
+  font-size: 0.8rem; color: #a0aec0; margin: 0.25rem 0;
+  font-style: italic;
+}
+
+.empty-state {
+  text-align: center; padding: 2.5rem 1rem; color: #a0aec0;
+  p { margin: 0.5rem 0 0; font-size: 0.9rem; }
+  small { font-size: 0.78rem; }
+}

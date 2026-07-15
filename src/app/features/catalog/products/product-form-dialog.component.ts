@@ -173,7 +173,7 @@ export class ProductFormDialogComponent implements OnInit {
   filteredSimpleProducts = computed(() => {
     const q = this.componentSearch().toLowerCase().trim();
     return q
-      ? this.simpleProducts().filter(p => p.name.toLowerCase().includes(q) || p.code.toLowerCase().includes(q))
+      ? this.simpleProducts().filter(p => p.name.toLowerCase().includes(q) || p.barcode.toLowerCase().includes(q))
       : this.simpleProducts();
   });
 
@@ -190,21 +190,14 @@ export class ProductFormDialogComponent implements OnInit {
 
   stepIdent = this.fb.group({
     name:        ['', [Validators.required, Validators.maxLength(255)]],
-    code:        ['', [Validators.required, Validators.maxLength(50)]],
-    sku:         [null as string | null],
     category_id: [null as number | null, Validators.required],
     description: [''],
   });
 
   stepClassif = this.fb.group({
-    classification_id:       [null as number | null],
-    concentration:           [null as string | null, Validators.maxLength(100)],
-    risk_level:              [null as string | null, Validators.maxLength(100)],
-    lab_brand:               [null as string | null, Validators.maxLength(255)],
-    pharmaceutical_form:     [null as string | null, Validators.maxLength(150)],
-    commercial_presentation: [null as string | null, Validators.maxLength(150)],
-    serie_reference:         [null as string | null, Validators.maxLength(150)],
-    useful_life:             [null as string | null, Validators.maxLength(100)],
+    classification_id:   [null as number | null],
+    concentration:       [null as string | null, Validators.maxLength(100)],
+    pharmaceutical_form: [null as string | null, Validators.maxLength(150)],
   });
 
   stepInv = this.fb.group({
@@ -229,7 +222,7 @@ export class ProductFormDialogComponent implements OnInit {
 
   getRowOptions(rowIndex: number): Product[] {
     const filtered   = this.filteredSimpleProducts();
-    const selectedId = (this.componentsArray.at(rowIndex) as FormGroup).get('component_product_id')?.value as number | null;
+    const selectedId = (this.componentsArray.at(rowIndex) as FormGroup).get('component_generic_id')?.value as number | null;
     if (!selectedId || filtered.some(p => p.id === selectedId)) return filtered;
     const selected = this.simpleProducts().find(p => p.id === selectedId);
     return selected ? [selected, ...filtered] : filtered;
@@ -238,7 +231,7 @@ export class ProductFormDialogComponent implements OnInit {
   getProductLabel(id: number | null): string {
     if (!id) return '';
     const p = this.simpleProducts().find(p => p.id === id);
-    return p ? `${p.name} (${p.code})` : String(id);
+    return p ? `${p.name} (${p.barcode})` : String(id);
   }
 
   // ── Presentaciones — métodos ──────────────────────────────
@@ -275,7 +268,7 @@ export class ProductFormDialogComponent implements OnInit {
   // ── BOM — métodos ─────────────────────────────────────────
   addComponentRow(): void {
     this.componentsArray.push(this.fb.group({
-      component_product_id: [null as number | null, Validators.required],
+      component_generic_id: [null as number | null, Validators.required],
       quantity_per_kit:     [1, [Validators.required, Validators.min(1)]],
     }));
   }
@@ -298,11 +291,10 @@ export class ProductFormDialogComponent implements OnInit {
       this._baseUnitSig.set(v);
     });
 
-    // Sincronizar _classifSig y validadores dinámicos
+    // Sincronizar _classifSig
     this.stepClassif.get('classification_id')!.valueChanges.subscribe(id => {
       const classif = id ? (this.data.classifications.find(c => c.id === id) ?? null) : null;
       this._classifSig.set(classif);
-      this._updateLabBrandValidator(classif);
     });
 
     if (this.data.product) {
@@ -311,22 +303,16 @@ export class ProductFormDialogComponent implements OnInit {
       this._baseUnitSig.set(p.base_unit_id);
 
       this.stepTipo.patchValue({ product_type: p.product_type });
-      this.stepIdent.patchValue({ name: p.name, code: p.code, sku: p.sku, category_id: p.category_id, description: p.description ?? '' });
+      this.stepIdent.patchValue({ name: p.name, category_id: p.category_id, description: p.description ?? '' });
       this.stepClassif.patchValue({
-        classification_id:       p.classification_id ?? null,
-        concentration:           p.concentration           ?? null,
-        risk_level:              p.risk_level              ?? null,
-        lab_brand:               p.lab_brand               ?? null,
-        pharmaceutical_form:     p.pharmaceutical_form     ?? null,
-        commercial_presentation: p.commercial_presentation ?? null,
-        serie_reference:         p.serie_reference         ?? null,
-        useful_life:             p.useful_life             ?? null,
+        classification_id:   p.classification_id   ?? null,
+        concentration:       p.concentration       ?? null,
+        pharmaceutical_form: p.pharmaceutical_form ?? null,
       });
       if (p.classification_id) {
         const classif = this.data.classifications.find(c => c.id === p.classification_id)
           ?? (p.classification ?? null);
         this._classifSig.set(classif);
-        this._updateLabBrandValidator(classif);
       }
       this.stepInv.patchValue({
         base_unit_id: p.base_unit_id,
@@ -348,16 +334,6 @@ export class ProductFormDialogComponent implements OnInit {
     }
   }
 
-  private _updateLabBrandValidator(classif: ProductClassification | null | undefined): void {
-    const ctrl = this.stepClassif.get('lab_brand')!;
-    if (classif?.has_lab_brand) {
-      ctrl.setValidators([Validators.required, Validators.maxLength(255)]);
-    } else {
-      ctrl.setValidators([Validators.maxLength(255)]);
-    }
-    ctrl.updateValueAndValidity();
-  }
-
   private _loadExistingComponents(productId: number): void {
     this.loadingComponents.set(true);
     this.svc.getKitComponents(productId).subscribe({
@@ -366,7 +342,7 @@ export class ProductFormDialogComponent implements OnInit {
         while (this.componentsArray.length) this.componentsArray.removeAt(0);
         r.data.forEach(c => {
           this.componentsArray.push(this.fb.group({
-            component_product_id: [c.component_product_id, Validators.required],
+            component_generic_id: [c.component_generic_id, Validators.required],
             quantity_per_kit:     [c.quantity_per_kit, [Validators.required, Validators.min(1)]],
           }));
         });
@@ -409,33 +385,26 @@ export class ProductFormDialogComponent implements OnInit {
     const sf = this.stepFinal.value;
 
     const basePayload: any = {
-      product_type:            ti.product_type,
-      name:                    si.name,
-      code:                    si.code,
-      sku:                     si.sku || null,
-      category_id:             si.category_id,
-      description:             si.description || null,
-      classification_id:       sc.classification_id || null,
-      concentration:           sc.concentration           || null,
-      risk_level:              sc.risk_level              || null,
-      lab_brand:               sc.lab_brand               || null,
-      pharmaceutical_form:     sc.pharmaceutical_form     || null,
-      commercial_presentation: sc.commercial_presentation || null,
-      serie_reference:         sc.serie_reference         || null,
-      useful_life:             sc.useful_life             || null,
-      base_unit_id:            iv.base_unit_id,
-      requires_cold_chain:     iv.requires_cold_chain,
-      reorder_point:           iv.reorder_point ?? 0,
-      reorder_quantity:        iv.reorder_quantity ?? 0,
-      min_stock:               iv.min_stock ?? 0,
-      max_stock:               iv.max_stock ?? 0,
-      volume_cm3:              iv.volume_cm3 != null ? Number(iv.volume_cm3) : null,
-      weight_kg:               iv.weight_kg  != null ? Number(iv.weight_kg)  : null,
-      is_active:               sf.is_active ?? true,
+      product_type:        ti.product_type,
+      name:                si.name,
+      category_id:         si.category_id,
+      description:         si.description || null,
+      classification_id:   sc.classification_id   || null,
+      concentration:       sc.concentration       || null,
+      pharmaceutical_form: sc.pharmaceutical_form || null,
+      base_unit_id:        iv.base_unit_id,
+      requires_cold_chain: iv.requires_cold_chain,
+      reorder_point:       iv.reorder_point   ?? 0,
+      reorder_quantity:    iv.reorder_quantity ?? 0,
+      min_stock:           iv.min_stock        ?? 0,
+      max_stock:           iv.max_stock        ?? 0,
+      volume_cm3:          iv.volume_cm3 != null ? Number(iv.volume_cm3) : null,
+      weight_kg:           iv.weight_kg  != null ? Number(iv.weight_kg)  : null,
+      is_active:           sf.is_active ?? true,
     };
 
     const kitComponents = (iv.components as any[]).map(c => ({
-      component_product_id: c.component_product_id,
+      component_generic_id: c.component_generic_id,
       quantity_per_kit:     c.quantity_per_kit,
     }));
 

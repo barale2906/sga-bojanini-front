@@ -51,7 +51,7 @@ export interface PresProductsDialogData {
         <div class="prod-row" (click)="goToProduct(p)">
           <mat-icon style="font-size:1rem;height:1rem;width:1rem;color:#3182ce;flex-shrink:0">inventory_2</mat-icon>
           <div style="flex:1;min-width:0">
-            <code style="font-size:0.78rem;background:#e2e8f0;padding:0.1rem 0.3rem;border-radius:3px">{{ p.code }}</code>
+            <code style="font-size:0.78rem;background:#e2e8f0;padding:0.1rem 0.3rem;border-radius:3px">{{ p.barcode }}</code>
             <span style="margin-left:0.35rem;font-size:0.88rem">{{ p.name }}</span>
           </div>
           <span class="type-chip" [style.background]="p.product_type === 'kit' ? '#e9d8fd' : '#c6f6d5'"
