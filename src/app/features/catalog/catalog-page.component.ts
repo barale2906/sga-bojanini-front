@@ -273,7 +273,7 @@ export class CatalogPageComponent implements OnInit {
         const items = products.map(p => `
           <div class="bc-item">
             <div class="bc-name">${escape(p.name)}</div>
-            <svg class="bc-svg" data-code="${escape(p.barcode)}"></svg>
+            <svg class="bc-svg" data-code="${escape(p.barcode)}" xmlns="http://www.w3.org/2000/svg"></svg>
             <div class="bc-code">${escape(p.barcode)}</div>
           </div>`).join('');
 
@@ -285,23 +285,36 @@ export class CatalogPageComponent implements OnInit {
   <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"><\/script>
   <style>
     *{box-sizing:border-box;margin:0;padding:0}
-    body{font-family:sans-serif;padding:1.5rem}
-    h1{font-size:1.1rem;margin-bottom:1.2rem;text-align:center}
-    .grid{display:flex;flex-wrap:wrap;gap:0.75rem;justify-content:flex-start}
-    .bc-item{border:1px solid #ccc;border-radius:4px;padding:0.6rem;text-align:center;width:180px}
-    .bc-name{font-size:0.72rem;font-weight:600;margin-bottom:0.4rem;line-height:1.2;word-break:break-word}
-    .bc-svg{width:100%;height:auto}
-    .bc-code{font-size:0.7rem;color:#555;margin-top:0.25rem;font-family:monospace}
-    @media print{@page{margin:1cm}body{padding:0.5rem}}
+    body{font-family:sans-serif;padding:1.5rem;font-size:0.82rem}
+    h1{font-size:1.1rem;margin-bottom:1rem;text-align:center}
+    .list{display:flex;flex-direction:column;gap:0}
+    .bc-item{
+      display:grid;
+      grid-template-columns:1fr 220px 160px;
+      align-items:center;
+      gap:0.75rem;
+      padding:0.35rem 0.6rem;
+      border-bottom:1px solid #e5e7eb;
+    }
+    .bc-item:nth-child(even){background:#f9fafb}
+    .bc-name{font-weight:600;line-height:1.3;word-break:break-word}
+    .bc-svg{display:block;height:44px;width:auto;max-width:100%}
+    .bc-code{font-family:monospace;font-size:0.78rem;color:#374151;text-align:right}
+    @media print{
+      @page{margin:1cm}
+      body{padding:0.25rem;font-size:0.75rem}
+      .bc-item{padding:0.25rem 0.4rem}
+      .bc-svg{height:36px}
+    }
   </style>
 </head>
 <body>
   <h1>Listado Código de Barras</h1>
-  <div class="grid">${items}</div>
+  <div class="list">${items}</div>
   <script>
     document.querySelectorAll('svg.bc-svg').forEach(function(el){
       var code = el.getAttribute('data-code');
-      try{ JsBarcode(el, code, {format:'CODE128',width:1.4,height:48,displayValue:false,margin:2}); }
+      try{ JsBarcode(el, code, {format:'CODE128',width:1.6,height:44,displayValue:false,margin:2}); }
       catch(e){ console.warn('Barcode error',code,e); }
     });
     window.print();
