@@ -1,3 +1,9 @@
+.embedded-toolbar {
+  display: flex;
+  justify-content: flex-end;
+  padding: 0.75rem 0;
+}
+
 .filters-bar {
   display: flex;
   gap: 1rem;

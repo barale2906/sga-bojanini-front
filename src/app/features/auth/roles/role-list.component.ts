@@ -1,4 +1,4 @@
-import { Component, inject, signal, OnInit } from '@angular/core';
+import { Component, inject, signal, OnInit, Input } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { MatTableModule } from '@angular/material/table';
 import { MatButtonModule } from '@angular/material/button';
@@ -32,6 +32,8 @@ import { PermissionDirective } from '../../../shared/directives/permission.direc
   styleUrl: './role-list.component.scss',
 })
 export class RoleListComponent implements OnInit {
+  @Input() embeddedMode = false;
+
   private roleService = inject(RoleService);
   private dialog = inject(MatDialog);
   private snackBar = inject(MatSnackBar);

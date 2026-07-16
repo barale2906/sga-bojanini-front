@@ -19,6 +19,11 @@
   mat-icon { font-size: 3rem; width: 3rem; height: 3rem; display: block; margin: 0 auto 0.5rem; }
 }
 
+.chart-sensor-row {
+  margin-bottom: 1.25rem;
+  .sensor-sel-field { width: 100%; max-width: 380px; }
+}
+
 .chart-header {
   display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 1.5rem;
   h3 { margin: 0 0 0.25rem; }

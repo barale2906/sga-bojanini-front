@@ -1,4 +1,4 @@
-import { Component, inject, signal, OnInit } from '@angular/core';
+import { Component, inject, signal, OnInit, Input } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterModule } from '@angular/router';
 import { FormBuilder, ReactiveFormsModule } from '@angular/forms';
@@ -48,6 +48,8 @@ import { DateFormatPipe } from '../../../shared/pipes/date-format.pipe';
   styleUrl: './user-list.component.scss',
 })
 export class UserListComponent implements OnInit {
+  @Input() embeddedMode = false;
+
   private userService = inject(UserService);
   private dialog = inject(MatDialog);
   private snackBar = inject(MatSnackBar);

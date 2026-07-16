@@ -3,128 +3,196 @@
   [subtitle]="isEdit() ? 'Modifica los datos del usuario' : 'Crea un nuevo usuario del sistema'"
   icon="person"
 >
-  <button mat-button routerLink="/users">
+  <button mat-button routerLink="/admin">
     <mat-icon>arrow_back</mat-icon>
     Volver
   </button>
 </app-page-header>
 
-<div class="form-container">
-  <mat-card>
-    <mat-card-content>
+<div class="wizard-container">
 
-      <app-form-errors [errors]="validationErrors()"></app-form-errors>
+  @if (loading()) {
+    <div class="loading-center">
+      <mat-spinner diameter="40"></mat-spinner>
+    </div>
+  }
 
-      @if (loading()) {
-        <div class="loading-center">
-          <mat-spinner diameter="40"></mat-spinner>
-        </div>
-      }
+  <mat-stepper [linear]="!isEdit()" orientation="horizontal" #stepper>
 
-      <form [formGroup]="form" (ngSubmit)="onSubmit()" novalidate>
-        <div class="form-grid">
+    <!-- ── Paso 1: Datos básicos ── -->
+    <mat-step [stepControl]="step1" label="Datos básicos">
+      <ng-template matStepLabel>
+        <span class="step-label"><mat-icon>person</mat-icon> Datos básicos</span>
+      </ng-template>
 
-          <!-- Nombre -->
-          <mat-form-field appearance="outline" class="col-span-2">
-            <mat-label>Nombre completo *</mat-label>
-            <mat-icon matPrefix>badge</mat-icon>
-            <input matInput formControlName="name" placeholder="Juan Pérez" />
-            @if (form.get('name')?.hasError('required') && form.get('name')?.touched) {
-              <mat-error>El nombre es requerido</mat-error>
-            }
-            @if (fieldErrors()['name']) {
-              <mat-error>{{ fieldErrors()['name'][0] }}</mat-error>
-            }
-          </mat-form-field>
+      <mat-card class="step-card">
+        <mat-card-content>
 
-          <!-- Email -->
-          <mat-form-field appearance="outline">
-            <mat-label>Correo electrónico *</mat-label>
-            <mat-icon matPrefix>email</mat-icon>
-            <input matInput type="email" formControlName="email" placeholder="usuario@bojanini.com" />
-            @if (form.get('email')?.hasError('email') && form.get('email')?.touched) {
-              <mat-error>Ingresa un email válido</mat-error>
-            }
-            @if (fieldErrors()['email']) {
-              <mat-error>{{ fieldErrors()['email'][0] }}</mat-error>
-            }
-          </mat-form-field>
+          <app-form-errors [errors]="validationErrors()"></app-form-errors>
 
-          <!-- Teléfono -->
-          <mat-form-field appearance="outline">
-            <mat-label>Teléfono</mat-label>
-            <mat-icon matPrefix>phone</mat-icon>
-            <input matInput formControlName="phone" placeholder="+573001234567" />
-          </mat-form-field>
+          <form [formGroup]="step1" novalidate>
+            <div class="form-grid">
 
-          <!-- Contraseña -->
-          <mat-form-field appearance="outline">
-            <mat-label>{{ isEdit() ? 'Nueva contraseña (dejar vacío para no cambiar)' : 'Contraseña *' }}</mat-label>
-            <mat-icon matPrefix>lock</mat-icon>
-            <input matInput [type]="showPassword() ? 'text' : 'password'" formControlName="password" />
-            <button mat-icon-button matSuffix type="button" (click)="showPassword.update(v => !v)">
-              <mat-icon>{{ showPassword() ? 'visibility_off' : 'visibility' }}</mat-icon>
-            </button>
-            @if (form.get('password')?.hasError('minlength') && form.get('password')?.touched) {
-              <mat-error>Mínimo 8 caracteres</mat-error>
-            }
-            @if (fieldErrors()['password']) {
-              <mat-error>{{ fieldErrors()['password'][0] }}</mat-error>
-            }
-          </mat-form-field>
+              <mat-form-field appearance="outline" class="col-span-2">
+                <mat-label>Nombre completo *</mat-label>
+                <mat-icon matPrefix>badge</mat-icon>
+                <input matInput formControlName="name" placeholder="Juan Pérez" />
+                @if (step1.get('name')?.hasError('required') && step1.get('name')?.touched) {
+                  <mat-error>El nombre es requerido</mat-error>
+                }
+                @if (fieldErrors()['name']) {
+                  <mat-error>{{ fieldErrors()['name'][0] }}</mat-error>
+                }
+              </mat-form-field>
 
-          <!-- Roles -->
-          <mat-form-field appearance="outline">
-            <mat-label>Roles</mat-label>
-            <mat-icon matPrefix>manage_accounts</mat-icon>
-            <mat-select formControlName="role_ids" multiple>
-              @for (role of roles(); track role.id) {
-                <mat-option [value]="role.id">{{ role.name }}</mat-option>
+              <mat-form-field appearance="outline">
+                <mat-label>Correo electrónico *</mat-label>
+                <mat-icon matPrefix>email</mat-icon>
+                <input matInput type="email" formControlName="email" placeholder="usuario@bojanini.com" />
+                @if (step1.get('email')?.hasError('email') && step1.get('email')?.touched) {
+                  <mat-error>Ingresa un email válido</mat-error>
+                }
+                @if (fieldErrors()['email']) {
+                  <mat-error>{{ fieldErrors()['email'][0] }}</mat-error>
+                }
+              </mat-form-field>
+
+              <mat-form-field appearance="outline">
+                <mat-label>Teléfono</mat-label>
+                <mat-icon matPrefix>phone</mat-icon>
+                <input matInput formControlName="phone" placeholder="+573001234567" />
+              </mat-form-field>
+
+              <mat-form-field appearance="outline">
+                <mat-label>{{ isEdit() ? 'Nueva contraseña (dejar vacío para no cambiar)' : 'Contraseña *' }}</mat-label>
+                <mat-icon matPrefix>lock</mat-icon>
+                <input matInput [type]="showPassword() ? 'text' : 'password'" formControlName="password" />
+                <button mat-icon-button matSuffix type="button" (click)="showPassword.update(v => !v)">
+                  <mat-icon>{{ showPassword() ? 'visibility_off' : 'visibility' }}</mat-icon>
+                </button>
+                @if (step1.get('password')?.hasError('minlength') && step1.get('password')?.touched) {
+                  <mat-error>Mínimo 8 caracteres</mat-error>
+                }
+                @if (fieldErrors()['password']) {
+                  <mat-error>{{ fieldErrors()['password'][0] }}</mat-error>
+                }
+              </mat-form-field>
+
+              <mat-form-field appearance="outline">
+                <mat-label>Roles</mat-label>
+                <mat-icon matPrefix>manage_accounts</mat-icon>
+                <mat-select formControlName="role_ids" multiple>
+                  @for (role of roles(); track role.id) {
+                    <mat-option [value]="role.id">{{ role.name }}</mat-option>
+                  }
+                </mat-select>
+              </mat-form-field>
+
+              <div class="toggle-field">
+                <label>Estado</label>
+                <mat-slide-toggle formControlName="is_active" color="primary">
+                  {{ step1.get('is_active')?.value ? 'Activo' : 'Inactivo' }}
+                </mat-slide-toggle>
+              </div>
+
+            </div>
+          </form>
+
+        </mat-card-content>
+      </mat-card>
+
+      <div class="step-actions">
+        <button mat-button type="button" routerLink="/admin" [disabled]="saving()">
+          Cancelar
+        </button>
+        <button mat-raised-button color="primary" matStepperNext [disabled]="step1.invalid">
+          Siguiente
+          <mat-icon>arrow_forward</mat-icon>
+        </button>
+      </div>
+    </mat-step>
+
+    <!-- ── Paso 2: Asignación de recursos (opcional) ── -->
+    <mat-step label="Recursos" [optional]="true">
+      <ng-template matStepLabel>
+        <span class="step-label"><mat-icon>folder_shared</mat-icon> Recursos</span>
+      </ng-template>
+
+      <mat-card class="step-card">
+        <mat-card-content>
+
+          <p class="step-hint">
+            <mat-icon>info</mat-icon>
+            Este paso es opcional. Puedes asignar almacenes y equipos de monitoreo al usuario.
+            Los usuarios de monitoreo solo necesitan sensores asignados.
+          </p>
+
+          <form [formGroup]="step2" novalidate>
+            <div class="form-grid">
+
+              @if (canAssignWarehouses()) {
+                <mat-form-field appearance="outline" class="col-span-2">
+                  <mat-label>Almacenes</mat-label>
+                  <mat-icon matPrefix>warehouse</mat-icon>
+                  <mat-select formControlName="warehouse_ids" multiple>
+                    @for (warehouse of warehouses(); track warehouse.id) {
+                      <mat-option [value]="warehouse.id">{{ warehouse.name }}</mat-option>
+                    }
+                  </mat-select>
+                  <mat-hint>Almacenes a los que este usuario tendrá acceso</mat-hint>
+                </mat-form-field>
               }
-            </mat-select>
-          </mat-form-field>
 
-          <!-- Almacenes -->
-          <mat-form-field appearance="outline" *sgaPermission="'almacenes.asignar'">
-            <mat-label>Almacenes</mat-label>
-            <mat-icon matPrefix>warehouse</mat-icon>
-            <mat-select formControlName="warehouse_ids" multiple>
-              @for (warehouse of warehouses(); track warehouse.id) {
-                <mat-option [value]="warehouse.id">{{ warehouse.name }}</mat-option>
+              @if (canAssignSensors()) {
+                <mat-form-field appearance="outline" class="col-span-2">
+                  <mat-label>Equipos de monitoreo</mat-label>
+                  <mat-icon matPrefix>sensors</mat-icon>
+                  <mat-select formControlName="sensor_ids" multiple>
+                    @for (sensor of sensors(); track sensor.id) {
+                      <mat-option [value]="sensor.id">
+                        {{ sensor.name }} — {{ sensor.code }}
+                        @if (sensor.zone) {
+                          <span class="sensor-zone">({{ sensor.zone.name }})</span>
+                        }
+                      </mat-option>
+                    }
+                  </mat-select>
+                  <mat-hint>Sensores a los que este usuario tendrá acceso</mat-hint>
+                </mat-form-field>
               }
-            </mat-select>
-            <mat-hint>Almacenes a los que este usuario tendrá acceso</mat-hint>
-          </mat-form-field>
 
-<!-- Estado -->
-          <div class="toggle-field">
-            <label>Estado</label>
-            <mat-slide-toggle formControlName="is_active" color="primary">
-              {{ form.get('is_active')?.value ? 'Activo' : 'Inactivo' }}
-            </mat-slide-toggle>
-          </div>
+              @if (!canAssignWarehouses() && !canAssignSensors()) {
+                <div class="no-resources-msg">
+                  <mat-icon>lock</mat-icon>
+                  <p>No tienes permisos para asignar almacenes ni sensores.</p>
+                </div>
+              }
 
-        </div>
+            </div>
+          </form>
 
-        <!-- Actions -->
-        <div class="form-actions">
-          <button mat-button type="button" routerLink="/users" [disabled]="saving()">
-            Cancelar
-          </button>
-          <button
-            mat-raised-button
-            color="primary"
-            type="submit"
-            [disabled]="form.invalid || saving()"
-          >
-            @if (saving()) {
-              <mat-spinner diameter="18" color="accent"></mat-spinner>
-            }
-            {{ isEdit() ? 'Guardar Cambios' : 'Crear Usuario' }}
-          </button>
-        </div>
+        </mat-card-content>
+      </mat-card>
 
-      </form>
-    </mat-card-content>
-  </mat-card>
+      <div class="step-actions">
+        <button mat-button type="button" matStepperPrevious [disabled]="saving()">
+          <mat-icon>arrow_back</mat-icon>
+          Anterior
+        </button>
+        <button
+          mat-raised-button
+          color="primary"
+          type="button"
+          (click)="onSubmit()"
+          [disabled]="step1.invalid || saving()"
+        >
+          @if (saving()) {
+            <mat-spinner diameter="18" color="accent"></mat-spinner>
+          }
+          {{ isEdit() ? 'Guardar Cambios' : 'Crear Usuario' }}
+        </button>
+      </div>
+    </mat-step>
+
+  </mat-stepper>
 </div>

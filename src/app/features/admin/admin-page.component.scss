@@ -1,0 +1,15 @@
+.tab-content {
+  padding: 1rem 0;
+}
+
+.tab-icon {
+  margin-right: 0.4rem;
+  vertical-align: middle;
+  font-size: 1.1rem;
+  width: 1.1rem;
+  height: 1.1rem;
+}
+
+::ng-deep .mat-mdc-tab-body-content {
+  overflow: visible !important;
+}

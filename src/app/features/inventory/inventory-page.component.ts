@@ -106,7 +106,7 @@ export class InventoryPageComponent implements OnInit {
   batches = signal<Batch[]>([]);
   batchMeta = signal<PaginationMeta>({ current_page: 1, last_page: 1, per_page: 25, total: 0 });
   expiringBatches = signal<Batch[]>([]);
-  batchCols = ['actions', 'lot_number', 'product', 'status', 'quantity', 'expiration_date', 'days'];
+  batchCols = ['lot_number', 'product', 'warehouse', 'status', 'quantity', 'expiration_date', 'days'];
   batchFilters = this.fb.group({ status: [''], warehouse_id: [''], generic_product_id: [''] });
   batchFilterProduct = signal<Product | null>(null);
 

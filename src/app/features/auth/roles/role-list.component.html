@@ -1,14 +1,30 @@
-<app-page-header title="Roles" subtitle="Gestión de roles y permisos" icon="manage_accounts">
-  <button
-    *sgaPermission="'roles.crear'"
-    mat-raised-button
-    color="primary"
-    (click)="openForm()"
-  >
-    <mat-icon>add</mat-icon>
-    Nuevo Rol
-  </button>
-</app-page-header>
+@if (!embeddedMode) {
+  <app-page-header title="Roles" subtitle="Gestión de roles y permisos" icon="manage_accounts">
+    <button
+      *sgaPermission="'roles.crear'"
+      mat-raised-button
+      color="primary"
+      (click)="openForm()"
+    >
+      <mat-icon>add</mat-icon>
+      Nuevo Rol
+    </button>
+  </app-page-header>
+}
+
+@if (embeddedMode) {
+  <div class="embedded-toolbar">
+    <button
+      *sgaPermission="'roles.crear'"
+      mat-raised-button
+      color="primary"
+      (click)="openForm()"
+    >
+      <mat-icon>add</mat-icon>
+      Nuevo Rol
+    </button>
+  </div>
+}
 
 <app-loading-spinner [loading]="loading()" [inline]="true"></app-loading-spinner>
 

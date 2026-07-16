@@ -1,14 +1,30 @@
-<app-page-header title="Usuarios" subtitle="Gestión de usuarios del sistema" icon="people">
-  <button
-    *sgaPermission="'usuarios.crear'"
-    mat-raised-button
-    color="primary"
-    routerLink="/users/new"
-  >
-    <mat-icon>add</mat-icon>
-    Nuevo Usuario
-  </button>
-</app-page-header>
+@if (!embeddedMode) {
+  <app-page-header title="Usuarios" subtitle="Gestión de usuarios del sistema" icon="people">
+    <button
+      *sgaPermission="'usuarios.crear'"
+      mat-raised-button
+      color="primary"
+      routerLink="/users/new"
+    >
+      <mat-icon>add</mat-icon>
+      Nuevo Usuario
+    </button>
+  </app-page-header>
+}
+
+@if (embeddedMode) {
+  <div class="embedded-toolbar">
+    <button
+      *sgaPermission="'usuarios.crear'"
+      mat-raised-button
+      color="primary"
+      routerLink="/users/new"
+    >
+      <mat-icon>add</mat-icon>
+      Nuevo Usuario
+    </button>
+  </div>
+}
 
 <!-- Filters -->
 <div class="filters-bar" [formGroup]="filters">

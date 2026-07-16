@@ -13,8 +13,6 @@ import { MatDialog } from '@angular/material/dialog';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { MonitoringService, Sensor, SensorStats } from './monitoring.service';
 import { WarehouseService, Warehouse, Zone } from '../warehouse/warehouse.service';
-import { UserService } from '../auth/users/user.service';
-import { AuthService } from '../../core/services/auth.service';
 import { PageHeaderComponent } from '../../shared/components/page-header/page-header.component';
 import { LoadingSpinnerComponent } from '../../shared/components/loading-spinner/loading-spinner.component';
 import { PermissionDirective } from '../../shared/directives/permission.directive';
@@ -39,8 +37,6 @@ import { SpcChartComponent } from './spc-chart/spc-chart.component';
 export class MonitoringPageComponent implements OnInit {
   private svc = inject(MonitoringService);
   private wSvc = inject(WarehouseService);
-  private userSvc = inject(UserService);
-  private authSvc = inject(AuthService);
   private dialog = inject(MatDialog);
   private snack = inject(MatSnackBar);
   private fb = inject(FormBuilder);
@@ -53,6 +49,7 @@ export class MonitoringPageComponent implements OnInit {
   stats = signal<SensorStats | null>(null);
   loading = signal(false);
   loadingStats = signal(false);
+  activeTab = signal(0);
 
   sensorCols = ['actions', 'code', 'name', 'zone', 'type', 'is_active'];
   sensorFilters = this.fb.group({ zone_id: [''], type: [''] });
@@ -70,9 +67,7 @@ export class MonitoringPageComponent implements OnInit {
   }
 
   loadSensors(): void {
-    const userId = this.authSvc.user()?.id;
-    if (!userId) return;
-    this.userSvc.getSensors(userId).subscribe({
+    this.svc.getSensors().subscribe({
       next: r => { this.allSensors.set(r.data ?? []); this.applyFilters(); },
       error: () => {},
     });
@@ -122,7 +117,16 @@ export class MonitoringPageComponent implements OnInit {
 
   selectSensorForChart(sensor: Sensor): void {
     this.selectedSensor.set(sensor);
+    this.activeTab.set(1);
     this.loadStats();
+  }
+
+  onSensorSelectChange(sensorId: number): void {
+    const sensor = this.sensors().find(s => s.id === sensorId);
+    if (sensor) {
+      this.selectedSensor.set(sensor);
+      this.loadStats();
+    }
   }
 
   loadStats(): void {

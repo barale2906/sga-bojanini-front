@@ -1,7 +1,8 @@
 <app-page-header title="Monitoreo Ambiental" subtitle="Sensores, lecturas y control estadístico" icon="thermostat">
 </app-page-header>
 
-<mat-tab-group color="primary" animationDuration="200ms">
+<mat-tab-group color="primary" animationDuration="200ms"
+  [selectedIndex]="activeTab()" (selectedIndexChange)="activeTab.set($event)">
 
   <!-- Sensores -->
   <mat-tab label="Sensores">
@@ -62,10 +63,26 @@
   <!-- Gráfico SPC -->
   <mat-tab label="Control Estadístico (SPC)">
     <div class="tab-body">
+
+      <!-- Selector de equipo (siempre visible, respeta permisos vía sensors()) -->
+      <div class="chart-sensor-row">
+        <mat-form-field appearance="outline" class="sensor-sel-field">
+          <mat-label>Equipo a evaluar</mat-label>
+          <mat-select [value]="selectedSensor()?.id" (selectionChange)="onSensorSelectChange($event.value)">
+            @if (sensors().length === 0) {
+              <mat-option disabled>Sin equipos asignados</mat-option>
+            }
+            @for (s of sensors(); track s.id) {
+              <mat-option [value]="s.id">{{ s.name }} ({{ s.code }})</mat-option>
+            }
+          </mat-select>
+        </mat-form-field>
+      </div>
+
       @if (!selectedSensor()) {
         <div class="empty-state">
           <mat-icon>show_chart</mat-icon>
-          <p>Selecciona un sensor en la pestaña anterior para ver el gráfico de control.</p>
+          <p>Selecciona un equipo para ver el gráfico de control estadístico.</p>
         </div>
       } @else {
         <div class="chart-header">

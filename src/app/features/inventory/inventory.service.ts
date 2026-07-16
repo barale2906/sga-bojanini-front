@@ -17,6 +17,8 @@ export interface Batch {
   status: 'active' | 'expired' | 'depleted';
   notes: string | null; received_at: string; days_until_expiry: number | null;
   variant?: VariantWithGeneric | null;
+  accessible_quantity?: number | null;
+  warehouses?: { id: number; code: string; name: string; quantity: number }[] | null;
 }
 
 /** Detalle de lote con ubicaciones físicas (respuesta de /generic-products/{id}/batches y /batches/{id}) */
@@ -40,7 +42,7 @@ export interface BatchLocation {
   location_name: string;
   location_code: string;
   quantity: number;
-  zone: { zone_id: number; zone_name: string; zone_code: string; warehouse_id: number } | null;
+  zone: { zone_id: number; zone_name: string; zone_code: string; warehouse_id: number; warehouse_name: string | null; warehouse_code: string | null } | null;
 }
 
 /** Respuesta de GET /stock/summary */

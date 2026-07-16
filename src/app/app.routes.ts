@@ -27,14 +27,7 @@ export const routes: Routes = [
         data: { title: 'Dashboard' },
       },
 
-      // Usuarios
-      {
-        path: 'users',
-        loadComponent: () =>
-          import('./features/auth/users/user-list.component').then((m) => m.UserListComponent),
-        canActivate: [permissionGuard],
-        data: { title: 'Usuarios', permission: 'usuarios.ver' },
-      },
+      // Formulario de usuario (wizard)
       {
         path: 'users/new',
         loadComponent: () =>
@@ -50,14 +43,16 @@ export const routes: Routes = [
         data: { title: 'Editar Usuario', permission: 'usuarios.editar' },
       },
 
-      // Roles
+      // Administración (usuarios + roles con tabs)
       {
-        path: 'roles',
+        path: 'admin',
         loadComponent: () =>
-          import('./features/auth/roles/role-list.component').then((m) => m.RoleListComponent),
+          import('./features/admin/admin-page.component').then((m) => m.AdminPageComponent),
         canActivate: [permissionGuard],
-        data: { title: 'Roles', permission: 'roles.ver' },
+        data: { title: 'Administración', permission: 'usuarios.ver' },
       },
+      { path: 'users', redirectTo: 'admin', pathMatch: 'full' },
+      { path: 'roles', redirectTo: 'admin', pathMatch: 'full' },
 
       // Perfil y contraseña
       {

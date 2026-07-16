@@ -1,0 +1,29 @@
+<app-page-header
+  title="Administración"
+  subtitle="Gestión de usuarios y roles del sistema"
+  icon="admin_panel_settings"
+></app-page-header>
+
+<mat-tab-group animationDuration="200ms" color="primary">
+
+  <mat-tab>
+    <ng-template mat-tab-label>
+      <mat-icon class="tab-icon">people</mat-icon>
+      Usuarios
+    </ng-template>
+    <div class="tab-content">
+      <app-user-list [embeddedMode]="true"></app-user-list>
+    </div>
+  </mat-tab>
+
+  <mat-tab>
+    <ng-template mat-tab-label>
+      <mat-icon class="tab-icon">manage_accounts</mat-icon>
+      Roles
+    </ng-template>
+    <div class="tab-content">
+      <app-role-list [embeddedMode]="true"></app-role-list>
+    </div>
+  </mat-tab>
+
+</mat-tab-group>

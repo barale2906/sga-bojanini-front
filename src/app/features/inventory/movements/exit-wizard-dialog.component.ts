@@ -13,7 +13,7 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { MatDividerModule } from '@angular/material/divider';
 import { DateAdapter, MAT_DATE_FORMATS } from '@angular/material/core';
-import { forkJoin, finalize } from 'rxjs';
+import { forkJoin, finalize, switchMap, of } from 'rxjs';
 import { InventoryService, StockSummary, BatchDetail, CostCenter, MovementDocument } from '../inventory.service';
 import { MovementConfirmDialogComponent, MovementConfirmResult } from './movement-confirm-dialog.component';
 import { MovementPdfSignature } from '../../../shared/services/movement-pdf.service';
@@ -457,6 +457,20 @@ export class ExitWizardDialogComponent implements OnInit {
         const cc = this.costCenters().find(c => c.id === cv.cost_center_id);
         const previewLines = this.dispatchPreview();
 
+        const summaryLines: ExitSummaryLine[] = flatMovements.length > 0
+          ? flatMovements.map(m => ({
+              product_name:    m.product_name ?? m.product?.name ?? '—',
+              lot_number:      m.batch_lot_number,
+              expiration_date: m.batch_expiration_date,
+              quantity:        Math.abs(m.quantity),
+            }))
+          : previewLines.map(line => ({
+              product_name:    line.product_name,
+              lot_number:      line.lot_number,
+              expiration_date: line.expiration_date,
+              quantity:        line.quantity,
+            }));
+
         this.exitSummaryData.set({
           doc_id:           document.id,
           doc_number:       document.document_number,
@@ -465,12 +479,7 @@ export class ExitWizardDialogComponent implements OnInit {
           warehouse_name:   wh?.name ?? `Almacén ${wId}`,
           cost_center_name: cc?.name ?? null,
           reason:           cv.reason || null,
-          lines: previewLines.map(line => ({
-            product_name:    line.product_name,
-            lot_number:      line.lot_number,
-            expiration_date: line.expiration_date,
-            quantity:        line.quantity,
-          })),
+          lines:            summaryLines,
           withRecords: false,
         });
 
@@ -525,7 +534,12 @@ export class ExitWizardDialogComponent implements OnInit {
               notes:               rv.notes || undefined,
               seller:              pd.seller || undefined,
               referrer:            pd.referrer || undefined,
-            })
+            }).pipe(
+              switchMap(res => rv.notes
+                ? this.medSvc.createEvolution(res.data.id, { content: rv.notes })
+                : of(null)
+              )
+            )
           );
           forkJoin(recordCalls).subscribe({
             next:  () => afterMovements(true),

@@ -47,8 +47,8 @@ export class MenuService {
     'reports.index': '/reports',
     'audit.index': '/audit',
     // Administración
-    'users.index': '/users',
-    'roles.index': '/roles',
+    'users.index': '/admin',
+    'roles.index': '/admin',
   };
 
   constructor(private http: HttpClient) {
