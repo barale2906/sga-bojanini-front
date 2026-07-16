@@ -130,7 +130,7 @@
           </ng-container>
 
           <tr mat-header-row *matHeaderRowDef="batchCols"></tr>
-          <tr mat-row *matRowDef="let r; columns: batchCols;"></tr>
+          <tr mat-row *matRowDef="let r; columns: batchCols;" [ngClass]="getBatchRowClass(r)"></tr>
           <tr class="mat-row" *matNoDataRow><td class="no-data" [attr.colspan]="batchCols.length">Sin lotes registrados</td></tr>
         </table>
         <mat-paginator [length]="batchMeta().total" [pageSize]="batchMeta().per_page" [pageIndex]="batchMeta().current_page - 1" [pageSizeOptions]="[10,25,50]" (page)="onBatchPage($event)" showFirstLastButtons></mat-paginator>

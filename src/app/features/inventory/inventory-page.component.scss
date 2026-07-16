@@ -42,3 +42,6 @@
 .no-data { text-align: center; padding: 2.5rem; color: #a0aec0; }
 .wh-row { display: flex; align-items: center; gap: 0.35rem; white-space: nowrap; }
 .qty-badge { background: #e2e8f0; color: #2d3748; border-radius: 9999px; font-size: 0.72rem; font-weight: 700; padding: 0 0.4rem; min-width: 1.25rem; text-align: center; }
+
+.row--expired td { background: #fee2e2; font-weight: 700; color: #991b1b; }
+.row--expiring td { background: #fff3e0; font-weight: 700; color: #b45309; }

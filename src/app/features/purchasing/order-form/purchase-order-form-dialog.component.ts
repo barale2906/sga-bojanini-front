@@ -125,9 +125,8 @@ export class PurchaseOrderFormDialogComponent implements OnInit {
         notes: [item.notes || ''],
       }));
       this.variantsMap.update(m => ({ ...m, [i]: [] }));
-      // El product del item es el producto genérico (product?.id = generic_id)
-      const product = (this.data.products as Product[] ?? []).find(p => p.id === item.product?.id) ?? null;
-      const genericId = item.product?.id ?? null;
+      const product = (this.data.products as Product[] ?? []).find(p => p.id === item.variant?.generic?.id) ?? null;
+      const genericId = item.variant?.generic?.id ?? null;
       this.rowSelectedProducts.update(arr => { const a = [...arr]; a[i] = product; return a; });
       this.rowGenericIds.update(arr => { const a = [...arr]; a[i] = genericId; return a; });
       if (genericId) {

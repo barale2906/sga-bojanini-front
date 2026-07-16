@@ -21,7 +21,7 @@
         </div>
         @if (_linkedPoItem) {
           <div class="po-item-detail">
-            <span><strong>Producto:</strong> {{ _linkedPoItem.product?.name || '—' }}</span>
+            <span><strong>Producto:</strong> {{ _linkedPoItem.variant?.generic?.name || '—' }}</span>
             <span><strong>Solicitado:</strong> {{ _linkedPoItem.quantity_requested }} uds.</span>
             @if ((_linkedPoItem.quantity_received ?? 0) > 0) {
               <span><strong>Recibido prev.:</strong> {{ _linkedPoItem.quantity_received }} uds.</span>
@@ -75,7 +75,7 @@
                   @for (item of _selectedPoItems(); track item.id) {
                     @if ((item.quantity_received ?? 0) < item.quantity_requested) {
                       <mat-option [value]="item.id">
-                        {{ item.product?.name || 'Ítem' }}
+                        {{ item.variant?.generic?.name || 'Ítem' }}
                         — Pedido: {{ item.quantity_requested }}
                         @if ((item.quantity_received ?? 0) > 0) { | Recibido: {{ item.quantity_received }} }
                         <span class="po-item-pending"> (pendiente: {{ item.quantity_requested - (item.quantity_received ?? 0) }})</span>

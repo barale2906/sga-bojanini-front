@@ -135,8 +135,8 @@ export class PurchaseOrderPdfService {
 
     return `<tr>
       <td style="${td}">${idx + 1}</td>
-      <td style="${td}"><code style="font-family:monospace;font-size:10px;background:#EDF2F7;padding:1px 5px;border-radius:3px;">${item.product?.barcode ?? '—'}</code></td>
-      <td style="${tdL}">${item.product?.name ?? '—'}</td>
+      <td style="${td}"><code style="font-family:monospace;font-size:10px;background:#EDF2F7;padding:1px 5px;border-radius:3px;">${item.variant?.generic?.barcode ?? '—'}</code></td>
+      <td style="${tdL}">${item.variant?.generic?.name ?? '—'}</td>
       <td style="${td}">${item.presentation?.name ?? '—'}</td>
       <td style="${td}">${item.quantity_requested}</td>
       ${showReceived ? `<td style="${td}">${item.quantity_received ?? 0}</td>` : ''}

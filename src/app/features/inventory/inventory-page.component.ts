@@ -477,6 +477,13 @@ export class InventoryPageComponent implements OnInit {
     return m[status] || '';
   }
 
+  getBatchRowClass(batch: Batch): string {
+    const days = batch.days_until_expiry;
+    if (batch.status === 'expired' || (days !== null && days !== undefined && days < 0)) return 'row--expired';
+    if (days !== null && days !== undefined && days >= 0 && days < 30) return 'row--expiring';
+    return '';
+  }
+
   getMovIcon(type: string): string {
     return MOV_TYPE_ICONS[type] || 'swap_vert';
   }

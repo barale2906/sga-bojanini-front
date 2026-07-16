@@ -17,7 +17,7 @@ export interface PurchaseOrderItem {
   tax_amount?: number | string;
   total_price?: number | string;
   notes?: string;
-  product?: { id: number; barcode: string; name: string };
+  variant?: { id: number; lab_brand: string; brand_sku: string; generic?: { id: number; name: string; barcode: string } };
   presentation?: { id: number; name: string; factor_to_base: number };
   subtotal?: number;
 }

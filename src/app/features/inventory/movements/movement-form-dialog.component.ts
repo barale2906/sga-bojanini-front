@@ -449,9 +449,13 @@ export class MovementFormDialogComponent implements OnInit {
             next: r => {
               const active = r.data.filter(v => v.is_active);
               this.variants.set(active);
-              // Auto-seleccionar si solo hay una variante activa
-              if (active.length === 1) {
-                this.form.patchValue({ product_variant_id: active[0].id }, { emitEvent: false });
+              // Pre-seleccionar la variante de la OC vinculada, o la única activa
+              const linkedVariantId = this._linkedPoItem?.variant?.id;
+              const variantToSelect = linkedVariantId
+                ? active.find(v => v.id === linkedVariantId)?.id
+                : (active.length === 1 ? active[0].id : undefined);
+              if (variantToSelect) {
+                this.form.patchValue({ product_variant_id: variantToSelect }, { emitEvent: false });
               }
               this.loadingVariants.set(false);
             },
@@ -533,10 +537,10 @@ export class MovementFormDialogComponent implements OnInit {
       const qty = pendingQty > 0 ? pendingQty : item.quantity_requested;
 
       this.form.patchValue({ warehouse_id: order.warehouse_id });
-      this.form.patchValue({ product_id: item.product?.id });
+      this.form.patchValue({ product_id: item.variant?.generic?.id });
 
       // Sincronizar el buscador con el producto de la OC
-      const product = this.data.products.find(p => p.id === item.product?.id) ?? null;
+      const product = this.data.products.find(p => p.id === item.variant?.generic?.id) ?? null;
       this._selectedProductFull.set(product);
 
       if (item.product_presentation_id) {
@@ -620,10 +624,10 @@ export class MovementFormDialogComponent implements OnInit {
     const pendingQty = item.quantity_requested - (item.quantity_received ?? 0);
     const qty = pendingQty > 0 ? pendingQty : item.quantity_requested;
 
-    this.form.patchValue({ product_id: item.product?.id });
+    this.form.patchValue({ product_id: item.variant?.generic?.id });
 
     // Sincronizar el buscador con el producto de la OC
-    const product = this.data.products.find(p => p.id === item.product?.id) ?? null;
+    const product = this.data.products.find(p => p.id === item.variant?.generic?.id) ?? null;
     this._selectedProductFull.set(product);
 
     if (item.product_presentation_id) {
