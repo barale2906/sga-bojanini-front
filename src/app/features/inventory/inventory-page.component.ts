@@ -23,7 +23,7 @@ import { MatSnackBar } from '@angular/material/snack-bar';
 import { InventoryService, Batch, StockItem, Movement, MovementSignatureRecord, MovementDocument } from './inventory.service';
 import { MovementPdfService, MovementPdfSignature } from '../../shared/services/movement-pdf.service';
 import { WarehouseService, Warehouse, Location } from '../warehouse/warehouse.service';
-import { CatalogService, Product } from '../catalog/catalog.service';
+import { CatalogService, Category, Product } from '../catalog/catalog.service';
 import { PaginationMeta } from '../../core/models/api-response.model';
 import { PageHeaderComponent } from '../../shared/components/page-header/page-header.component';
 import { LoadingSpinnerComponent } from '../../shared/components/loading-spinner/loading-spinner.component';
@@ -44,6 +44,7 @@ interface MovementRow {
   movement_document_id: number | null;
   movement_type: string;
   product_name: string;
+  category_name: string;
   lot_number: string | null;
   expiration_date: string | null;
   warehouse_name: string;
@@ -106,24 +107,25 @@ export class InventoryPageComponent implements OnInit {
   batches = signal<Batch[]>([]);
   batchMeta = signal<PaginationMeta>({ current_page: 1, last_page: 1, per_page: 25, total: 0 });
   expiringBatches = signal<Batch[]>([]);
-  batchCols = ['lot_number', 'product', 'warehouse', 'status', 'quantity', 'expiration_date', 'days'];
-  batchFilters = this.fb.group({ status: [''], warehouse_id: [''], generic_product_id: [''] });
+  batchCols = ['lot_number', 'product', 'category', 'warehouse', 'status', 'quantity', 'expiration_date', 'days'];
+  batchFilters = this.fb.group({ status: [''], warehouse_id: [''], category_id: [''], generic_product_id: [''] });
   batchFilterProduct = signal<Product | null>(null);
 
   // Stock
   stock = signal<StockItem[]>([]);
   stockMeta = signal<PaginationMeta>({ current_page: 1, last_page: 1, per_page: 25, total: 0 });
   lowStock = signal<StockItem[]>([]);
-  stockCols = ['product', 'warehouse', 'available', 'total', 'last_movement'];
-  stockFilters = this.fb.group({ warehouse_id: [''], generic_product_id: [''] });
+  stockCols = ['product', 'category', 'warehouse', 'available', 'total', 'last_movement'];
+  stockFilters = this.fb.group({ warehouse_id: [''], category_id: [''], generic_product_id: [''] });
 
   // Movements
   moveDisplayRows = signal<MovementRow[]>([]);
   moveMeta = signal<PaginationMeta>({ current_page: 1, last_page: 1, per_page: 25, total: 0 });
-  moveCols = ['type', 'product', 'lot_number', 'expiration_date', 'warehouse', 'quantity', 'user', 'created_at'];
+  moveCols = ['type', 'product', 'category', 'lot_number', 'expiration_date', 'warehouse', 'quantity', 'user', 'created_at'];
   moveFilters = this.fb.group({
     movement_type: [''],
     warehouse_id: [''],
+    category_id: [''],
     generic_product_id: [''],
     date_from: [null as Date | null],
     date_to: [null as Date | null],
@@ -151,6 +153,7 @@ export class InventoryPageComponent implements OnInit {
   // Data
   warehouses = signal<Warehouse[]>([]);
   products = signal<Product[]>([]);
+  categories = signal<Category[]>([]);
   locations = signal<Location[]>([]);
   loading = signal(false);
 
@@ -189,14 +192,16 @@ export class InventoryPageComponent implements OnInit {
   ngOnInit(): void {
     const pendingOrder = this.poReceiveCtx.consumeOrder();
 
-    // Carga inicial de almacenes y productos; si hay OC pendiente, esperar antes de abrir diálogos
+    // Carga inicial de almacenes, productos y categorías; si hay OC pendiente, esperar antes de abrir diálogos
     forkJoin([
       this.wSvc.getWarehouses(),
       this.cSvc.getProducts({ per_page: 200 }),
+      this.cSvc.getCategories({ is_active: '1' }),
     ]).subscribe({
-      next: ([wRes, pRes]) => {
+      next: ([wRes, pRes, cRes]) => {
         this.warehouses.set(wRes.data);
         this.products.set(pRes.data);
+        this.categories.set(cRes.data);
         if (pendingOrder) {
           this._openPoReceiveSequentially(pendingOrder);
         }
@@ -250,8 +255,15 @@ export class InventoryPageComponent implements OnInit {
   }
 
   loadBatches(page = 1): void {
-    const { status, warehouse_id, generic_product_id } = this.batchFilters.value;
-    this.svc.getBatches({ status: status || undefined, warehouse_id: warehouse_id ? Number(warehouse_id) : undefined, generic_product_id: generic_product_id ? Number(generic_product_id) : undefined, page, per_page: this.batchMeta().per_page }).subscribe({
+    const { status, warehouse_id, category_id, generic_product_id } = this.batchFilters.value;
+    this.svc.getBatches({
+      status:             status             || undefined,
+      warehouse_id:       warehouse_id       ? Number(warehouse_id)      : undefined,
+      category_id:        category_id        ? Number(category_id)       : undefined,
+      generic_product_id: generic_product_id ? Number(generic_product_id): undefined,
+      page,
+      per_page: this.batchMeta().per_page,
+    }).subscribe({
       next: r => { this.batches.set(r.data ?? []); this.batchMeta.set(r.meta); },
       error: () => {},
     });
@@ -262,9 +274,15 @@ export class InventoryPageComponent implements OnInit {
   }
 
   loadStock(page = 1): void {
-    const { warehouse_id, generic_product_id } = this.stockFilters.value;
+    const { warehouse_id, category_id, generic_product_id } = this.stockFilters.value;
     this.loading.set(true);
-    this.svc.getStock({ warehouse_id: warehouse_id ? Number(warehouse_id) : undefined, generic_product_id: generic_product_id ? Number(generic_product_id) : undefined, page, per_page: this.stockMeta().per_page }).subscribe({
+    this.svc.getStock({
+      warehouse_id:       warehouse_id       ? Number(warehouse_id)       : undefined,
+      category_id:        category_id        ? Number(category_id)        : undefined,
+      generic_product_id: generic_product_id ? Number(generic_product_id) : undefined,
+      page,
+      per_page: this.stockMeta().per_page,
+    }).subscribe({
       next: r => { this.stock.set((r.data ?? []).filter(s => s.available_quantity > 0)); this.stockMeta.set(r.meta); this.loading.set(false); },
       error: () => this.loading.set(false),
     });
@@ -275,10 +293,11 @@ export class InventoryPageComponent implements OnInit {
   }
 
   loadMovements(page = 1): void {
-    const { movement_type, warehouse_id, generic_product_id, date_from, date_to } = this.moveFilters.value;
+    const { movement_type, warehouse_id, category_id, generic_product_id, date_from, date_to } = this.moveFilters.value;
     this.svc.getMovements({
       movement_type:      movement_type      || undefined,
       warehouse_id:       warehouse_id       ? Number(warehouse_id)       : undefined,
+      category_id:        category_id        ? Number(category_id)        : undefined,
       generic_product_id: generic_product_id ? Number(generic_product_id) : undefined,
       date_from:     date_from     ? this.toApiDate(date_from)  : undefined,
       date_to:       date_to       ? this.toApiDate(date_to)    : undefined,
@@ -293,6 +312,7 @@ export class InventoryPageComponent implements OnInit {
           // product_name ya no siempre viene en el listado (nuevo modelo genérico+variante);
           // variant_lab_brand es el fallback cuando el backend no carga el genérico completo.
           product_name: m.product_name || m.product?.name || m.variant_lab_brand || '—',
+          category_name: m.category_name ?? '—',
           lot_number: m.batch_lot_number ?? null,
           expiration_date: m.batch_expiration_date ?? null,
           // m.warehouse?.name evita la race condition con el forkJoin de almacenes en ngOnInit.

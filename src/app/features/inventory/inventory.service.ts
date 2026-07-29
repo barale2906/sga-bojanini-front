@@ -7,7 +7,7 @@ import { ApiResponse, PaginatedResponse } from '../../core/models/api-response.m
 export interface VariantWithGeneric {
   id: number;
   lab_brand: string | null;
-  generic: { id: number; barcode: string; name: string } | null;
+  generic: { id: number; barcode: string; name: string; category_id?: number; category?: { id: number; name: string } } | null;
 }
 
 export interface Batch {
@@ -158,6 +158,8 @@ export interface Movement {
   cost_center?: { id: number; code: string; name: string; type: string };
   medical_service?: { id: number; code: string; name: string };
   product?: { id: number; barcode: string; name: string };
+  category_id?: number | null;
+  category_name?: string | null;
   warehouse?: { id: number; name: string };
 }
 
@@ -192,10 +194,11 @@ export class InventoryService {
   private api = environment.apiUrl;
 
   // Batches
-  getBatches(f: { product_variant_id?: number; generic_product_id?: number; status?: string; warehouse_id?: number; per_page?: number; page?: number } = {}): Observable<PaginatedResponse<Batch>> {
+  getBatches(f: { product_variant_id?: number; generic_product_id?: number; category_id?: number; status?: string; warehouse_id?: number; per_page?: number; page?: number } = {}): Observable<PaginatedResponse<Batch>> {
     let p = new HttpParams();
     if (f.product_variant_id)  p = p.set('product_variant_id',  String(f.product_variant_id));
     if (f.generic_product_id)  p = p.set('generic_product_id',  String(f.generic_product_id));
+    if (f.category_id)         p = p.set('category_id',         String(f.category_id));
     if (f.status)              p = p.set('status', f.status);
     if (f.warehouse_id)        p = p.set('warehouse_id',         String(f.warehouse_id));
     if (f.per_page)            p = p.set('per_page',             String(f.per_page));
@@ -232,10 +235,11 @@ export class InventoryService {
   }
 
   // Stock
-  getStock(f: { warehouse_id?: number; generic_product_id?: number; per_page?: number; page?: number } = {}): Observable<PaginatedResponse<StockItem>> {
+  getStock(f: { warehouse_id?: number; generic_product_id?: number; category_id?: number; per_page?: number; page?: number } = {}): Observable<PaginatedResponse<StockItem>> {
     let p = new HttpParams();
-    if (f.warehouse_id) p = p.set('warehouse_id', String(f.warehouse_id));
-    if (f.generic_product_id) p = p.set('generic_product_id', String(f.generic_product_id));
+    if (f.warehouse_id)        p = p.set('warehouse_id',        String(f.warehouse_id));
+    if (f.generic_product_id)  p = p.set('generic_product_id',  String(f.generic_product_id));
+    if (f.category_id)         p = p.set('category_id',         String(f.category_id));
     if (f.per_page) p = p.set('per_page', String(f.per_page));
     if (f.page) p = p.set('page', String(f.page));
     return this.http.get<PaginatedResponse<StockItem>>(`${this.api}/stock`, { params: p });
@@ -276,6 +280,7 @@ export class InventoryService {
     warehouse_to_id?: number;
     product_variant_id?: number;
     generic_product_id?: number;
+    category_id?: number;
     movement_type?: string;
     cost_center_id?: number;
     cost_center_type?: 'internal' | 'external';
@@ -292,6 +297,7 @@ export class InventoryService {
     if (f.warehouse_to_id)     p = p.set('warehouse_to_id',     String(f.warehouse_to_id));
     if (f.product_variant_id)  p = p.set('product_variant_id',  String(f.product_variant_id));
     if (f.generic_product_id)  p = p.set('generic_product_id',  String(f.generic_product_id));
+    if (f.category_id)         p = p.set('category_id',         String(f.category_id));
     if (f.movement_type)    p = p.set('movement_type',    f.movement_type);
     if (f.cost_center_id)   p = p.set('cost_center_id',   String(f.cost_center_id));
     if (f.cost_center_type) p = p.set('cost_center_type', f.cost_center_type);
