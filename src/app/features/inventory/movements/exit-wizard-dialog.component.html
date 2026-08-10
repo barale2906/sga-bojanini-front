@@ -101,7 +101,7 @@
                 <mat-icon>remove</mat-icon>
               </button>
               <mat-form-field appearance="outline" class="qty-field">
-                <input matInput type="number" [value]="item.quantity" min="1"
+                <input matInput type="number" [value]="item.quantity" min="0.001" step="any"
                        (change)="updateCartQty(i, +$any($event.target).value)" />
               </mat-form-field>
               <button mat-icon-button type="button" class="qty-btn"

@@ -92,7 +92,7 @@
             <!-- Cantidad -->
             <mat-form-field appearance="outline" class="item-qty">
               <mat-label>Cant. *</mat-label>
-              <input matInput type="number" formControlName="quantity" min="1" />
+              <input matInput type="number" formControlName="quantity" min="0.001" step="any" />
               @if (getItemPresName($index)) {
                 <mat-hint>{{ getItemPresName($index) }}</mat-hint>
               }

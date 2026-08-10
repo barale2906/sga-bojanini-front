@@ -302,15 +302,15 @@ export class MovementFormDialogComponent implements OnInit {
     if (this.isEntry) {
       if (this.useDistribution()) return !this.entryRows.invalid && this.entryRows.length > 0;
       if (this.usePresentationMode()) {
-        return !!v.product_presentation_id && !!(v.quantity_in_presentation) && (v.quantity_in_presentation ?? 0) >= 1;
+        return !!v.product_presentation_id && !!(v.quantity_in_presentation) && (v.quantity_in_presentation ?? 0) > 0;
       }
-      return !!(v.quantity_base) && (v.quantity_base ?? 0) >= 1;
+      return !!(v.quantity_base) && (v.quantity_base ?? 0) > 0;
     }
 
     if (this.isTransfer) {
       if (!v.location_from_id) return false;
       if (this.useDistribution()) return !this.transferRows.invalid && this.transferRows.length > 0;
-      return !!v.location_to_id && !!(v.quantity) && (v.quantity ?? 0) >= 1;
+      return !!v.location_to_id && !!(v.quantity) && (v.quantity ?? 0) > 0;
     }
 
     if (this.isAdjustment) {
@@ -320,7 +320,7 @@ export class MovementFormDialogComponent implements OnInit {
     }
 
     if (this.isReturn) {
-      if (!v.quantity || (v.quantity ?? 0) < 1) return false;
+      if (!v.quantity || (v.quantity ?? 0) <= 0) return false;
       const s = this.stockSummary();
       if (s !== null && this.operableQuantity === 0) return false;
       if (s !== null && (v.quantity ?? 0) > this.operableQuantity) return false;
@@ -328,7 +328,7 @@ export class MovementFormDialogComponent implements OnInit {
     }
 
     if (this.isLoss) {
-      if (!v.batch_id || !v.location_id || !v.quantity || (v.quantity ?? 0) < 1) return false;
+      if (!v.batch_id || !v.location_id || !v.quantity || (v.quantity ?? 0) <= 0) return false;
       if (!v.loss_reason_category) return false;
       if (v.loss_reason_category === 'other' && !v.reason?.trim()) return false;
       const s = this.stockSummary();
@@ -336,7 +336,7 @@ export class MovementFormDialogComponent implements OnInit {
       return !this.lossExceedsStock;
     }
 
-    if (!v.quantity || (v.quantity ?? 0) < 1) return false;
+    if (!v.quantity || (v.quantity ?? 0) <= 0) return false;
     if (this.isExit) {
       const s = this.stockSummary();
       if (s !== null && s.available_quantity === 0) return false;
@@ -692,7 +692,7 @@ export class MovementFormDialogComponent implements OnInit {
   private _addEntryRow(): void {
     this.entryRows.push(this.fb.group({
       location_id:   [null as number | null, Validators.required],
-      quantity_base: [null as number | null, [Validators.required, Validators.min(1)]],
+      quantity_base: [null as number | null, [Validators.required, Validators.min(0.001)]],
     }));
     this.entryRowCaps.update(arr => { while (arr.length < this.entryRows.length) arr = [...arr, null]; return arr; });
   }
@@ -720,7 +720,7 @@ export class MovementFormDialogComponent implements OnInit {
   private _addTransferRow(): void {
     this.transferRows.push(this.fb.group({
       location_to_id: [null as number | null, Validators.required],
-      quantity:       [null as number | null, [Validators.required, Validators.min(1)]],
+      quantity:       [null as number | null, [Validators.required, Validators.min(0.001)]],
     }));
     this.transferRowCaps.update(arr => { while (arr.length < this.transferRows.length) arr = [...arr, null]; return arr; });
   }
@@ -979,9 +979,9 @@ export class MovementFormDialogComponent implements OnInit {
       const item: Record<string, unknown> = { ...lotInfo, location_id: v.location_id || undefined };
       if (this.usePresentationMode() && v.product_presentation_id) {
         item['product_presentation_id'] = v.product_presentation_id;
-        item['quantity_in_presentation'] = v.quantity_in_presentation;
+        item['quantity_in_presentation'] = Number(v.quantity_in_presentation);
       } else {
-        item['quantity_base'] = v.quantity_base || v.quantity;
+        item['quantity_base'] = Number(v.quantity_base);
       }
 
       this.data.inventorySvc.entry({ ...entryHeader, items: [item] }).subscribe({
@@ -1014,7 +1014,7 @@ export class MovementFormDialogComponent implements OnInit {
         warehouse_from_id: v.warehouse_id,
         warehouse_to_id:   v.warehouse_id,
         reason:            v.reason || undefined,
-        items: [{ product_variant_id: v.product_variant_id, location_from_id: v.location_from_id, location_to_id: v.location_to_id, quantity: v.quantity }],
+        items: [{ product_variant_id: v.product_variant_id, location_from_id: v.location_from_id, location_to_id: v.location_to_id, quantity: Number(v.quantity) }],
       }).subscribe({
         next: res => {
           const doc = res.data;
@@ -1027,7 +1027,7 @@ export class MovementFormDialogComponent implements OnInit {
 
     // ── AJUSTE ───────────────────────────────────────────────────
     if (this.isAdjustment) {
-      this.data.inventorySvc.adjustment({ ...basePayload, location_id: v.location_id || undefined, quantity: v.quantity, reason: v.reason })
+      this.data.inventorySvc.adjustment({ ...basePayload, location_id: v.location_id || undefined, quantity: Number(v.quantity), reason: v.reason })
         .subscribe({
           next: res => this._afterMovements([res.data], res.data, 'adjustment'),
           error: err => this._handleError(err),
@@ -1040,7 +1040,7 @@ export class MovementFormDialogComponent implements OnInit {
       const exitPayload: Record<string, unknown> = {
         ...basePayload,
         location_id:    v.location_id    || undefined,
-        quantity:       v.quantity,
+        quantity:       Number(v.quantity),
         cost_center_id: v.cost_center_id,
       };
 
@@ -1073,7 +1073,7 @@ export class MovementFormDialogComponent implements OnInit {
       const detail = v.reason?.trim();
       const reason = detail ? `${categoryLabel}: ${detail}` : categoryLabel;
 
-      this.data.inventorySvc.loss({ ...basePayload, batch_id: v.batch_id, location_id: v.location_id, quantity: v.quantity, reason })
+      this.data.inventorySvc.loss({ ...basePayload, batch_id: v.batch_id, location_id: v.location_id, quantity: Number(v.quantity), reason })
         .subscribe({
           next: res => this._afterMovements([res.data], res.data, 'loss'),
           error: err => this._handleError(err),
@@ -1082,7 +1082,7 @@ export class MovementFormDialogComponent implements OnInit {
     }
 
     // ── DEVOLUCIÓN ───────────────────────────────────────────────
-    this.data.inventorySvc.return_({ ...basePayload, location_id: v.location_id || undefined, quantity: v.quantity })
+    this.data.inventorySvc.return_({ ...basePayload, location_id: v.location_id || undefined, quantity: Number(v.quantity) })
       .subscribe({
         next: res => this._afterMovements([res.data], res.data, 'return'),
         error: err => this._handleError(err),

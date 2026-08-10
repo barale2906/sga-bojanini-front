@@ -163,7 +163,7 @@ export class ExitWizardDialogComponent implements OnInit {
     if (!this.warehouseControl.valid) return false;
     if (this.cartItems().length === 0) return false;
     return this.cartItems().every((item, i) => {
-      if (item.quantity < 1) return false;
+      if (item.quantity <= 0) return false;
       if (item.loadingStock || item.loadingFefo || item.checkingExpired) return false;
       const exitable = this.cartExitableQty(i);
       if (exitable === 0) return false;
@@ -302,7 +302,9 @@ export class ExitWizardDialogComponent implements OnInit {
   }
 
   updateCartQty(i: number, qty: number): void {
-    const v = Math.max(1, Math.floor(qty) || 1);
+    const item = this.cartItems()[i];
+    const parsed = item?.isKit ? (Math.floor(qty) || 1) : (qty || 0.001);
+    const v = Math.max(item?.isKit ? 1 : 0.001, parsed);
     this.cartItems.update(arr => {
       const u = [...arr]; u[i] = { ...u[i], quantity: v }; return u;
     });
@@ -436,7 +438,7 @@ export class ExitWizardDialogComponent implements OnInit {
       reason:         cv.reason || undefined,
       items: this.cartItems().map(item => ({
         generic_product_id: item.product.id,
-        quantity:           item.quantity,
+        quantity:           Number(item.quantity),
       })),
     };
 

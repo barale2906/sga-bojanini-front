@@ -119,7 +119,7 @@ export class PurchaseOrderFormDialogComponent implements OnInit {
       this.items.push(this.fb.group({
         product_variant_id: [item.product_variant_id, Validators.required],
         product_presentation_id: [item.product_presentation_id, Validators.required],
-        quantity: [item.quantity_requested, [Validators.required, Validators.min(1)]],
+        quantity: [item.quantity_requested, [Validators.required, Validators.min(0.001)]],
         unit_price: [Number(item.unit_price), [Validators.required, Validators.min(0)]],
         tax_rate: [item.tax_rate != null ? Number(item.tax_rate) : null, [Validators.min(0), Validators.max(100)]],
         notes: [item.notes || ''],
@@ -240,7 +240,7 @@ export class PurchaseOrderFormDialogComponent implements OnInit {
     this.items.push(this.fb.group({
       product_variant_id: [null as number | null, Validators.required],
       product_presentation_id: [null as number | null, Validators.required],
-      quantity: [1, [Validators.required, Validators.min(1)]],
+      quantity: [1, [Validators.required, Validators.min(0.001)]],
       unit_price: [0, [Validators.required, Validators.min(0)]],
       tax_rate: [null as number | null, [Validators.min(0), Validators.max(100)]],
       notes: [''],
@@ -254,7 +254,7 @@ export class PurchaseOrderFormDialogComponent implements OnInit {
     this.items.push(this.fb.group({
       product_variant_id: [null as number | null, Validators.required],
       product_presentation_id: [null as number | null, Validators.required],
-      quantity: [qty, [Validators.required, Validators.min(1)]],
+      quantity: [qty, [Validators.required, Validators.min(0.001)]],
       unit_price: [0, [Validators.required, Validators.min(0)]],
       tax_rate: [null as number | null, [Validators.min(0), Validators.max(100)]],
       notes: [''],

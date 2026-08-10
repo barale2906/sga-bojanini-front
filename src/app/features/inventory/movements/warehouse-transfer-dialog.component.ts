@@ -100,7 +100,7 @@ export class WarehouseTransferDialogComponent implements OnInit {
     product_variant_id: [null as number | null, Validators.required],
     warehouse_to_id:    [null as number | null, Validators.required],
     location_to_id:     [null as number | null, Validators.required],
-    quantity:           [null as number | null, [Validators.required, Validators.min(1)]],
+    quantity:           [null as number | null, [Validators.required, Validators.min(0.001)]],
     reason:             [''],
   });
 
@@ -226,7 +226,7 @@ export class WarehouseTransferDialogComponent implements OnInit {
     if (!v.warehouse_from_id || !v.location_from_id) return false;
     if (!this._genericProductId() || !v.product_variant_id) return false;
     if (!v.warehouse_to_id || !v.location_to_id) return false;
-    if (!v.quantity || v.quantity < 1) return false;
+    if (!v.quantity || v.quantity <= 0) return false;
     if (this.loadingStock() || this.loadingExitable() || this.checkingExpired()) return false;
     if (this.hasNoStock) return false;
     if (Number(v.quantity) > this.exitableQty) return false;
@@ -248,7 +248,7 @@ export class WarehouseTransferDialogComponent implements OnInit {
         product_variant_id: v.product_variant_id,
         location_from_id:   v.location_from_id,
         location_to_id:     v.location_to_id,
-        quantity:           v.quantity,
+        quantity:           Number(v.quantity),
       }],
     };
 

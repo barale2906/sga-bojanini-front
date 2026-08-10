@@ -368,7 +368,7 @@
         @if (!usePresentationMode()) {
           <mat-form-field appearance="outline" class="span2">
             <mat-label>Cantidad en {{ selectedProduct?.base_unit?.abbreviation || 'unidad base' }} *</mat-label>
-            <input matInput type="number" formControlName="quantity_base" min="1" />
+            <input matInput type="number" formControlName="quantity_base" min="0.001" step="any" />
             <mat-hint>Número de {{ selectedProduct?.base_unit?.name || 'unidades base' }}</mat-hint>
           </mat-form-field>
         }
@@ -391,7 +391,7 @@
 
           <mat-form-field appearance="outline">
             <mat-label>Cantidad de empaques *</mat-label>
-            <input matInput type="number" formControlName="quantity_in_presentation" min="1" />
+            <input matInput type="number" formControlName="quantity_in_presentation" min="0.001" step="any" />
             @if (selectedPresentation) {
               <mat-hint>{{ selectedPresentation.name }}{{ (form.get('quantity_in_presentation')?.value || 0) > 1 ? 's' : '' }}</mat-hint>
             }
@@ -444,7 +444,7 @@
                 <!-- Cantidad (uds base) -->
                 <mat-form-field appearance="outline" class="dist-qty-field">
                   <mat-label>Cant. ({{ selectedProduct?.base_unit?.abbreviation || 'uds' }})</mat-label>
-                  <input matInput type="number" formControlName="quantity_base" min="1" />
+                  <input matInput type="number" formControlName="quantity_base" min="0.001" step="any" />
                 </mat-form-field>
 
                 <!-- Badge de capacidad -->
@@ -590,7 +590,7 @@
 
         <mat-form-field appearance="outline" class="span2">
           <mat-label>Cantidad *</mat-label>
-          <input matInput type="number" formControlName="quantity" min="1" />
+          <input matInput type="number" formControlName="quantity" min="0.001" step="any" />
         </mat-form-field>
 
       } <!-- /!useDistribution() transfer -->
@@ -624,7 +624,7 @@
 
                 <mat-form-field appearance="outline" class="dist-qty-field">
                   <mat-label>Cantidad</mat-label>
-                  <input matInput type="number" formControlName="quantity" min="1" />
+                  <input matInput type="number" formControlName="quantity" min="0.001" step="any" />
                 </mat-form-field>
 
                 <div class="dist-cap-badge dist-cap-badge--{{ projStatus(transferRowCaps()[i], asGroup(ctrl).get('quantity')?.value ?? 0) }}">
@@ -732,7 +732,7 @@
       <!-- Cantidad y Motivo -->
       <mat-form-field appearance="outline">
         <mat-label>Cantidad (+ agregar / − quitar) *</mat-label>
-        <input matInput type="number" formControlName="quantity" />
+        <input matInput type="number" formControlName="quantity" step="any" />
         @if (stockSummary(); as s) {
           <mat-hint>Disponible: {{ s.available_quantity }} {{ selectedProduct?.base_unit?.abbreviation || 'uds' }}</mat-hint>
         }
@@ -923,7 +923,7 @@
         <!-- Cantidad -->
         <mat-form-field appearance="outline" class="span2">
           <mat-label>Cantidad *</mat-label>
-          <input matInput type="number" formControlName="quantity" min="1" />
+          <input matInput type="number" formControlName="quantity" min="0.001" step="any" />
           @if (stockSummary(); as s) {
             <mat-hint>
               Disponible: {{ isReturn ? operableQuantity : s.available_quantity }}
@@ -1066,7 +1066,7 @@
         @if (form.get('location_id')?.value) {
           <mat-form-field appearance="outline" class="span2">
             <mat-label>Cantidad a dar de baja *</mat-label>
-            <input matInput type="number" formControlName="quantity" min="1" [max]="selectedLossLocationQty" />
+            <input matInput type="number" formControlName="quantity" min="0.001" step="any" [max]="selectedLossLocationQty" />
             <mat-hint>Disponible en esta ubicación: {{ selectedLossLocationQty }} {{ selectedProduct?.base_unit?.abbreviation || 'uds' }}</mat-hint>
           </mat-form-field>
         }
