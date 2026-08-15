@@ -1,0 +1,446 @@
+<app-page-header title="Consolidar Órdenes de Compra" subtitle="Unifica varias OC del mismo proveedor en un documento para contabilidad" icon="merge">
+  <button mat-button (click)="goBack()">
+    <mat-icon>arrow_back</mat-icon> Volver a Compras
+  </button>
+</app-page-header>
+
+<div class="wizard-container">
+  <mat-stepper #stepper orientation="horizontal" (selectionChange)="onStepChange($event)">
+
+    <!-- ─── PASO 1: Proveedor ─── -->
+    <mat-step [completed]="!!selectedSupplier()">
+      <ng-template matStepLabel>Proveedor</ng-template>
+
+      <div class="step-content">
+        <p class="step-hint">Selecciona el proveedor cuyas órdenes deseas consolidar. Solo se muestran proveedores con OC completamente recibidas y aún no consolidadas.</p>
+
+        <app-loading-spinner [loading]="loadingSuppliers()" [inline]="true"></app-loading-spinner>
+
+        @if (!loadingSuppliers() && suppliers().length === 0) {
+          <div class="empty-state">
+            <mat-icon>inventory_2</mat-icon>
+            <p>No hay órdenes pendientes de consolidar.</p>
+            <p class="hint">Todas las órdenes recibidas ya fueron consolidadas o no existen OC en estado "Recibida".</p>
+          </div>
+        }
+
+        @if (!loadingSuppliers() && suppliers().length > 0) {
+          <form [formGroup]="step1Form">
+            <mat-form-field appearance="outline" class="supplier-field">
+              <mat-label>Proveedor</mat-label>
+              <mat-select formControlName="supplier_id"
+                          (selectionChange)="onSupplierChange($event.value)">
+                @for (s of suppliers(); track s.id) {
+                  <mat-option [value]="s.id">
+                    <strong>{{ s.name }}</strong>
+                    @if (s.tax_id) { &nbsp;<small class="muted">{{ s.tax_id }}</small> }
+                  </mat-option>
+                }
+              </mat-select>
+              <mat-hint>{{ suppliers().length }} proveedor(es) disponibles</mat-hint>
+            </mat-form-field>
+          </form>
+        }
+      </div>
+
+      <div class="step-actions">
+        <button mat-raised-button color="primary"
+                [disabled]="!selectedSupplier()"
+                matStepperNext>
+          Seleccionar órdenes <mat-icon iconPositionEnd>chevron_right</mat-icon>
+        </button>
+      </div>
+    </mat-step>
+
+    <!-- ─── PASO 2: Selección de OC ─── -->
+    <mat-step [completed]="selectedIds().size > 0">
+      <ng-template matStepLabel>Órdenes a consolidar</ng-template>
+
+      <div class="step-content">
+        <div class="orders-layout">
+
+          <!-- Panel izquierdo: filtros + tablas -->
+          <div class="orders-column">
+
+            <!-- Barra de filtro por período -->
+            <div class="period-bar" [formGroup]="periodForm">
+              <mat-form-field appearance="outline" class="date-field">
+                <mat-label>Desde</mat-label>
+                <input matInput type="date" formControlName="date_from" />
+              </mat-form-field>
+              <mat-form-field appearance="outline" class="date-field">
+                <mat-label>Hasta</mat-label>
+                <input matInput type="date" formControlName="date_to" />
+              </mat-form-field>
+              <button mat-stroked-button (click)="loadOrders()" [disabled]="loadingOrders()">
+                <mat-icon>filter_list</mat-icon> Filtrar
+              </button>
+            </div>
+
+            <app-loading-spinner [loading]="loadingOrders()" [inline]="true"></app-loading-spinner>
+
+            @if (!loadingOrders()) {
+              <!-- Tabla: Órdenes en el período -->
+              @if (inRange().length > 0) {
+                <h4 class="table-heading">Órdenes en el período</h4>
+                <div class="table-wrap mat-elevation-z1">
+                  <table mat-table [dataSource]="inRange()" multiTemplateDataRows>
+
+                    <ng-container matColumnDef="select">
+                      <th mat-header-cell *matHeaderCellDef>
+                        <mat-checkbox color="primary"
+                          [checked]="isAllInRangeSelected()"
+                          [indeterminate]="isSomeInRangeSelected()"
+                          (change)="toggleAllInRange()">
+                        </mat-checkbox>
+                      </th>
+                      <td mat-cell *matCellDef="let o" (click)="$event.stopPropagation()">
+                        <mat-checkbox color="primary"
+                          [checked]="isSelected(o)"
+                          (change)="toggleOrder(o)">
+                        </mat-checkbox>
+                      </td>
+                    </ng-container>
+
+                    <ng-container matColumnDef="code">
+                      <th mat-header-cell *matHeaderCellDef>Código OC</th>
+                      <td mat-cell *matCellDef="let o"><code class="code-tag">{{ o.code }}</code></td>
+                    </ng-container>
+
+                    <ng-container matColumnDef="warehouse">
+                      <th mat-header-cell *matHeaderCellDef>Almacén</th>
+                      <td mat-cell *matCellDef="let o">{{ o.warehouse?.name ?? '—' }}</td>
+                    </ng-container>
+
+                    <ng-container matColumnDef="received_at">
+                      <th mat-header-cell *matHeaderCellDef>Recibida</th>
+                      <td mat-cell *matCellDef="let o">{{ formatDate(o.received_at) }}</td>
+                    </ng-container>
+
+                    <ng-container matColumnDef="total">
+                      <th mat-header-cell *matHeaderCellDef class="num">Total</th>
+                      <td mat-cell *matCellDef="let o" class="num"><strong>{{ formatCurrency(+o.total_amount) }}</strong></td>
+                    </ng-container>
+
+                    <ng-container matColumnDef="expand">
+                      <th mat-header-cell *matHeaderCellDef></th>
+                      <td mat-cell *matCellDef="let o" (click)="$event.stopPropagation()">
+                        <button mat-icon-button type="button" class="expand-btn"
+                                [matTooltip]="isExpanded(o) ? 'Ocultar ítems' : 'Ver ítems'"
+                                (click)="toggleExpand(o)">
+                          <mat-icon>{{ isExpanded(o) ? 'expand_less' : 'expand_more' }}</mat-icon>
+                        </button>
+                      </td>
+                    </ng-container>
+
+                    <ng-container matColumnDef="expandedDetail">
+                      <td mat-cell *matCellDef="let o" [attr.colspan]="ocCols.length" class="detail-cell">
+                        @if (isExpanded(o)) {
+                          <div class="items-detail-panel">
+                            @if (loadingDetails()[o.id]) {
+                              <div class="items-loading"><mat-spinner diameter="18"></mat-spinner> Cargando ítems…</div>
+                            }
+                            @if (!loadingDetails()[o.id] && getOrderItems(o.id).length === 0) {
+                              <span class="items-empty">Sin ítems registrados</span>
+                            }
+                            @if (getOrderItems(o.id).length > 0) {
+                              <table class="items-inner-table">
+                                <thead><tr><th>Producto</th><th>Marca</th><th>Presentación</th><th class="num">Cant.</th><th class="num">P. Unit.</th><th class="num">Total</th></tr></thead>
+                                <tbody>
+                                  @for (item of getOrderItems(o.id); track item.id) {
+                                    <tr>
+                                      <td>{{ item.variant?.generic?.name ?? '—' }}</td>
+                                      <td class="muted-cell">{{ item.variant?.lab_brand ?? '—' }}</td>
+                                      <td class="muted-cell">{{ item.presentation?.name ?? '—' }}</td>
+                                      <td class="num">{{ item.quantity_received ?? item.quantity_requested }}</td>
+                                      <td class="num">{{ formatCurrency(+item.unit_price) }}</td>
+                                      <td class="num">{{ item.total_price != null ? formatCurrency(+item.total_price) : '—' }}</td>
+                                    </tr>
+                                  }
+                                </tbody>
+                              </table>
+                            }
+                          </div>
+                        }
+                      </td>
+                    </ng-container>
+
+                    <tr mat-header-row *matHeaderRowDef="ocCols"></tr>
+                    <tr mat-row *matRowDef="let r; columns: ocCols;"
+                        class="oc-row" [class.selected-row]="isSelected(r)"
+                        (click)="toggleOrder(r)">
+                    </tr>
+                    <tr mat-row *matRowDef="let r; columns: ['expandedDetail']" class="detail-row"></tr>
+                  </table>
+                </div>
+              }
+
+              <!-- Tabla: Órdenes pendientes de períodos anteriores -->
+              @if (pending().length > 0) {
+                <div class="pending-header">
+                  <mat-icon color="warn">warning</mat-icon>
+                  <h4 class="table-heading pending-title">Pendientes de períodos anteriores</h4>
+                  <span class="pending-badge">{{ pending().length }}</span>
+                </div>
+                <p class="hint">Estas OC fueron recibidas antes del rango de fechas seleccionado y nunca se han consolidado. Puedes incluirlas si corresponde.</p>
+                <div class="table-wrap mat-elevation-z1 pending-table">
+                  <table mat-table [dataSource]="pending()" multiTemplateDataRows>
+
+                    <ng-container matColumnDef="select">
+                      <th mat-header-cell *matHeaderCellDef>
+                        <mat-checkbox color="warn"
+                          [checked]="isAllPendingSelected()"
+                          [indeterminate]="isSomePendingSelected()"
+                          (change)="toggleAllPending()">
+                        </mat-checkbox>
+                      </th>
+                      <td mat-cell *matCellDef="let o" (click)="$event.stopPropagation()">
+                        <mat-checkbox color="warn"
+                          [checked]="isSelected(o)"
+                          (change)="toggleOrder(o)">
+                        </mat-checkbox>
+                      </td>
+                    </ng-container>
+
+                    <ng-container matColumnDef="code">
+                      <th mat-header-cell *matHeaderCellDef>Código OC</th>
+                      <td mat-cell *matCellDef="let o"><code class="code-tag code-warn">{{ o.code }}</code></td>
+                    </ng-container>
+
+                    <ng-container matColumnDef="warehouse">
+                      <th mat-header-cell *matHeaderCellDef>Almacén</th>
+                      <td mat-cell *matCellDef="let o">{{ o.warehouse?.name ?? '—' }}</td>
+                    </ng-container>
+
+                    <ng-container matColumnDef="received_at">
+                      <th mat-header-cell *matHeaderCellDef>Recibida</th>
+                      <td mat-cell *matCellDef="let o">{{ formatDate(o.received_at) }}</td>
+                    </ng-container>
+
+                    <ng-container matColumnDef="total">
+                      <th mat-header-cell *matHeaderCellDef class="num">Total</th>
+                      <td mat-cell *matCellDef="let o" class="num"><strong>{{ formatCurrency(+o.total_amount) }}</strong></td>
+                    </ng-container>
+
+                    <ng-container matColumnDef="expand">
+                      <th mat-header-cell *matHeaderCellDef></th>
+                      <td mat-cell *matCellDef="let o" (click)="$event.stopPropagation()">
+                        <button mat-icon-button type="button" class="expand-btn"
+                                [matTooltip]="isExpanded(o) ? 'Ocultar ítems' : 'Ver ítems'"
+                                (click)="toggleExpand(o)">
+                          <mat-icon>{{ isExpanded(o) ? 'expand_less' : 'expand_more' }}</mat-icon>
+                        </button>
+                      </td>
+                    </ng-container>
+
+                    <ng-container matColumnDef="expandedDetail">
+                      <td mat-cell *matCellDef="let o" [attr.colspan]="ocCols.length" class="detail-cell">
+                        @if (isExpanded(o)) {
+                          <div class="items-detail-panel">
+                            @if (loadingDetails()[o.id]) {
+                              <div class="items-loading"><mat-spinner diameter="18"></mat-spinner> Cargando ítems…</div>
+                            }
+                            @if (!loadingDetails()[o.id] && getOrderItems(o.id).length === 0) {
+                              <span class="items-empty">Sin ítems registrados</span>
+                            }
+                            @if (getOrderItems(o.id).length > 0) {
+                              <table class="items-inner-table">
+                                <thead><tr><th>Producto</th><th>Marca</th><th>Presentación</th><th class="num">Cant.</th><th class="num">P. Unit.</th><th class="num">Total</th></tr></thead>
+                                <tbody>
+                                  @for (item of getOrderItems(o.id); track item.id) {
+                                    <tr>
+                                      <td>{{ item.variant?.generic?.name ?? '—' }}</td>
+                                      <td class="muted-cell">{{ item.variant?.lab_brand ?? '—' }}</td>
+                                      <td class="muted-cell">{{ item.presentation?.name ?? '—' }}</td>
+                                      <td class="num">{{ item.quantity_received ?? item.quantity_requested }}</td>
+                                      <td class="num">{{ formatCurrency(+item.unit_price) }}</td>
+                                      <td class="num">{{ item.total_price != null ? formatCurrency(+item.total_price) : '—' }}</td>
+                                    </tr>
+                                  }
+                                </tbody>
+                              </table>
+                            }
+                          </div>
+                        }
+                      </td>
+                    </ng-container>
+
+                    <tr mat-header-row *matHeaderRowDef="ocCols"></tr>
+                    <tr mat-row *matRowDef="let r; columns: ocCols;"
+                        class="oc-row" [class.selected-row]="isSelected(r)"
+                        (click)="toggleOrder(r)">
+                    </tr>
+                    <tr mat-row *matRowDef="let r; columns: ['expandedDetail']" class="detail-row"></tr>
+                  </table>
+                </div>
+              }
+
+              @if (inRange().length === 0 && pending().length === 0) {
+                <div class="empty-state">
+                  <mat-icon>search_off</mat-icon>
+                  <p>No hay órdenes disponibles para consolidar en este período.</p>
+                </div>
+              }
+            }
+          </div>
+
+          <!-- Panel derecho: resumen de selección -->
+          <div class="summary-panel mat-elevation-z2">
+            <div class="summary-header">
+              <mat-icon>summarize</mat-icon> Resumen
+            </div>
+            <div class="summary-count">
+              <strong>{{ selectedIds().size }}</strong>
+              <span>OC seleccionadas</span>
+            </div>
+
+            @if (selectedOrders().length > 0) {
+              <div class="summary-list">
+                @for (o of selectedOrders(); track o.id) {
+                  <div class="summary-oc-item">
+                    <code class="code-tag">{{ o.code }}</code>
+                    <span>{{ formatCurrency(+o.total_amount) }}</span>
+                  </div>
+                }
+              </div>
+              <mat-divider></mat-divider>
+            }
+
+            <div class="summary-totals">
+              <div class="summary-row"><span>Subtotal</span><span>{{ formatCurrency(summarySubtotal()) }}</span></div>
+              <div class="summary-row"><span>IVA</span><span>{{ formatCurrency(summaryTax()) }}</span></div>
+              <div class="summary-row total-row"><span>TOTAL</span><strong>{{ formatCurrency(summaryTotal()) }}</strong></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="step-actions">
+        <button mat-button matStepperPrevious>
+          <mat-icon>chevron_left</mat-icon> Anterior
+        </button>
+        <button mat-raised-button color="primary"
+                [disabled]="selectedIds().size === 0"
+                matStepperNext>
+          Confirmar y crear <mat-icon iconPositionEnd>chevron_right</mat-icon>
+        </button>
+      </div>
+    </mat-step>
+
+    <!-- ─── PASO 3: Confirmar y crear ─── -->
+    <mat-step>
+      <ng-template matStepLabel>Confirmar</ng-template>
+
+      <div class="step-content">
+        <p class="step-hint">
+          Se consolidarán <strong>{{ selectedIds().size }} órdenes</strong> de
+          <strong>{{ selectedSupplier()?.name }}</strong> por un total de
+          <strong>{{ formatCurrency(summaryTotal()) }}</strong>.
+        </p>
+
+        <!-- OC incluidas (referencia rápida) -->
+        <div class="confirm-oc-list">
+          @for (o of previewOcList().length ? previewOcList() : selectedOrders(); track o.id) {
+            <div class="confirm-oc-item">
+              <code class="code-tag">{{ o.code }}</code>
+              <span class="muted">{{ o['warehouse']?.name }}</span>
+              <strong>{{ formatCurrency(+o.total_amount) }}</strong>
+            </div>
+          }
+        </div>
+
+        <!-- Productos agrupados — datos del backend -->
+        <h4 class="products-heading">Detalle de productos</h4>
+        @if (previewLoading()) {
+          <div class="items-loading" style="margin-bottom:1rem">
+            <mat-spinner diameter="18"></mat-spinner> Calculando consolidado…
+          </div>
+        }
+        @if (!previewLoading() && previewError()) {
+          <div class="items-loading" style="margin-bottom:1rem;color:#c53030">
+            <mat-icon style="font-size:1.1rem;width:1.1rem;height:1.1rem">error_outline</mat-icon>
+            {{ previewError() }}
+          </div>
+        }
+        @if (!previewLoading() && !previewError() && previewItems().length > 0) {
+          <div class="confirm-products-block">
+            <table class="items-inner-table confirm-grouped-table">
+              <thead>
+                <tr>
+                  <th>Producto</th>
+                  <th>Marca</th>
+                  <th>Presentación</th>
+                  <th class="num">Cant.</th>
+                  <th class="num">P. Unit.</th>
+                  <th class="num">% IVA</th>
+                  <th class="num">IVA línea</th>
+                  <th class="num">Total</th>
+                  <th>OC origen</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (g of previewItems(); track $index) {
+                  <tr>
+                    <td>{{ g.variant?.generic?.name ?? '—' }}</td>
+                    <td class="muted-cell">{{ g.variant?.lab_brand ?? '—' }}</td>
+                    <td class="muted-cell">{{ g.presentation?.name ?? '—' }}</td>
+                    <td class="num"><strong>{{ g.quantity }}</strong></td>
+                    <td class="num">{{ formatCurrency(+g.unit_price) }}</td>
+                    <td class="num tax-rate-cell">{{ +g.tax_rate > 0 ? g.tax_rate + '%' : '—' }}</td>
+                    <td class="num muted-cell">{{ +g.tax_rate > 0 ? formatCurrency(+g.tax_amount) : '—' }}</td>
+                    <td class="num">{{ formatCurrency(+g.total_price) }}</td>
+                    <td><span class="oc-origins">{{ g.source_order_codes.join(', ') }}</span></td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        }
+
+        <!-- Resumen de totales -->
+        <div class="confirm-totals">
+          <div class="ct-row"><span>Subtotal</span><span>{{ formatCurrency(previewItems().length ? previewSubtotal() : summarySubtotal()) }}</span></div>
+          @if (previewItems().length && previewTaxBreakdown().length) {
+            @for (tb of previewTaxBreakdown(); track tb.rate) {
+              @if (tb.rate > 0) {
+                <div class="ct-row ct-tax-line">
+                  <span>IVA {{ tb.rate }}%</span>
+                  <span>{{ formatCurrency(tb.tax_amount) }}</span>
+                </div>
+              }
+            }
+            <div class="ct-row ct-tax-total"><span>Total IVA</span><span>{{ formatCurrency(previewTax()) }}</span></div>
+          } @else {
+            <div class="ct-row"><span>IVA</span><span>{{ formatCurrency(previewItems().length ? previewTax() : summaryTax()) }}</span></div>
+          }
+          <div class="ct-row ct-total"><span>TOTAL</span><strong>{{ formatCurrency(previewItems().length ? previewTotal() : summaryTotal()) }}</strong></div>
+        </div>
+
+        <!-- Notas opcionales -->
+        <mat-form-field appearance="outline" class="notes-field" [formGroup]="confirmForm">
+          <mat-label>Observaciones (opcional)</mat-label>
+          <textarea matInput formControlName="notes" rows="3"
+                    placeholder="Ej: Consolidado agosto 2026 — factura 00123"
+                    maxlength="1000">
+          </textarea>
+          <mat-hint align="end">{{ (confirmForm.value.notes || '').length }}/1000</mat-hint>
+        </mat-form-field>
+      </div>
+
+      <div class="step-actions">
+        <button mat-button matStepperPrevious [disabled]="creating()">
+          <mat-icon>chevron_left</mat-icon> Anterior
+        </button>
+        <button *sgaPermission="'ordenes_compra.consolidar'"
+                mat-raised-button color="primary"
+                (click)="create()"
+                [disabled]="creating() || selectedIds().size === 0">
+          @if (creating()) { <mat-spinner diameter="18" class="btn-spinner"></mat-spinner> }
+          @if (!creating()) { <mat-icon>merge</mat-icon> }
+          {{ creating() ? 'Creando...' : 'Crear consolidado' }}
+        </button>
+      </div>
+    </mat-step>
+
+  </mat-stepper>
+</div>

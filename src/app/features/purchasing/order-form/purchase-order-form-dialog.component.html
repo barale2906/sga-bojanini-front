@@ -84,9 +84,6 @@
                   </mat-option>
                 }
               </mat-select>
-              @if ($any(item).get('product_variant_id')?.value && getItemPresentations($index).length === 0) {
-                <mat-hint style="color:#c05621">Configure presentaciones en Catálogo</mat-hint>
-              }
             </mat-form-field>
 
             <!-- Cantidad -->
@@ -106,9 +103,8 @@
 
             <!-- IVA -->
             <mat-form-field appearance="outline" class="item-tax">
-              <mat-label>IVA %</mat-label>
+              <mat-label matTooltip="Dejar vacío = exento">IVA %</mat-label>
               <input matInput type="number" formControlName="tax_rate" min="0" max="100" step="1" placeholder="0" />
-              <mat-hint>Vacío = exento</mat-hint>
             </mat-form-field>
 
             <!-- Eliminar ítem -->

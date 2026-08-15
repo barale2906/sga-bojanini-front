@@ -1,4 +1,7 @@
 <app-page-header title="Compras" subtitle="Órdenes de compra, aprobaciones y recepciones" icon="shopping_cart">
+  <button *sgaPermission="'ordenes_compra.ver'" mat-stroked-button (click)="goToConsolidar()">
+    <mat-icon>merge</mat-icon> Consolidar OC
+  </button>
   <button *sgaPermission="'ordenes_compra.crear'" mat-raised-button color="primary" (click)="openNewOrder()">
     <mat-icon>add</mat-icon> Nueva OC
   </button>
@@ -25,7 +28,12 @@
           <ng-container matColumnDef="supplier"><th mat-header-cell *matHeaderCellDef>Proveedor</th><td mat-cell *matCellDef="let o">{{ o.supplier?.name || '—' }}</td></ng-container>
           <ng-container matColumnDef="warehouse"><th mat-header-cell *matHeaderCellDef>Almacén</th><td mat-cell *matCellDef="let o">{{ o.warehouse?.name || '—' }}</td></ng-container>
           <ng-container matColumnDef="status"><th mat-header-cell *matHeaderCellDef>Estado</th>
-            <td mat-cell *matCellDef="let o"><span class="st-badge" [class]="getStatusClass(o.status)">{{ statusLabel(o.status) }}</span></td>
+            <td mat-cell *matCellDef="let o">
+              <span class="st-badge" [class]="getStatusClass(o.status)">{{ statusLabel(o.status) }}</span>
+              @if (o.consolidated_order_id) {
+                <span class="st-badge st-consolidated" style="margin-left:4px; cursor:pointer;" matTooltip="Ver consolidado" (click)="$event.stopPropagation(); viewConsolidatedFromOrder(o.consolidated_order_id)">Consolidada</span>
+              }
+            </td>
           </ng-container>
           <ng-container matColumnDef="total"><th mat-header-cell *matHeaderCellDef>Total</th><td mat-cell *matCellDef="let o"><strong>{{ formatCurrency(o.total_amount) }}</strong></td></ng-container>
           <ng-container matColumnDef="created_at"><th mat-header-cell *matHeaderCellDef>Fecha</th><td mat-cell *matCellDef="let o">{{ o.created_at | dateFormat }}</td></ng-container>
@@ -120,6 +128,86 @@
           </table>
         </div>
       }
+    </div>
+  </mat-tab>
+
+  <!-- Consolidados -->
+  <mat-tab label="Consolidados">
+    <div class="tab-body">
+      <div class="tab-toolbar" [formGroup]="occFilters">
+        <mat-form-field appearance="outline" class="date">
+          <mat-label>Desde</mat-label>
+          <input matInput type="date" formControlName="date_from" />
+        </mat-form-field>
+        <mat-form-field appearance="outline" class="date">
+          <mat-label>Hasta</mat-label>
+          <input matInput type="date" formControlName="date_to" />
+        </mat-form-field>
+        <button mat-stroked-button (click)="loadConsolidatedOrders()">
+          <mat-icon>filter_list</mat-icon> Filtrar
+        </button>
+        <button *sgaPermission="'ordenes_compra.ver'" mat-raised-button color="primary" style="margin-left:auto" (click)="goToConsolidar()">
+          <mat-icon>merge</mat-icon> Nuevo Consolidado
+        </button>
+      </div>
+
+      <app-loading-spinner [loading]="loadingConsolidated()" [inline]="true"></app-loading-spinner>
+
+      <div class="table-wrap mat-elevation-z1">
+        <table mat-table [dataSource]="consolidatedOrders()">
+          <ng-container matColumnDef="code">
+            <th mat-header-cell *matHeaderCellDef>Código</th>
+            <td mat-cell *matCellDef="let occ"><code class="code-tag">{{ occ.code }}</code></td>
+          </ng-container>
+          <ng-container matColumnDef="supplier">
+            <th mat-header-cell *matHeaderCellDef>Proveedor</th>
+            <td mat-cell *matCellDef="let occ">{{ occ.supplier?.name ?? '—' }}</td>
+          </ng-container>
+          <ng-container matColumnDef="period">
+            <th mat-header-cell *matHeaderCellDef>Período</th>
+            <td mat-cell *matCellDef="let occ">{{ formatPeriod(occ) }}</td>
+          </ng-container>
+          <ng-container matColumnDef="total">
+            <th mat-header-cell *matHeaderCellDef>Total</th>
+            <td mat-cell *matCellDef="let occ"><strong>{{ formatCurrency(+occ.total_amount) }}</strong></td>
+          </ng-container>
+          <ng-container matColumnDef="created_at">
+            <th mat-header-cell *matHeaderCellDef>Fecha</th>
+            <td mat-cell *matCellDef="let occ">{{ occ.created_at | dateFormat }}</td>
+          </ng-container>
+          <ng-container matColumnDef="occ_actions">
+            <th mat-header-cell *matHeaderCellDef class="act">Acciones</th>
+            <td mat-cell *matCellDef="let occ" class="act">
+              <button mat-icon-button color="primary" (click)="openConsolidatedDetail(occ)" matTooltip="Ver detalle">
+                <mat-icon>visibility</mat-icon>
+              </button>
+              <button mat-icon-button color="accent"
+                      (click)="downloadOccPdf(occ)"
+                      [disabled]="occPdfLoadingId() === occ.id"
+                      matTooltip="Imprimir / PDF">
+                @if (occPdfLoadingId() === occ.id) {
+                  <mat-icon class="spin-icon">sync</mat-icon>
+                } @else {
+                  <mat-icon>picture_as_pdf</mat-icon>
+                }
+              </button>
+            </td>
+          </ng-container>
+          <tr mat-header-row *matHeaderRowDef="occCols"></tr>
+          <tr mat-row *matRowDef="let r; columns: occCols;"></tr>
+          <tr class="mat-row" *matNoDataRow>
+            <td class="no-data" colspan="6">Sin órdenes consolidadas</td>
+          </tr>
+        </table>
+        <mat-paginator
+          [length]="consolidatedMeta().total"
+          [pageSize]="consolidatedMeta().per_page"
+          [pageIndex]="consolidatedMeta().current_page - 1"
+          [pageSizeOptions]="[10,25,50]"
+          (page)="onOccPage($event)"
+          showFirstLastButtons>
+        </mat-paginator>
+      </div>
     </div>
   </mat-tab>
 

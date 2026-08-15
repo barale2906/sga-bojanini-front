@@ -26,6 +26,8 @@ export class AuthService {
         this.currentUser.set(JSON.parse(saved));
         this.startTokenRefresh();
         this.menuService.loadMenu().subscribe();
+        // Refrescar permisos desde el servidor sin bloquear el inicio
+        this.getMe().subscribe({ error: () => {} });
       } catch {
         this.clearSession();
       }

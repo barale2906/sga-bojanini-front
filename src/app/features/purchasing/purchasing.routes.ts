@@ -6,4 +6,11 @@ export const purchasingRoutes: Routes = [
     loadComponent: () =>
       import('./purchasing-page.component').then((m) => m.PurchasingPageComponent),
   },
+  {
+    path: 'consolidar',
+    loadComponent: () =>
+      import('./consolidation/consolidation-wizard-page.component').then(
+        (m) => m.ConsolidationWizardPageComponent
+      ),
+  },
 ];

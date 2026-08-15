@@ -1,6 +1,7 @@
 import { Component, inject, signal, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormBuilder, ReactiveFormsModule } from '@angular/forms';
+import { Router } from '@angular/router';
 import { MatTabsModule } from '@angular/material/tabs';
 import { MatTableModule } from '@angular/material/table';
 import { MatPaginatorModule, PageEvent } from '@angular/material/paginator';
@@ -14,7 +15,7 @@ import { MatCheckboxModule } from '@angular/material/checkbox';
 import { MatDialog } from '@angular/material/dialog';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { SelectionModel } from '@angular/cdk/collections';
-import { PurchasingService, PurchaseOrder, ReorderSuggestion, ApprovalFlow } from './purchasing.service';
+import { PurchasingService, PurchaseOrder, ReorderSuggestion, ApprovalFlow, ConsolidatedOrder } from './purchasing.service';
 import { CatalogService } from '../catalog/catalog.service';
 import { WarehouseService } from '../warehouse/warehouse.service';
 import { PaginationMeta } from '../../core/models/api-response.model';
@@ -26,7 +27,9 @@ import { ConfirmDialogComponent } from '../../shared/components/confirm-dialog/c
 import { PurchaseOrderFormDialogComponent } from './order-form/purchase-order-form-dialog.component';
 import { PurchaseOrderDetailDialogComponent } from './order-detail/purchase-order-detail-dialog.component';
 import { PurchaseOrderPdfService } from './services/purchase-order-pdf.service';
+import { ConsolidatedOrderPdfService } from './services/consolidated-order-pdf.service';
 import { ApprovalFlowFormDialogComponent } from './approval-flows/approval-flow-form-dialog.component';
+import { ConsolidatedOrderDetailDialogComponent } from './consolidation/consolidated-order-detail-dialog.component';
 
 @Component({
   selector: 'app-purchasing-page',
@@ -40,13 +43,15 @@ import { ApprovalFlowFormDialogComponent } from './approval-flows/approval-flow-
   styleUrl: './purchasing-page.component.scss',
 })
 export class PurchasingPageComponent implements OnInit {
-  private svc = inject(PurchasingService);
-  private cSvc = inject(CatalogService);
-  private wSvc = inject(WarehouseService);
-  private dialog = inject(MatDialog);
-  private snack = inject(MatSnackBar);
-  private fb = inject(FormBuilder);
-  private pdfSvc = inject(PurchaseOrderPdfService);
+  private svc        = inject(PurchasingService);
+  private cSvc       = inject(CatalogService);
+  private wSvc       = inject(WarehouseService);
+  private dialog     = inject(MatDialog);
+  private snack      = inject(MatSnackBar);
+  private fb         = inject(FormBuilder);
+  private router     = inject(Router);
+  private pdfSvc     = inject(PurchaseOrderPdfService);
+  private occPdfSvc  = inject(ConsolidatedOrderPdfService);
 
   orders = signal<PurchaseOrder[]>([]);
   meta = signal<PaginationMeta>({ current_page: 1, last_page: 1, per_page: 25, total: 0 });
@@ -54,6 +59,14 @@ export class PurchasingPageComponent implements OnInit {
   approvalFlows = signal<ApprovalFlow[]>([]);
   loading = signal(false);
   pdfLoadingId = signal<number | null>(null);
+
+  // Consolidados
+  consolidatedOrders  = signal<ConsolidatedOrder[]>([]);
+  consolidatedMeta    = signal<PaginationMeta>({ current_page: 1, last_page: 1, per_page: 25, total: 0 });
+  loadingConsolidated = signal(false);
+  occPdfLoadingId     = signal<number | null>(null);
+  occFilters          = this.fb.group({ date_from: [''], date_to: [''] });
+  occCols             = ['code', 'supplier', 'period', 'total', 'created_at', 'occ_actions'];
 
   cols = ['actions', 'code', 'supplier', 'warehouse', 'status', 'total', 'created_at'];
   suggCols = ['actions', 'select', 'product', 'current_stock', 'reorder_point', 'suggested_qty', 'supplier'];
@@ -70,10 +83,66 @@ export class PurchasingPageComponent implements OnInit {
     this.loadOrders();
     this.loadSuggestions();
     this.loadApprovalFlows();
+    this.loadConsolidatedOrders();
     this.cSvc.getSuppliers({ per_page: 200 }).subscribe({ next: r => this.suppliers.set(r.data ?? []), error: () => {} });
     this.wSvc.getWarehouses().subscribe({ next: r => this.warehouses.set(r.data ?? []), error: () => {} });
     this.cSvc.getProducts({ per_page: 200, product_type: 'simple' }).subscribe({ next: r => this.products.set(r.data ?? []), error: () => {} });
     this.filters.get('status')!.valueChanges.subscribe(() => this.loadOrders(1));
+  }
+
+  loadConsolidatedOrders(page = 1): void {
+    this.loadingConsolidated.set(true);
+    const { date_from, date_to } = this.occFilters.value;
+    this.svc.getConsolidatedOrders({
+      date_from: date_from || undefined,
+      date_to: date_to || undefined,
+      per_page: this.consolidatedMeta().per_page,
+      page,
+    }).subscribe({
+      next: r => {
+        this.consolidatedOrders.set(r.data ?? []);
+        this.consolidatedMeta.set(r.meta);
+        this.loadingConsolidated.set(false);
+      },
+      error: () => this.loadingConsolidated.set(false),
+    });
+  }
+
+  openConsolidatedDetail(occ: ConsolidatedOrder): void {
+    this.dialog.open(ConsolidatedOrderDetailDialogComponent, {
+      data: { order: occ, purchasingSvc: this.svc },
+      width: '1000px', maxWidth: '96vw', maxHeight: '92vh',
+    });
+  }
+
+  downloadOccPdf(occ: ConsolidatedOrder): void {
+    if (this.occPdfLoadingId() !== null) return;
+    this.occPdfLoadingId.set(occ.id);
+    this.svc.getConsolidatedOrder(occ.id).subscribe({
+      next: r => { this.occPdfLoadingId.set(null); this.occPdfSvc.generate(r.data!); },
+      error: () => { this.occPdfLoadingId.set(null); this.snack.open('No se pudo generar el PDF', 'OK', { duration: 3000 }); },
+    });
+  }
+
+  onOccPage(e: PageEvent): void {
+    this.consolidatedMeta.update(m => ({ ...m, per_page: e.pageSize }));
+    this.loadConsolidatedOrders(e.pageIndex + 1);
+  }
+
+  goToConsolidar(): void {
+    this.router.navigate(['/purchasing/consolidar']);
+  }
+
+  viewConsolidatedFromOrder(consolidatedOrderId: number): void {
+    this.svc.getConsolidatedOrder(consolidatedOrderId).subscribe({
+      next: r => this.openConsolidatedDetail(r.data!),
+      error: () => this.snack.open('No se pudo cargar el consolidado', 'OK', { duration: 3000 }),
+    });
+  }
+
+  formatPeriod(occ: ConsolidatedOrder): string {
+    const fmt = (d: string) => { const [y, m, day] = d.split('-'); return `${day}/${m}/${y}`; };
+    return `${fmt(occ.period_from)} — ${fmt(occ.period_to)}`;
   }
 
   loadApprovalFlows(): void {
@@ -99,7 +168,7 @@ export class PurchasingPageComponent implements OnInit {
   openNewOrder(): void {
     this.dialog.open(PurchaseOrderFormDialogComponent, {
       data: { order: null, suppliers: this.suppliers(), warehouses: this.warehouses(), products: this.products(), purchasingSvc: this.svc, catalogSvc: this.cSvc },
-      width: '900px', maxWidth: '95vw', maxHeight: '90vh',
+      width: '90vw', maxWidth: '98vw', maxHeight: '92vh',
     }).afterClosed().subscribe(ok => {
       if (ok) {
         this.snack.open('Orden creada', 'OK', { duration: 3000 });
@@ -139,7 +208,7 @@ export class PurchasingPageComponent implements OnInit {
         purchasingSvc: this.svc,
         catalogSvc: this.cSvc,
       },
-      width: '900px', maxWidth: '95vw', maxHeight: '90vh',
+      width: '90vw', maxWidth: '98vw', maxHeight: '92vh',
     }).afterClosed().subscribe(ok => {
       if (ok) {
         this.snack.open('Orden actualizada', 'OK', { duration: 3000 });
@@ -281,7 +350,7 @@ export class PurchasingPageComponent implements OnInit {
         prefillItems: group.items.map(s => ({ product_variant_id: s.generic_product_id, suggested_quantity: s.suggested_quantity })),
         orderLabel: total > 1 ? `Orden ${index + 1} de ${total}${group.supplier ? ' — ' + group.supplier.name : ''}` : null,
       },
-      width: '900px', maxWidth: '95vw', maxHeight: '90vh',
+      width: '90vw', maxWidth: '98vw', maxHeight: '92vh',
     }).afterClosed().subscribe(ok => {
       if (ok) {
         const msg = total > 1 ? `Orden ${index + 1}/${total} creada` : 'Orden creada';

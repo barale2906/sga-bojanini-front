@@ -52,13 +52,14 @@ const ACTION_LABELS: Record<string, string> = {
   aprobar: 'Aprobar',
   enviar: 'Enviar',
   recibir: 'Recibir',
+  consolidar: 'Consolidar',
   configurar: 'Configurar',
 };
 
 const ACTION_ORDER = [
   'ver', 'crear', 'editar', 'eliminar', 'importar', 'exportar',
   'entrada', 'salida', 'transferir', 'ajuste', 'devolucion', 'baja',
-  'aprobar', 'enviar', 'recibir', 'configurar',
+  'aprobar', 'enviar', 'recibir', 'consolidar', 'configurar',
 ];
 
 @Component({

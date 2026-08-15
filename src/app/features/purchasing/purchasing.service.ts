@@ -27,11 +27,86 @@ export interface PurchaseOrder {
   status: string; notes: string | null; expected_delivery_date: string | null;
   subtotal: number | string; tax_amount: number | string; total_amount: number | string;
   created_at: string;
+  received_at?: string | null;
+  consolidated_order_id?: number | null;
   supplier?: { id: number; name: string };
   warehouse?: { id: number; name: string };
   items?: PurchaseOrderItem[];
   tax_breakdown?: TaxBreakdownLine[];
   approval_records?: PurchaseOrderApprovalRecord[];
+}
+
+export interface ConsolidableSupplier {
+  id: number;
+  name: string;
+  tax_id: string;
+}
+
+export interface ConsolidatedOrderItem {
+  id: number;
+  product_variant_id: number;
+  product_presentation_id: number;
+  quantity: string;
+  unit_price: string;
+  tax_rate: string;
+  tax_amount: string;
+  total_price: string;
+  variant?: { id: number; lab_brand: string; brand_sku: string; generic?: { id: number; name: string; barcode: string } };
+  presentation?: { id: number; code: string; name: string };
+}
+
+export interface ConsolidatedOrder {
+  id: number;
+  code: string;
+  supplier_id: number;
+  period_from: string;
+  period_to: string;
+  subtotal: string;
+  tax_breakdown?: TaxBreakdownEntry[];
+  tax_amount: string;
+  total_amount: string;
+  notes?: string | null;
+  created_by?: number;
+  created_at: string;
+  supplier?: { id: number; name: string };
+  createdBy?: { id: number; name: string };
+  items?: ConsolidatedOrderItem[];
+  purchase_orders?: Array<{
+    id: number; code: string; status: string; total_amount: string;
+    received_at?: string;
+    warehouse?: { id: number; name: string; code: string };
+    items?: PurchaseOrderItem[];
+  }>;
+}
+
+export interface ConsolidationPreviewItem {
+  product_variant_id: number;
+  product_presentation_id: number;
+  quantity: number;
+  unit_price: number;
+  tax_rate: number;
+  subtotal: number;
+  tax_amount: number;
+  total_price: number;
+  source_order_codes: string[];
+  variant?: { id: number; lab_brand: string; brand_sku: string; generic?: { id: number; name: string } };
+  presentation?: { id: number; code: string; name: string };
+}
+
+export interface TaxBreakdownEntry {
+  rate: number;
+  taxable_base: number;
+  tax_amount: number;
+}
+
+export interface ConsolidationPreview {
+  supplier: { id: number; name: string; tax_id: string };
+  purchase_orders: Array<{ id: number; code: string; total_amount: number; warehouse: { id: number; name: string } }>;
+  items: ConsolidationPreviewItem[];
+  subtotal: number;
+  tax_breakdown: TaxBreakdownEntry[];
+  tax_amount: number;
+  total_amount: number;
 }
 
 export interface ReorderSuggestion {
@@ -135,5 +210,39 @@ export class PurchasingService {
 
   deleteApprovalFlow(id: number): Observable<ApiResponse<null>> {
     return this.http.delete<ApiResponse<null>>(`${this.api}/approval-flows/${id}`);
+  }
+
+  // Consolidación de OC
+  getConsolidableSuppliers(): Observable<ApiResponse<ConsolidableSupplier[]>> {
+    return this.http.get<ApiResponse<ConsolidableSupplier[]>>(`${this.api}/purchase-orders/consolidable-suppliers`);
+  }
+
+  getConsolidableOrders(params: { supplier_id: number; date_from?: string; date_to?: string }): Observable<ApiResponse<{ in_range: PurchaseOrder[]; pending: PurchaseOrder[] }>> {
+    let p = new HttpParams().set('supplier_id', String(params.supplier_id));
+    if (params.date_from) p = p.set('date_from', params.date_from);
+    if (params.date_to) p = p.set('date_to', params.date_to);
+    return this.http.get<ApiResponse<{ in_range: PurchaseOrder[]; pending: PurchaseOrder[] }>>(`${this.api}/purchase-orders/consolidable`, { params: p });
+  }
+
+  createConsolidatedOrder(payload: { purchase_order_ids: number[]; notes?: string }): Observable<ApiResponse<ConsolidatedOrder>> {
+    return this.http.post<ApiResponse<ConsolidatedOrder>>(`${this.api}/consolidated-orders`, payload);
+  }
+
+  getConsolidatedOrders(f: { supplier_id?: number; date_from?: string; date_to?: string; per_page?: number; page?: number } = {}): Observable<PaginatedResponse<ConsolidatedOrder>> {
+    let p = new HttpParams();
+    if (f.supplier_id) p = p.set('supplier_id', String(f.supplier_id));
+    if (f.date_from) p = p.set('date_from', f.date_from);
+    if (f.date_to) p = p.set('date_to', f.date_to);
+    if (f.per_page) p = p.set('per_page', String(f.per_page));
+    if (f.page) p = p.set('page', String(f.page));
+    return this.http.get<PaginatedResponse<ConsolidatedOrder>>(`${this.api}/consolidated-orders`, { params: p });
+  }
+
+  getConsolidatedOrder(id: number): Observable<ApiResponse<ConsolidatedOrder>> {
+    return this.http.get<ApiResponse<ConsolidatedOrder>>(`${this.api}/consolidated-orders/${id}`);
+  }
+
+  getConsolidationPreview(purchase_order_ids: number[]): Observable<ApiResponse<ConsolidationPreview>> {
+    return this.http.post<ApiResponse<ConsolidationPreview>>(`${this.api}/purchase-orders/consolidation-preview`, { purchase_order_ids });
   }
 }
