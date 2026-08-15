@@ -94,6 +94,8 @@ export class WarehouseTransferDialogComponent implements OnInit {
   /** true si el producto no tiene stock vigente pero sí stock vencido en el almacén de origen */
   expiredOnly   = signal(false);
 
+  readonly today = new Date().toISOString().split('T')[0];
+
   form = this.fb.group({
     warehouse_from_id:  [null as number | null, Validators.required],
     location_from_id:   [null as number | null, Validators.required],
@@ -101,6 +103,7 @@ export class WarehouseTransferDialogComponent implements OnInit {
     warehouse_to_id:    [null as number | null, Validators.required],
     location_to_id:     [null as number | null, Validators.required],
     quantity:           [null as number | null, [Validators.required, Validators.min(0.001)]],
+    movement_date:      [''],
     reason:             [''],
   });
 
@@ -243,6 +246,7 @@ export class WarehouseTransferDialogComponent implements OnInit {
     const payload = {
       warehouse_from_id: v.warehouse_from_id,
       warehouse_to_id:   v.warehouse_to_id,
+      movement_date:     v.movement_date || undefined,
       reason:            v.reason || undefined,
       items: [{
         product_variant_id: v.product_variant_id,
@@ -268,7 +272,7 @@ export class WarehouseTransferDialogComponent implements OnInit {
             movement_type:     'transfer',
             doc_id:            document.id,
             doc_number:        document.document_number,
-            date:              document.created_at,
+            date:              document.movement_date ?? document.created_at,
             user_name:         document.user_name,
             warehouse_name:    wFrom?.name ?? `Almacén ${v.warehouse_from_id}`,
             warehouse_to_name: wTo?.name   ?? `Almacén ${v.warehouse_to_id}`,
@@ -338,4 +342,5 @@ export class WarehouseTransferDialogComponent implements OnInit {
   formatQty(v: number | undefined): string {
     return v !== undefined ? v.toLocaleString('es-CO') : '—';
   }
+
 }

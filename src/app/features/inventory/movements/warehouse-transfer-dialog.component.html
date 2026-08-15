@@ -191,6 +191,12 @@
       </mat-form-field>
     </div>
 
+    <mat-form-field appearance="outline" class="w-full">
+      <mat-label>Fecha del movimiento</mat-label>
+      <input matInput type="date" formControlName="movement_date" [max]="today" />
+      <mat-hint>Dejar vacío para usar la fecha actual</mat-hint>
+    </mat-form-field>
+
     <!-- Nota FEFO -->
     <div class="fefo-note">
       <mat-icon>info</mat-icon>

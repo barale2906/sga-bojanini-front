@@ -359,7 +359,10 @@ export class MovementFormDialogComponent implements OnInit {
   /** Motivos de baja disponibles para el selector del formulario. */
   readonly lossReasonOptions = LOSS_REASON_OPTIONS;
 
+  readonly today = new Date().toISOString().split('T')[0];
+
   form = this.fb.group({
+    movement_date:            [''],
     product_id:               [null as number | null, Validators.required],
     product_variant_id:       [null as number | null],
     warehouse_id:             [null as number | null, Validators.required],
@@ -956,6 +959,7 @@ export class MovementFormDialogComponent implements OnInit {
       // Campos de cabecera del documento (top-level)
       const entryHeader: Record<string, unknown> = {
         warehouse_id:      v.warehouse_id,
+        movement_date:     v.movement_date || undefined,
         invoice_number:    v.invoice_number   || undefined,
         entry_temperature: v.entry_temperature != null ? v.entry_temperature : undefined,
         reason:            v.reason           || undefined,
@@ -1000,7 +1004,7 @@ export class MovementFormDialogComponent implements OnInit {
           location_to_id:     row.location_to_id,
           quantity:           Number(row.quantity),
         }));
-        this.data.inventorySvc.transfer({ warehouse_from_id: v.warehouse_id, warehouse_to_id: v.warehouse_id, reason: v.reason || undefined, items: transferItems })
+        this.data.inventorySvc.transfer({ warehouse_from_id: v.warehouse_id, warehouse_to_id: v.warehouse_id, movement_date: v.movement_date || undefined, reason: v.reason || undefined, items: transferItems })
           .subscribe({
             next: res => {
               const doc = res.data;
@@ -1013,6 +1017,7 @@ export class MovementFormDialogComponent implements OnInit {
       this.data.inventorySvc.transfer({
         warehouse_from_id: v.warehouse_id,
         warehouse_to_id:   v.warehouse_id,
+        movement_date:     v.movement_date || undefined,
         reason:            v.reason || undefined,
         items: [{ product_variant_id: v.product_variant_id, location_from_id: v.location_from_id, location_to_id: v.location_to_id, quantity: Number(v.quantity) }],
       }).subscribe({
@@ -1039,6 +1044,7 @@ export class MovementFormDialogComponent implements OnInit {
     if (this.isExit) {
       const exitPayload: Record<string, unknown> = {
         ...basePayload,
+        movement_date:  v.movement_date || undefined,
         location_id:    v.location_id    || undefined,
         quantity:       Number(v.quantity),
         cost_center_id: v.cost_center_id,
@@ -1152,7 +1158,7 @@ export class MovementFormDialogComponent implements OnInit {
     this.pdfSvc.generateAndPrint({
       movement_type:     type,
       doc_id:            movement.movement_document_id ?? movement.id,
-      date:              movement.created_at,
+      date:              movement.movement_date ?? movement.created_at,
       user_name:         movement.user_name,
       warehouse_name:    wh?.name ?? `Almacén ${movement.warehouse_id}`,
       warehouse_to_name: whTo?.name ?? null,

@@ -113,6 +113,7 @@ export interface MovementDocument {
   invoice_number: string | null;
   entry_temperature: number | null;
   reason: string | null;
+  movement_date: string | null;
   user_id: number;
   user_name: string;
   created_at: string;
@@ -138,6 +139,7 @@ export interface Movement {
   movement_type: string;
   quantity: number;
   reason: string | null;
+  movement_date?: string | null;
   user_id: number;
   created_at: string;
   /** Nombre del genérico — presente en GET /movements/{id} (carga variant.genericProduct). Puede ser null en el listado. */

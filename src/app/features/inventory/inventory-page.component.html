@@ -260,7 +260,7 @@
             <td mat-cell *matCellDef="let m">{{ m.user_name }}</td>
           </ng-container>
           <ng-container matColumnDef="created_at">
-            <th mat-header-cell *matHeaderCellDef mat-sort-header>Fecha</th>
+            <th mat-header-cell *matHeaderCellDef mat-sort-header>Fecha del movimiento</th>
             <td mat-cell *matCellDef="let m">{{ m.date | dateFormat:'datetime' }}</td>
           </ng-container>
           <tr mat-header-row *matHeaderRowDef="moveCols"></tr>

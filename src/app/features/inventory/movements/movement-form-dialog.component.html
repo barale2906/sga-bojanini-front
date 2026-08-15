@@ -198,6 +198,14 @@
       </mat-select>
     </mat-form-field>
 
+    <!-- ── Fecha del movimiento (solo entrada, salida y transferencia) ── -->
+    @if (isEntry || isExit || isTransfer) {
+      <mat-form-field appearance="outline" class="span2">
+        <mat-label>Fecha del movimiento</mat-label>
+        <input matInput type="date" formControlName="movement_date" [max]="today" />
+        <mat-hint>Dejar vacío para usar la fecha actual</mat-hint>
+      </mat-form-field>
+    }
 
     <!-- ══════════════════════ ENTRADA ══════════════════════════ -->
     @if (isEntry) {

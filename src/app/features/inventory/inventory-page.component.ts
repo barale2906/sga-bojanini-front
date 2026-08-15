@@ -115,7 +115,7 @@ export class InventoryPageComponent implements OnInit {
   stock = signal<StockItem[]>([]);
   stockMeta = signal<PaginationMeta>({ current_page: 1, last_page: 1, per_page: 25, total: 0 });
   lowStock = signal<StockItem[]>([]);
-  stockCols = ['product', 'category', 'warehouse', 'available', 'total', 'last_movement'];
+  stockCols = ['product', 'category', 'warehouse', 'available', 'total'];
   stockFilters = this.fb.group({ warehouse_id: [''], category_id: [''], generic_product_id: [''] });
 
   // Movements
@@ -320,7 +320,7 @@ export class InventoryPageComponent implements OnInit {
           warehouse_to_name: m.warehouse_to_name ?? (m.warehouse_to_id ? this.getWarehouseName(m.warehouse_to_id) : null),
           quantity: m.quantity,
           user_name: m.user_name || '—',
-          date: m.created_at,
+          date: m.movement_date ?? m.created_at,
         }));
         this.moveDisplayRows.set(rows);
         this.moveMeta.set(r.meta);
@@ -420,7 +420,7 @@ export class InventoryPageComponent implements OnInit {
             movement_type:     doc.document_type,
             doc_id:            doc.id,
             doc_number:        doc.document_number,
-            date:              doc.created_at,
+            date:              doc.movement_date ?? doc.created_at,
             user_name:         doc.user_name,
             warehouse_name:    doc.warehouse_name ?? row.warehouse_name,
             warehouse_to_name: doc.warehouse_to_name,
@@ -461,7 +461,7 @@ export class InventoryPageComponent implements OnInit {
           this.movPdfSvc.generateAndPrint({
             movement_type:     m.movement_type,
             doc_id:            m.movement_document_id ?? m.id,
-            date:              m.created_at,
+            date:              m.movement_date ?? m.created_at,
             user_name:         m.user_name,
             warehouse_name:    row.warehouse_name,
             warehouse_to_name: row.warehouse_to_name,

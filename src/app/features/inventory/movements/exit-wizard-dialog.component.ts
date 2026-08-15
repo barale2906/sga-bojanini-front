@@ -13,6 +13,7 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { MatDividerModule } from '@angular/material/divider';
 import { DateAdapter, MAT_DATE_FORMATS } from '@angular/material/core';
+import { MatDatepickerModule } from '@angular/material/datepicker';
 import { forkJoin, finalize, switchMap, of } from 'rxjs';
 import { InventoryService, StockSummary, BatchDetail, CostCenter, MovementDocument } from '../inventory.service';
 import { MovementConfirmDialogComponent, MovementConfirmResult } from './movement-confirm-dialog.component';
@@ -117,8 +118,11 @@ export class ExitWizardDialogComponent implements OnInit {
   // ── Step 2: Centro de costos ──────────────────────────────────
   centerForm = this.fb.group({
     cost_center_id: [null as number | null, Validators.required],
+    movement_date:  [''],
     reason:         [''],
   });
+
+  readonly today = new Date().toISOString().split('T')[0];
 
   costCenters        = signal<CostCenter[]>([]);
   loadingCostCenters = signal(false);
@@ -435,6 +439,7 @@ export class ExitWizardDialogComponent implements OnInit {
     const payload: Record<string, unknown> = {
       warehouse_id:   wId,
       cost_center_id: cv.cost_center_id,
+      movement_date:  cv.movement_date || undefined,
       reason:         cv.reason || undefined,
       items: this.cartItems().map(item => ({
         generic_product_id: item.product.id,
@@ -476,7 +481,7 @@ export class ExitWizardDialogComponent implements OnInit {
         this.exitSummaryData.set({
           doc_id:           document.id,
           doc_number:       document.document_number,
-          date:             document.created_at,
+          date:             document.movement_date ?? document.created_at,
           user_name:        document.user_name,
           warehouse_name:   wh?.name ?? `Almacén ${wId}`,
           cost_center_name: cc?.name ?? null,
