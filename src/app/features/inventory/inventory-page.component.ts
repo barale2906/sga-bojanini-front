@@ -21,6 +21,7 @@ import { DateAdapter, MAT_DATE_FORMATS } from '@angular/material/core';
 import { MatDialog } from '@angular/material/dialog';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { InventoryService, Batch, StockItem, Movement, MovementSignatureRecord, MovementDocument } from './inventory.service';
+import { AuthService } from '../../core/services/auth.service';
 import { MovementPdfService, MovementPdfSignature } from '../../shared/services/movement-pdf.service';
 import { WarehouseService, Warehouse, Location } from '../warehouse/warehouse.service';
 import { CatalogService, Category, Product } from '../catalog/catalog.service';
@@ -35,6 +36,7 @@ import { ExitWizardDialogComponent } from './movements/exit-wizard-dialog.compon
 import { WarehouseTransferDialogComponent } from './movements/warehouse-transfer-dialog.component';
 import { InitialEntriesImportDialogComponent } from './initial-entries/initial-entries-import-dialog.component';
 import { ConfirmDialogComponent } from '../../shared/components/confirm-dialog/confirm-dialog.component';
+import { SendDocumentEmailDialogComponent, SendDocumentEmailDialogData } from '../../shared/components/send-document-email-dialog/send-document-email-dialog.component';
 import { PurchaseReceiveContextService } from '../purchasing/purchase-receive-context.service';
 import { PurchaseOrder } from '../purchasing/purchasing.service';
 import { EsDateAdapter, ES_DATE_FORMATS } from '../../shared/adapters/es-date.adapter';
@@ -42,6 +44,8 @@ import { EsDateAdapter, ES_DATE_FORMATS } from '../../shared/adapters/es-date.ad
 interface MovementRow {
   id: number | null;
   movement_document_id: number | null;
+  doc_number: string | null;
+  doc_status: 'pending_signature' | 'confirmed' | null;
   movement_type: string;
   product_name: string;
   category_name: string;
@@ -102,6 +106,7 @@ export class InventoryPageComponent implements OnInit {
   private router       = inject(Router);
   private poReceiveCtx = inject(PurchaseReceiveContextService);
   private movPdfSvc    = inject(MovementPdfService);
+  protected authSvc    = inject(AuthService);
 
   // Batches
   batches = signal<Batch[]>([]);
@@ -308,6 +313,8 @@ export class InventoryPageComponent implements OnInit {
         const rows: MovementRow[] = (r.data ?? []).map(m => ({
           id: m.id,
           movement_document_id: m.movement_document_id ?? null,
+          doc_number: null,
+          doc_status: m.status ?? null,
           movement_type: m.movement_type,
           // product_name ya no siempre viene en el listado (nuevo modelo genérico+variante);
           // variant_lab_brand es el fallback cuando el backend no carga el genérico completo.
@@ -477,6 +484,19 @@ export class InventoryPageComponent implements OnInit {
         this.loadingPdf.set(null);
         this.snack.open('No se pudo cargar el movimiento para imprimir', 'OK', { duration: 3000 });
       },
+    });
+  }
+
+  openSendEmail(row: MovementRow): void {
+    if (!row.movement_document_id) return;
+    this.dialog.open(SendDocumentEmailDialogComponent, {
+      data: {
+        document_id:     row.movement_document_id,
+        document_number: row.doc_number ?? `#${row.movement_document_id}`,
+        inventorySvc:    this.svc,
+      } satisfies SendDocumentEmailDialogData,
+      width: '540px', maxWidth: '96vw', maxHeight: '90vh',
+      disableClose: true,
     });
   }
 

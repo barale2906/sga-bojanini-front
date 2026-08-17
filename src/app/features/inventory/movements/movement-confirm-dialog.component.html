@@ -156,6 +156,16 @@
         </div>
       </div>
     </div>
+
+    @if (showEmailPrompt()) {
+      <div class="email-prompt">
+        <mat-icon>email</mat-icon>
+        <div class="email-prompt-text">
+          <strong>¿Desea enviar el comprobante por correo?</strong>
+          <span>Puede seleccionar destinatarios internos o externos.</span>
+        </div>
+      </div>
+    }
   }
 
 </mat-dialog-content>
@@ -198,9 +208,19 @@
       </button>
     }
   } @else {
-    <button mat-flat-button color="primary" (click)="closeConfirmed()">
-      <mat-icon>close</mat-icon>
-      Cerrar
-    </button>
+    @if (showEmailPrompt()) {
+      <button mat-button type="button" (click)="dismissEmailPrompt()">
+        Ahora no
+      </button>
+      <button mat-flat-button color="primary" type="button" (click)="openEmailDialog()">
+        <mat-icon>email</mat-icon>
+        Sí, enviar
+      </button>
+    } @else {
+      <button mat-flat-button color="primary" (click)="closeConfirmed()">
+        <mat-icon>close</mat-icon>
+        Cerrar
+      </button>
+    }
   }
 </mat-dialog-actions>

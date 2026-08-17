@@ -1,0 +1,81 @@
+<h2 mat-dialog-title class="email-title">
+  <mat-icon>email</mat-icon>
+  Enviar comprobante {{ data.document_number }}
+</h2>
+
+<mat-dialog-content class="email-content">
+
+  <mat-form-field appearance="outline" class="full-width">
+    <mat-label>Destinatarios</mat-label>
+    <mat-chip-grid #chipGrid aria-label="Destinatarios">
+      @for (email of recipients(); track email) {
+        <mat-chip-row (removed)="removeRecipient(email)" class="recipient-chip">
+          <mat-icon matChipAvatar>person</mat-icon>
+          {{ email }}
+          <button matChipRemove [attr.aria-label]="'Quitar ' + email">
+            <mat-icon>cancel</mat-icon>
+          </button>
+        </mat-chip-row>
+      }
+      <input
+        #emailInput
+        placeholder="Nombre, correo o Enter para agregar…"
+        [formControl]="inputCtrl"
+        [matChipInputFor]="chipGrid"
+        [matChipInputSeparatorKeyCodes]="separatorKeyCodes"
+        [matChipInputAddOnBlur]="false"
+        [matAutocomplete]="autoUsers"
+        (matChipInputTokenEnd)="addFromInput($event)"
+        autocomplete="off">
+    </mat-chip-grid>
+
+    <mat-autocomplete #autoUsers="matAutocomplete"
+                      [displayWith]="userDisplay"
+                      (optionSelected)="selectUser($event)">
+      @for (u of userResults(); track u.id) {
+        <mat-option [value]="u" class="user-option">
+          <mat-icon class="user-opt-icon">person</mat-icon>
+          <span class="user-option-name">{{ u.name }}</span>
+          <span class="user-option-email">{{ u.email }}</span>
+        </mat-option>
+      }
+      @if (!userResults().length && (inputCtrl.value?.length ?? 0) >= 2) {
+        <mat-option disabled class="hint-option">
+          <mat-icon>alternate_email</mat-icon>
+          Presiona Enter para agregar "{{ inputCtrl.value }}" como correo externo
+        </mat-option>
+      }
+    </mat-autocomplete>
+
+    <mat-hint>Busca un usuario interno o escribe un correo y presiona Enter / coma</mat-hint>
+  </mat-form-field>
+
+  @if (!recipients().length) {
+    <div class="empty-hint">
+      <mat-icon>inbox</mat-icon>
+      <span>Agrega al menos un destinatario para poder enviar</span>
+    </div>
+  }
+
+  <app-form-errors [errors]="errors()"></app-form-errors>
+
+</mat-dialog-content>
+
+<mat-dialog-actions align="end">
+  <button mat-button type="button" [mat-dialog-close]="false" [disabled]="sending()">
+    Cancelar
+  </button>
+  <button mat-flat-button
+          color="primary"
+          type="button"
+          [disabled]="!recipients().length || sending()"
+          (click)="send()">
+    @if (sending()) {
+      <mat-spinner diameter="16"></mat-spinner>
+      Enviando…
+    } @else {
+      <mat-icon>send</mat-icon>
+      Enviar
+    }
+  </button>
+</mat-dialog-actions>

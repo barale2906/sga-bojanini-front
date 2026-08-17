@@ -1,7 +1,7 @@
 import { Component, inject, signal, ViewChild, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
-import { MatDialogModule, MAT_DIALOG_DATA, MatDialogRef } from '@angular/material/dialog';
+import { MatDialogModule, MAT_DIALOG_DATA, MatDialogRef, MatDialog } from '@angular/material/dialog';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatButtonModule } from '@angular/material/button';
@@ -13,6 +13,7 @@ import { AuthService } from '../../../core/services/auth.service';
 import { MovementPdfSignature } from '../../../shared/services/movement-pdf.service';
 import { FormErrorsComponent } from '../../../shared/components/form-errors/form-errors.component';
 import { SignatureCapturePadComponent } from '../../../shared/components/signature-capture-pad/signature-capture-pad.component';
+import { SendDocumentEmailDialogComponent, SendDocumentEmailDialogData } from '../../../shared/components/send-document-email-dialog/send-document-email-dialog.component';
 
 export interface MovementConfirmResult {
   confirmed:    true;
@@ -53,16 +54,18 @@ export class MovementConfirmDialogComponent implements OnInit {
   data: MovementConfirmDialogData = inject(MAT_DIALOG_DATA);
   private ref     = inject(MatDialogRef<MovementConfirmDialogComponent>);
   private fb      = inject(FormBuilder);
+  private dialog  = inject(MatDialog);
   protected authSvc = inject(AuthService);
 
   @ViewChild('deliveredPad') deliveredPad!: SignatureCapturePadComponent;
   @ViewChild('receivedPad')  receivedPad!:  SignatureCapturePadComponent;
 
-  confirming = signal(false);
-  cancelling = signal(false);
-  errors     = signal<string[]>([]);
-  confirmed  = signal(false);
-  padTouched = signal(false);
+  confirming       = signal(false);
+  cancelling       = signal(false);
+  errors           = signal<string[]>([]);
+  confirmed        = signal(false);
+  padTouched       = signal(false);
+  showEmailPrompt  = signal(false);
 
   // Guardadas antes de que @if(!confirmed()) destruya los canvas del DOM
   private _capturedDeliveredB64 = '';
@@ -126,6 +129,9 @@ export class MovementConfirmDialogComponent implements OnInit {
       next: () => {
         this.confirming.set(false);
         this.confirmed.set(true);
+        if (this.authSvc.hasPermission('movimientos.enviar_correo')) {
+          this.showEmailPrompt.set(true);
+        }
       },
       error: err => {
         this.confirming.set(false);
@@ -146,6 +152,25 @@ export class MovementConfirmDialogComponent implements OnInit {
       next:  () => { this.cancelling.set(false); this.ref.close({ cancelled: true }); },
       error: () => { this.cancelling.set(false); this.ref.close({ cancelled: true }); },
     });
+  }
+
+  dismissEmailPrompt(): void {
+    this.showEmailPrompt.set(false);
+    this.closeConfirmed();
+  }
+
+  openEmailDialog(): void {
+    this.showEmailPrompt.set(false);
+    const docNumber = `DOC-${this.data.document_id}`;
+    this.dialog.open(SendDocumentEmailDialogComponent, {
+      data: {
+        document_id:     this.data.document_id,
+        document_number: docNumber,
+        inventorySvc:    this.data.inventorySvc,
+      } satisfies SendDocumentEmailDialogData,
+      width: '540px', maxWidth: '96vw', maxHeight: '90vh',
+      disableClose: true,
+    }).afterClosed().subscribe(() => this.closeConfirmed());
   }
 
   closeConfirmed(): void {

@@ -219,6 +219,14 @@
                     }
                   </button>
                 }
+                @if (PRINTABLE_TYPES.has(m.movement_type) && m.movement_document_id && authSvc.hasPermission('movimientos.enviar_correo')) {
+                  <button mat-icon-button class="pdf-btn"
+                          (click)="openSendEmail(m); $event.stopPropagation()"
+                          [matTooltip]="m.doc_status === 'confirmed' ? 'Enviar por correo' : 'Solo disponible para comprobantes confirmados'"
+                          [disabled]="m.doc_status !== 'confirmed'">
+                    <mat-icon>email</mat-icon>
+                  </button>
+                }
               </div>
             </td>
           </ng-container>

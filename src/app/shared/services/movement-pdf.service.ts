@@ -199,7 +199,7 @@ export class MovementPdfService {
     deliveredBy: MovementPdfSignature | null,
     receivedBy:  MovementPdfSignature | null,
   ): string {
-    const hasData = !!(deliveredBy && receivedBy);
+    const hasData = !!(deliveredBy?.signature_data && receivedBy?.signature_data);
 
     if (hasData) {
       const colHtml = (role: string, sig: MovementPdfSignature) => `

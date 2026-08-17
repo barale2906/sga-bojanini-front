@@ -126,6 +126,14 @@ export interface ConfirmMovementPayload {
   received_by:  { name: string; document: string; signature: string };
 }
 
+export interface UserSearchResult {
+  id: number;
+  name: string;
+  email: string;
+  is_active: boolean;
+  roles: string[];
+}
+
 export interface Movement {
   id: number;
   movement_document_id?: number | null;
@@ -352,6 +360,16 @@ export class InventoryService {
   /** Cancela un documento pendiente de firma (id = movement_document.id). */
   cancelPendingMovement(id: number): Observable<ApiResponse<null>> {
     return this.http.delete<ApiResponse<null>>(`${this.api}/movement-documents/${id}/pending`);
+  }
+
+  /** Busca usuarios internos activos por nombre o email. */
+  searchUsers(search: string): Observable<ApiResponse<UserSearchResult[]>> {
+    return this.http.get<ApiResponse<UserSearchResult[]>>(`${this.api}/auth/users`, { params: { search } });
+  }
+
+  /** Envía el comprobante de un documento confirmado por correo electrónico. */
+  sendDocumentEmail(id: number, recipients: string[]): Observable<ApiResponse<null>> {
+    return this.http.post<ApiResponse<null>>(`${this.api}/movement-documents/${id}/send-email`, { recipients });
   }
 
   /** Obtiene una firma específica de un documento (id = movement_document.id). */
