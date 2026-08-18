@@ -1,0 +1,91 @@
+.form-content { max-height: 82vh; overflow-y: auto; padding: 1rem 1.5rem; }
+h3 { font-size: 0.9rem; font-weight: 600; margin: 0; }
+.og-badge { font-size: 0.75rem; background: #e9d8fd; color: #553c9a; padding: 0.1rem 0.5rem; border-radius: 9999px; margin-left: 0.5rem; font-weight: 600; }
+.field-label { font-size: 0.75rem; color: #718096; font-weight: 600; text-transform: uppercase; display: block; margin-bottom: 0.4rem; }
+
+/* ── Sección de proveedor ── */
+.supplier-section { margin-bottom: 1rem; }
+.supplier-field { width: 100%; }
+
+.supplier-chip {
+  display: flex; align-items: center; gap: 0.75rem;
+  background: #EBF8FF; border: 1.5px solid #bee3f8; border-radius: 10px;
+  padding: 0.6rem 0.75rem; margin-bottom: 0.5rem;
+}
+.chip-icon { color: #2b6cb0; font-size: 1.4rem; flex-shrink: 0; }
+.chip-info { flex: 1; display: flex; flex-direction: column; }
+.chip-name { font-size: 0.95rem; font-weight: 600; color: #2d3748; }
+.chip-sub  { font-size: 0.78rem; color: #718096; }
+.chip-clear { flex-shrink: 0; }
+
+.create-btn { margin-top: 0.25rem; }
+
+/* Opciones del autocomplete */
+.supplier-option { line-height: 1.2; padding: 8px 12px !important; }
+.opt-name { font-size: 0.9rem; color: #2d3748; }
+.opt-sub  { font-size: 0.75rem; color: #a0aec0; }
+.create-option {
+  color: #553c9a; font-weight: 600; font-size: 0.85rem;
+  border-top: 1px solid #e2e8f0; margin-top: 4px;
+  display: flex; align-items: center; gap: 6px;
+  mat-icon { font-size: 1.1rem; }
+}
+.no-results { color: #a0aec0; font-size: 0.82rem; }
+
+/* ── Panel crear proveedor ── */
+.create-supplier-panel {
+  background: #f7fafc; border: 1.5px solid #e2e8f0; border-radius: 10px;
+  padding: 1rem; margin-top: 0.5rem; margin-bottom: 0.5rem;
+}
+.create-panel-header {
+  display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.75rem;
+  font-size: 0.9rem; color: #2d3748;
+  mat-icon { color: #553c9a; }
+  button { margin-left: auto; }
+}
+.create-errors { background: #fff5f5; border: 1px solid #fed7d7; border-radius: 6px; padding: 0.5rem 0.75rem; margin-bottom: 0.5rem;
+  p { margin: 0.15rem 0; font-size: 0.82rem; color: #c53030; }
+}
+.create-panel-form {
+  display: flex; gap: 0.75rem; flex-wrap: wrap;
+  .cf-name  { flex: 2; min-width: 180px; }
+  .cf-nit   { width: 150px; }
+  .cf-email { flex: 2; min-width: 160px; }
+  .cf-phone { width: 140px; }
+  .cf-notes { flex: 3; min-width: 180px; }
+}
+.create-panel-actions { display: flex; justify-content: flex-end; gap: 0.5rem; margin-top: 0.25rem; }
+
+/* ── Cabecera de orden ── */
+.header-row {
+  display: flex; gap: 1rem; flex-wrap: wrap; margin-bottom: 0.5rem;
+  .field-date  { width: 170px; }
+  .field-notes { flex: 3; min-width: 200px; }
+}
+
+/* ── Ítems ── */
+.items-header { display: flex; align-items: center; justify-content: space-between; margin: 0.75rem 0 0.5rem; }
+.items-list { display: flex; flex-direction: column; gap: 0.5rem; }
+
+.item-row {
+  display: flex; align-items: flex-start; gap: 0.5rem; flex-wrap: wrap;
+  padding: 0.5rem 0.75rem; background: #f7fafc; border-radius: 8px;
+  .item-num { min-width: 20px; padding-top: 1.1rem; color: #a0aec0; font-size: 0.8rem; font-weight: 600; }
+  .f-desc  { flex: 4; min-width: 180px; }
+  .f-unit  { width: 100px; }
+  .f-qty   { width: 100px; }
+  .f-price { width: 140px; }
+  .f-tax   { width: 90px; }
+  .f-notes { flex: 2; min-width: 130px; }
+}
+
+/* Botón al pie de la lista */
+.add-item-btn { width: 100%; margin-top: 0.4rem; border-style: dashed !important; color: #553c9a; }
+
+/* ── Totales ── */
+.totals-preview {
+  display: flex; justify-content: flex-end; align-items: center;
+  gap: 1rem; padding: 0.75rem 0.25rem 0; font-size: 0.875rem;
+  .tot-label { color: #718096; }
+  .tot-final { font-size: 1rem; }
+}

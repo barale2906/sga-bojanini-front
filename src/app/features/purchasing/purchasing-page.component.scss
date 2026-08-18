@@ -12,6 +12,11 @@
 .st-rejected { background:#fed7d7; color:#c53030; }
 .st-cancelled { background:#e2e8f0; color:#718096; }
 .st-consolidated { background:#e9d8fd; color:#553c9a; cursor:pointer; &:hover { opacity:0.8; } }
+/* Badges de pago para OG */
+.og-pay {}
+.pay-unpaid  { background:#fed7d7; color:#c53030; }
+.pay-partial { background:#fefcbf; color:#744210; }
+.pay-paid    { background:#c6f6d5; color:#276749; }
 .act { /* global col-actions en styles.scss */ }
 .date { width: 170px; }
 .no-data, .empty-state { text-align: center; padding: 2.5rem; color: #a0aec0; mat-icon { font-size: 3rem; width: 3rem; height: 3rem; display: block; margin: 0 auto 0.5rem; } }

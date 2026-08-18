@@ -139,9 +139,10 @@ export class PurchasingService {
   private http = inject(HttpClient);
   private api = environment.apiUrl;
 
-  getOrders(f: { status?: string; per_page?: number; page?: number } = {}): Observable<PaginatedResponse<PurchaseOrder>> {
+  getOrders(f: { status?: string; order_type?: string; per_page?: number; page?: number } = {}): Observable<PaginatedResponse<PurchaseOrder>> {
     let p = new HttpParams();
     if (f.status) p = p.set('status', f.status);
+    if (f.order_type) p = p.set('order_type', f.order_type);
     if (f.per_page) p = p.set('per_page', String(f.per_page));
     if (f.page) p = p.set('page', String(f.page));
     return this.http.get<PaginatedResponse<PurchaseOrder>>(`${this.api}/purchase-orders`, { params: p });

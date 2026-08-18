@@ -1,0 +1,209 @@
+<h2 mat-dialog-title>{{ isEditMode ? 'Editar Orden de Gasto' : 'Nueva Orden de Gasto' }} <span class="og-badge">OG</span></h2>
+
+<mat-dialog-content class="form-content">
+  <app-form-errors [errors]="errors()"></app-form-errors>
+
+  <form [formGroup]="form">
+
+    <!-- ── Proveedor (typeahead) ── -->
+    <div class="supplier-section">
+      <label class="field-label">Proveedor *</label>
+
+      @if (selectedSupplier()) {
+        <!-- Proveedor seleccionado -->
+        <div class="supplier-chip">
+          <mat-icon class="chip-icon">store</mat-icon>
+          <div class="chip-info">
+            <span class="chip-name">{{ selectedSupplier()!.name }}</span>
+            @if (selectedSupplier()!.tax_id) {
+              <span class="chip-sub">NIT: {{ selectedSupplier()!.tax_id }}</span>
+            }
+          </div>
+          <button mat-icon-button type="button" (click)="clearSupplier()" matTooltip="Cambiar proveedor" class="chip-clear">
+            <mat-icon>close</mat-icon>
+          </button>
+        </div>
+      } @else {
+        <!-- Input de búsqueda -->
+        <mat-form-field appearance="outline" class="supplier-field">
+          <mat-label>Buscar proveedor por nombre o NIT…</mat-label>
+          <input matInput [formControl]="supplierQuery"
+                 [matAutocomplete]="supplierAuto"
+                 autocomplete="off" />
+          @if (searchingSupplier()) {
+            <mat-spinner matSuffix diameter="18" style="margin-right:8px"></mat-spinner>
+          } @else {
+            <mat-icon matSuffix>search</mat-icon>
+          }
+          <mat-autocomplete #supplierAuto="matAutocomplete" (optionSelected)="onSupplierSelected($event)">
+            @for (s of supplierResults(); track s.id) {
+              <mat-option [value]="s" class="supplier-option">
+                <div class="opt-name">{{ s.name }}</div>
+                @if (s.tax_id) { <div class="opt-sub">NIT {{ s.tax_id }}</div> }
+              </mat-option>
+            }
+            @if (supplierResults().length > 0 || currentQuery.length >= 2) {
+              <mat-option [value]="null" (click)="openCreateSupplier(); $event.stopPropagation()" class="create-option">
+                <mat-icon>add_circle_outline</mat-icon>
+                Crear "{{ currentQuery || '…' }}" como nuevo proveedor
+              </mat-option>
+            }
+            @if (currentQuery.length >= 2 && !searchingSupplier() && supplierResults().length === 0) {
+              <mat-option disabled>
+                <span class="no-results">Sin resultados — usa "Crear nuevo" para agregar</span>
+              </mat-option>
+            }
+            @if (currentQuery.length < 2 && currentQuery.length > 0) {
+              <mat-option disabled>
+                <span class="no-results">Escribe al menos 2 caracteres</span>
+              </mat-option>
+            }
+          </mat-autocomplete>
+        </mat-form-field>
+
+        @if (currentQuery.length < 2) {
+          <button mat-stroked-button type="button" (click)="openCreateSupplier()" class="create-btn">
+            <mat-icon>add</mat-icon> Nuevo proveedor
+          </button>
+        }
+      }
+
+      <!-- Panel de creación de proveedor -->
+      @if (showCreateSupplier()) {
+        <div class="create-supplier-panel">
+          <div class="create-panel-header">
+            <mat-icon>store</mat-icon>
+            <strong>Nuevo proveedor de gastos</strong>
+            <button mat-icon-button type="button" (click)="cancelCreateSupplier()" [disabled]="creatingSupplier()">
+              <mat-icon>close</mat-icon>
+            </button>
+          </div>
+
+          @if (createErrors().length > 0) {
+            <div class="create-errors">
+              @for (e of createErrors(); track e) { <p>{{ e }}</p> }
+            </div>
+          }
+
+          <div class="create-panel-form" [formGroup]="createForm">
+            <mat-form-field appearance="outline" class="cf-name">
+              <mat-label>Nombre *</mat-label>
+              <input matInput formControlName="name" />
+            </mat-form-field>
+            <mat-form-field appearance="outline" class="cf-nit">
+              <mat-label>NIT / RUT</mat-label>
+              <input matInput formControlName="tax_id" />
+            </mat-form-field>
+            <mat-form-field appearance="outline" class="cf-email">
+              <mat-label>Email</mat-label>
+              <input matInput type="email" formControlName="email" />
+            </mat-form-field>
+            <mat-form-field appearance="outline" class="cf-phone">
+              <mat-label>Teléfono</mat-label>
+              <input matInput formControlName="phone" />
+            </mat-form-field>
+            <mat-form-field appearance="outline" class="cf-notes">
+              <mat-label>Notas</mat-label>
+              <input matInput formControlName="notes" />
+            </mat-form-field>
+          </div>
+
+          <div class="create-panel-actions">
+            <button mat-button type="button" (click)="cancelCreateSupplier()" [disabled]="creatingSupplier()">Cancelar</button>
+            <button mat-raised-button color="primary" type="button"
+                    (click)="saveNewSupplier()"
+                    [disabled]="createForm.invalid || creatingSupplier()">
+              @if (creatingSupplier()) { <mat-spinner diameter="16" style="display:inline-block;margin-right:6px"></mat-spinner> }
+              Crear proveedor
+            </button>
+          </div>
+        </div>
+      }
+    </div>
+
+    <!-- ── Datos generales ── -->
+    <div class="header-row">
+      <mat-form-field appearance="outline" class="field-date">
+        <mat-label>Entrega esperada</mat-label>
+        <input matInput type="date" formControlName="expected_delivery_date" />
+      </mat-form-field>
+      <mat-form-field appearance="outline" class="field-notes">
+        <mat-label>Notas generales</mat-label>
+        <input matInput formControlName="notes" />
+      </mat-form-field>
+    </div>
+
+    <!-- ── Ítems ── -->
+    <div class="items-header">
+      <h3>Ítems</h3>
+    </div>
+
+    <div formArrayName="items" class="items-list">
+      @for (item of items.controls; track $index; let i = $index) {
+        <div [formGroupName]="i" class="item-row">
+          <span class="item-num">{{ i + 1 }}</span>
+
+          <mat-form-field appearance="outline" class="f-desc">
+            <mat-label>Descripción *</mat-label>
+            <input #descInput matInput formControlName="description" placeholder="Ej: Uniforme talla M" />
+          </mat-form-field>
+
+          <mat-form-field appearance="outline" class="f-unit">
+            <mat-label>Unidad *</mat-label>
+            <mat-select formControlName="unit">
+              @for (u of units; track u) { <mat-option [value]="u">{{ u }}</mat-option> }
+            </mat-select>
+          </mat-form-field>
+
+          <mat-form-field appearance="outline" class="f-qty">
+            <mat-label>Cantidad *</mat-label>
+            <input matInput type="number" min="0.001" step="0.001" formControlName="quantity" />
+          </mat-form-field>
+
+          <mat-form-field appearance="outline" class="f-price">
+            <mat-label>Precio unit. *</mat-label>
+            <span matTextPrefix>$&nbsp;</span>
+            <input matInput type="number" min="0" step="1" formControlName="unit_price" />
+          </mat-form-field>
+
+          <mat-form-field appearance="outline" class="f-tax">
+            <mat-label>IVA %</mat-label>
+            <input matInput type="number" min="0" max="100" step="1" formControlName="tax_rate" />
+            <span matTextSuffix>%</span>
+          </mat-form-field>
+
+          <mat-form-field appearance="outline" class="f-notes">
+            <mat-label>Nota</mat-label>
+            <input matInput formControlName="notes" />
+          </mat-form-field>
+
+          <button mat-icon-button color="warn" type="button" (click)="removeItem(i)"
+                  [disabled]="items.length === 1" matTooltip="Eliminar ítem">
+            <mat-icon>delete_outline</mat-icon>
+          </button>
+        </div>
+      }
+    </div>
+
+    <!-- Botón agregar al final de la lista -->
+    <button mat-stroked-button type="button" (click)="addItem()" class="add-item-btn">
+      <mat-icon>add</mat-icon> Agregar ítem
+    </button>
+
+    <!-- ── Totales ── -->
+    <div class="totals-preview">
+      <span class="tot-label">Subtotal:</span><span>{{ formatCurrency(totals.subtotal) }}</span>
+      <span class="tot-label">IVA:</span><span>{{ formatCurrency(totals.tax) }}</span>
+      <span class="tot-label tot-final">Total:</span><strong>{{ formatCurrency(totals.total) }}</strong>
+    </div>
+
+  </form>
+</mat-dialog-content>
+
+<mat-dialog-actions align="end">
+  <button mat-button mat-dialog-close [disabled]="saving()">Cancelar</button>
+  <button mat-raised-button color="primary" (click)="save()" [disabled]="form.invalid || saving()">
+    @if (saving()) { <mat-spinner diameter="18" style="display:inline-block;margin-right:6px"></mat-spinner> }
+    {{ isEditMode ? 'Guardar cambios' : 'Crear orden' }}
+  </button>
+</mat-dialog-actions>

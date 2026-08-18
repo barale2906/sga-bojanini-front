@@ -22,6 +22,12 @@ export const errorInterceptor: HttpInterceptorFn = (req, next) => {
             panelClass: ['snack-warn'],
           });
           break;
+        case 404:
+          snackBar.open(error.error?.message || 'Recurso no encontrado.', 'Cerrar', {
+            duration: 5000,
+            panelClass: ['snack-warn'],
+          });
+          break;
         case 409:
           snackBar.open(error.error?.message || 'Error de negocio', 'Cerrar', {
             duration: 5000,

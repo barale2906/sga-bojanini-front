@@ -16,6 +16,10 @@ import { MatDialog } from '@angular/material/dialog';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { SelectionModel } from '@angular/cdk/collections';
 import { PurchasingService, PurchaseOrder, ReorderSuggestion, ApprovalFlow, ConsolidatedOrder } from './purchasing.service';
+import { ExpenseOrderService, ExpenseOrder } from './expense-orders/expense-order.service';
+import { ExpenseOrderFormDialogComponent } from './expense-orders/expense-order-form-dialog.component';
+import { ExpenseOrderDetailDialogComponent } from './expense-orders/expense-order-detail-dialog.component';
+import { ExpenseOrderPdfService } from './services/expense-order-pdf.service';
 import { CatalogService } from '../catalog/catalog.service';
 import { WarehouseService } from '../warehouse/warehouse.service';
 import { PaginationMeta } from '../../core/models/api-response.model';
@@ -44,6 +48,7 @@ import { ConsolidatedOrderDetailDialogComponent } from './consolidation/consolid
 })
 export class PurchasingPageComponent implements OnInit {
   private svc        = inject(PurchasingService);
+  private expenseSvc = inject(ExpenseOrderService);
   private cSvc       = inject(CatalogService);
   private wSvc       = inject(WarehouseService);
   private dialog     = inject(MatDialog);
@@ -52,6 +57,7 @@ export class PurchasingPageComponent implements OnInit {
   private router     = inject(Router);
   private pdfSvc     = inject(PurchaseOrderPdfService);
   private occPdfSvc  = inject(ConsolidatedOrderPdfService);
+  private ogPdfSvc   = inject(ExpenseOrderPdfService);
 
   orders = signal<PurchaseOrder[]>([]);
   meta = signal<PaginationMeta>({ current_page: 1, last_page: 1, per_page: 25, total: 0 });
@@ -59,6 +65,16 @@ export class PurchasingPageComponent implements OnInit {
   approvalFlows = signal<ApprovalFlow[]>([]);
   loading = signal(false);
   pdfLoadingId = signal<number | null>(null);
+
+  // Órdenes de Gasto
+  expenseOrders      = signal<ExpenseOrder[]>([]);
+  expenseMeta        = signal<PaginationMeta>({ current_page: 1, last_page: 1, per_page: 25, total: 0 });
+  loadingExpense     = signal(false);
+  ogPdfLoadingId     = signal<number | null>(null);
+  ogFilters          = this.fb.group({ status: [''], payment_status: [''] });
+  ogCols             = ['actions', 'code', 'supplier', 'status', 'payment_status', 'total', 'created_at'];
+  ogStatuses         = ['draft','pending_approval','approved','sent','partially_received','received','rejected','cancelled'];
+  ogPaymentStatuses  = ['unpaid', 'partial', 'paid'];
 
   // Consolidados
   consolidatedOrders  = signal<ConsolidatedOrder[]>([]);
@@ -84,10 +100,12 @@ export class PurchasingPageComponent implements OnInit {
     this.loadSuggestions();
     this.loadApprovalFlows();
     this.loadConsolidatedOrders();
+    this.loadExpenseOrders();
     this.cSvc.getSuppliers({ per_page: 200 }).subscribe({ next: r => this.suppliers.set(r.data ?? []), error: () => {} });
     this.wSvc.getWarehouses().subscribe({ next: r => this.warehouses.set(r.data ?? []), error: () => {} });
     this.cSvc.getProducts({ per_page: 200, product_type: 'simple' }).subscribe({ next: r => this.products.set(r.data ?? []), error: () => {} });
     this.filters.get('status')!.valueChanges.subscribe(() => this.loadOrders(1));
+    this.ogFilters.valueChanges.subscribe(() => this.loadExpenseOrders(1));
   }
 
   loadConsolidatedOrders(page = 1): void {
@@ -152,8 +170,17 @@ export class PurchasingPageComponent implements OnInit {
   loadOrders(page = 1): void {
     this.loading.set(true);
     const { status } = this.filters.value;
-    this.svc.getOrders({ status: status || undefined, per_page: this.meta().per_page, page }).subscribe({
-      next: r => { this.orders.set(r.data ?? []); this.meta.set(r.meta); this.loading.set(false); },
+    this.svc.getOrders({ status: status || undefined, order_type: 'purchase', per_page: this.meta().per_page, page }).subscribe({
+      next: r => {
+        // Doble filtro: parámetro al backend + filtro local por código/tipo
+        const onlyOC = (r.data ?? []).filter(o =>
+          !String(o.code ?? '').startsWith('OG-') &&
+          (!(o as any).order_type || (o as any).order_type === 'purchase')
+        );
+        this.orders.set(onlyOC);
+        this.meta.set(r.meta);
+        this.loading.set(false);
+      },
       error: () => this.loading.set(false),
     });
   }
@@ -179,6 +206,11 @@ export class PurchasingPageComponent implements OnInit {
   }
 
   openDetail(order: PurchaseOrder): void {
+    // Guardia: si el backend devuelve una OG aquí, abrir el diálogo correcto
+    if ((order as any).order_type === 'expense' || order.code?.startsWith('OG-')) {
+      this.openExpenseDetail(order as any);
+      return;
+    }
     this.dialog.open(PurchaseOrderDetailDialogComponent, {
       data: {
         order,
@@ -237,7 +269,12 @@ export class PurchasingPageComponent implements OnInit {
     this.svc.getOrder(order.id).subscribe({
       next: r => {
         this.pdfLoadingId.set(null);
-        this.pdfSvc.generate(r.data);
+        const data = r.data as any;
+        if (data?.order_type === 'expense' || String(data?.code ?? '').startsWith('OG-')) {
+          this.ogPdfSvc.generate(data);
+        } else {
+          this.pdfSvc.generate(r.data);
+        }
       },
       error: () => {
         this.pdfLoadingId.set(null);
@@ -328,6 +365,97 @@ export class PurchasingPageComponent implements OnInit {
   flowConditionLabel(flow: ApprovalFlow): string {
     if (!flow.conditions?.amount_gte && flow.conditions?.amount_gte !== 0) return 'Todas las órdenes';
     return `Órdenes ≥ ${this.formatCurrency(flow.conditions.amount_gte)}`;
+  }
+
+  // ── Órdenes de Gasto ──────────────────────────────────────────
+
+  loadExpenseOrders(page = 1): void {
+    this.loadingExpense.set(true);
+    const { status, payment_status } = this.ogFilters.value;
+    this.expenseSvc.getOrders({
+      status: status || undefined,
+      payment_status: payment_status || undefined,
+      per_page: this.expenseMeta().per_page,
+      page,
+    }).subscribe({
+      next: r => {
+        this.expenseOrders.set(r.data ?? []);
+        this.expenseMeta.set(r.meta);
+        this.loadingExpense.set(false);
+      },
+      error: () => this.loadingExpense.set(false),
+    });
+  }
+
+  openNewExpenseOrder(): void {
+    this.dialog.open(ExpenseOrderFormDialogComponent, {
+      data: { order: null, expenseSvc: this.expenseSvc },
+      width: '90vw', maxWidth: '98vw', maxHeight: '92vh',
+    }).afterClosed().subscribe(ok => {
+      if (ok) { this.snack.open('Orden de gasto creada', 'OK', { duration: 3000 }); this.loadExpenseOrders(); }
+    });
+  }
+
+  openExpenseDetail(order: ExpenseOrder): void {
+    this.dialog.open(ExpenseOrderDetailDialogComponent, {
+      data: { order, expenseSvc: this.expenseSvc },
+      width: '92vw', maxWidth: '1300px', maxHeight: '92vh',
+    }).afterClosed().subscribe((result?: { action: string; order?: ExpenseOrder }) => {
+      if (result?.action === 'edit' && result.order) {
+        this.openExpenseEdit(result.order);
+      } else {
+        this.loadExpenseOrders(this.expenseMeta().current_page);
+      }
+    });
+  }
+
+  openExpenseEdit(order: ExpenseOrder): void {
+    this.dialog.open(ExpenseOrderFormDialogComponent, {
+      data: { order, expenseSvc: this.expenseSvc },
+      width: '90vw', maxWidth: '98vw', maxHeight: '92vh',
+    }).afterClosed().subscribe(ok => {
+      if (ok) { this.snack.open('Orden de gasto actualizada', 'OK', { duration: 3000 }); this.loadExpenseOrders(this.expenseMeta().current_page); }
+    });
+  }
+
+  downloadExpensePdf(order: ExpenseOrder): void {
+    if (this.ogPdfLoadingId() !== null) return;
+    this.ogPdfLoadingId.set(order.id);
+    this.expenseSvc.getOrder(order.id).subscribe({
+      next: r => { this.ogPdfLoadingId.set(null); this.ogPdfSvc.generate(r.data!); },
+      error: () => { this.ogPdfLoadingId.set(null); this.snack.open('No se pudo generar el PDF', 'OK', { duration: 3000 }); },
+    });
+  }
+
+  onExpensePage(e: PageEvent): void {
+    this.expenseMeta.update(m => ({ ...m, per_page: e.pageSize }));
+    this.loadExpenseOrders(e.pageIndex + 1);
+  }
+
+  ogStatusLabel(status: string): string {
+    const m: Record<string, string> = {
+      draft: 'Borrador', pending_approval: 'En Aprobación', approved: 'Aprobado',
+      sent: 'Enviado', partially_received: 'Recibido Parcial',
+      received: 'Recibido', rejected: 'Rechazado', cancelled: 'Cancelado',
+    };
+    return m[status] || status;
+  }
+
+  ogPaymentLabel(s: string): string {
+    return { unpaid: 'Sin pago', partial: 'Pago parcial', paid: 'Pagado' }[s] ?? s;
+  }
+
+  ogStatusClass(status: string): string {
+    const m: Record<string, string> = {
+      draft: 'st-draft', pending_approval: 'st-pending', approved: 'st-approved',
+      sent: 'st-sent', partially_received: 'st-partial', received: 'st-done',
+      rejected: 'st-rejected', cancelled: 'st-cancelled',
+    };
+    return m[status] || '';
+  }
+
+  ogPaymentClass(s: string): string {
+    return { unpaid: 'pay-unpaid', partial: 'pay-partial', paid: 'pay-paid' }[s] ?? '';
   }
 
   private openSuggOrderSequentially(
