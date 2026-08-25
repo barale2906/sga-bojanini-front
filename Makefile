@@ -1,4 +1,4 @@
-.PHONY: up down start stop restart ps logs angular npm init show-urls build build-prod
+.PHONY: up down start stop restart ps logs angular npm init show-urls build build-prod build-gislasas
 
 API_URL ?= https://bojapp.gislasas.com
 
@@ -55,6 +55,15 @@ build-prod:
 	@docker compose exec angular bash -c "\
 		cp src/environments/environment.prod.ts src/environments/environment.prod.ts.bak && \
 		sed -i \"s|apiUrl:.*|apiUrl: '$(API_URL)/api/v1',|\" src/environments/environment.prod.ts && \
+		npm run build; \
+		mv src/environments/environment.prod.ts.bak src/environments/environment.prod.ts && \
+		echo '=> Archivos listos en dist/browser'"
+
+build-gislasas:
+	@echo "=> Generando build para bojapp.gislasas.com (apiUrl relativa /api/)"
+	@docker compose exec angular bash -c "\
+		cp src/environments/environment.prod.ts src/environments/environment.prod.ts.bak && \
+		sed -i \"s|apiUrl:.*|apiUrl: '/api/v1',|\" src/environments/environment.prod.ts && \
 		npm run build; \
 		mv src/environments/environment.prod.ts.bak src/environments/environment.prod.ts && \
 		echo '=> Archivos listos en dist/browser'"
