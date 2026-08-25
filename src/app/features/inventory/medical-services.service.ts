@@ -96,6 +96,7 @@ export interface PatientProcedureRecordPayload {
   notes?: string | null;
   seller?: string | null;
   referrer?: string | null;
+  appointment_code?: string | null;
 }
 
 export interface ClinicalTemplate {
@@ -142,6 +143,32 @@ export interface MedicalServiceImportResult {
   success: number;
   failed: number;
   errors: { row: number; errors: Record<string, string[]> }[];
+}
+
+// ── MedSys integration ────────────────────────────────────────
+export interface MedsysPatient {
+  codigo: string;
+  tipodoc: string;
+  documento: string;
+  nombre: string;
+}
+
+export interface MedsysAppointment {
+  codcontrol: string;
+  fecha: string;
+  hora: string;
+  codtipocontrol: string;
+  servicio: string;
+  estado: string;
+  medical_service_id: number | null;
+  medical_service_name: string | null;
+  is_mapped: boolean;
+}
+
+export interface MedsysPatientSearchResult {
+  patient?: MedsysPatient;
+  appointments?: MedsysAppointment[];
+  patients?: MedsysPatient[];
 }
 
 @Injectable({ providedIn: 'root' })
@@ -286,6 +313,19 @@ export class MedicalServicesService {
 
   getProcedureMedications(recordId: number): Observable<ApiResponse<ProcedureMedication[]>> {
     return this.http.get<ApiResponse<ProcedureMedication[]>>(`${this.api}/patient-procedure-records/${recordId}/medications`);
+  }
+
+  // ── MedSys integration ──────────────────────────────────────
+
+  searchMedsysPatients(search: string): Observable<ApiResponse<MedsysPatientSearchResult>> {
+    const params = new HttpParams().set('search', search);
+    return this.http.get<ApiResponse<MedsysPatientSearchResult>>(`${this.api}/medsys/patients`, { params });
+  }
+
+  getMedsysAppointments(codigo: string, date?: string): Observable<ApiResponse<MedsysAppointment[]>> {
+    let params = new HttpParams();
+    if (date) params = params.set('date', date);
+    return this.http.get<ApiResponse<MedsysAppointment[]>>(`${this.api}/medsys/patients/${encodeURIComponent(codigo)}/appointments`, { params });
   }
 
   // ── Importación masiva ───────────────────────────────────────

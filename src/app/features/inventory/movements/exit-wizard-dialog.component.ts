@@ -541,6 +541,7 @@ export class ExitWizardDialogComponent implements OnInit {
               notes:               rv.notes || undefined,
               seller:              pd.seller || undefined,
               referrer:            pd.referrer || undefined,
+              appointment_code:    pd.appointment_code ?? undefined,
             }).pipe(
               switchMap(res => rv.notes
                 ? this.medSvc.createEvolution(res.data.id, { content: rv.notes })

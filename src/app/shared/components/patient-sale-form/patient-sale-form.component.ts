@@ -15,9 +15,10 @@ import { MatAutocompleteModule } from '@angular/material/autocomplete';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { DateAdapter, MAT_DATE_FORMATS } from '@angular/material/core';
 import { Subject, of } from 'rxjs';
-import { debounceTime, distinctUntilChanged, finalize, switchMap } from 'rxjs/operators';
+import { catchError, debounceTime, distinctUntilChanged, finalize, switchMap } from 'rxjs/operators';
 import {
   MedicalServicesService, MedicalServiceNode, ProcedurePrice, ClinicalTemplate,
+  MedsysPatient, MedsysAppointment,
 } from '../../../features/inventory/medical-services.service';
 import { EsDateAdapter, ES_DATE_FORMATS } from '../../adapters/es-date.adapter';
 import { RichTextEditorComponent } from '../rich-text-editor/rich-text-editor.component';
@@ -30,6 +31,7 @@ export interface PatientSaleFormValue {
   service_date:        Date;
   seller:              string;
   referrer:            string;
+  appointment_code:    string | null;
   procedures: {
     procedure_id: number;
     quantity:     number;
@@ -87,6 +89,18 @@ export class PatientSaleFormComponent implements OnInit {
   referrerSuggestions   = signal<string[]>([]);
   selectedServiceId     = signal<number | null>(null);
 
+  // ── MedSys patient search ─────────────────────────────────────
+  medsysSearchQuery     = signal('');
+  medsysSearchLoading   = signal(false);
+  medsysSearchError     = signal<string | null>(null);
+  medsysPatientList     = signal<MedsysPatient[]>([]);
+  medsysSelectedPatient = signal<MedsysPatient | null>(null);
+  medsysAppointments    = signal<MedsysAppointment[]>([]);
+  medsysApptLoading     = signal(false);
+  medsysSelectedAppt    = signal<MedsysAppointment | null>(null);
+
+  private _appointmentCode = signal<string | null>(null);
+  private _medsysSearch$   = new Subject<string>();
   private _sellerSearch$   = new Subject<string>();
   private _referrerSearch$ = new Subject<string>();
 
@@ -123,6 +137,7 @@ export class PatientSaleFormComponent implements OnInit {
       service_date:        v.service_date!,
       seller:              v.seller!,
       referrer:            v.referrer!,
+      appointment_code:    this._appointmentCode(),
       procedures: (this.procedureRows.value as any[]).map(r => ({
         procedure_id: r.procedure_id,
         quantity:     r.quantity,
@@ -142,6 +157,41 @@ export class PatientSaleFormComponent implements OnInit {
   // ── Lifecycle ──────────────────────────────────────────────────
   ngOnInit(): void {
     this._loadServicesTree();
+
+    this._medsysSearch$.pipe(
+      debounceTime(400), distinctUntilChanged(),
+      switchMap(term => {
+        if (term.trim().length < 3) {
+          this.medsysPatientList.set([]);
+          this.medsysSearchError.set(null);
+          return of(null);
+        }
+        this.medsysSearchLoading.set(true);
+        this.medsysSearchError.set(null);
+        return this.medSvc.searchMedsysPatients(term).pipe(
+          finalize(() => this.medsysSearchLoading.set(false)),
+          catchError(err => {
+            const msg = err.status === 404
+              ? (err.error?.message ?? 'Paciente no encontrado en MedSys')
+              : err.status === 403
+                ? 'Sin permiso para consultar MedSys'
+                : 'Error al consultar MedSys';
+            this.medsysSearchError.set(msg);
+            return of(null);
+          }),
+        );
+      }),
+    ).subscribe(res => {
+      if (!res) return;
+      const d = res.data;
+      if (d.patient) {
+        this._fillPatientFromMedsys(d.patient);
+        this.medsysAppointments.set(d.appointments ?? []);
+        this.medsysPatientList.set([]);
+      } else if (d.patients) {
+        this.medsysPatientList.set(d.patients);
+      }
+    });
 
     this.patientForm.get('filter_service_id')!.valueChanges.subscribe(serviceId => {
       this.procedureRows.clear();
@@ -171,6 +221,81 @@ export class PatientSaleFormComponent implements OnInit {
       const unique = [...new Set((res.data ?? []).map(m => m.referrer).filter(Boolean) as string[])];
       this.referrerSuggestions.set(unique);
     });
+  }
+
+  // ── MedSys handlers ───────────────────────────────────────────
+  onMedsysSearchInput(value: string): void {
+    this.medsysSearchQuery.set(value);
+    this.medsysPatientList.set([]);
+    this.medsysSelectedPatient.set(null);
+    this.medsysAppointments.set([]);
+    this.medsysSelectedAppt.set(null);
+    this._appointmentCode.set(null);
+    this._medsysSearch$.next(value);
+  }
+
+  selectMedsysPatient(patient: MedsysPatient): void {
+    this._fillPatientFromMedsys(patient);
+    this.medsysPatientList.set([]);
+    this.medsysApptLoading.set(true);
+    const today = new Date().toISOString().split('T')[0];
+    this.medSvc.getMedsysAppointments(patient.codigo, today)
+      .pipe(finalize(() => this.medsysApptLoading.set(false)))
+      .subscribe({
+        next:  r => this.medsysAppointments.set(r.data),
+        error: () => this.medsysAppointments.set([]),
+      });
+  }
+
+  selectMedsysAppointment(appt: MedsysAppointment): void {
+    this.medsysSelectedAppt.set(appt);
+    this._appointmentCode.set(appt.codcontrol);
+    // Auto-fill date from appointment (avoid UTC offset issues with noon time)
+    this.patientForm.get('service_date')!.setValue(new Date(appt.fecha + 'T12:00:00'));
+    if (appt.is_mapped && appt.medical_service_id) {
+      this.patientForm.get('filter_service_id')!.setValue(appt.medical_service_id);
+      if (this.procedureRows.length === 0) this.addProcedureRow();
+    }
+  }
+
+  private readonly _ACTIVE_APPT_STATES = ['Cita Agendada', 'Cita Confirmada', 'En Consultorio'];
+
+  isActiveAppointment(appt: MedsysAppointment): boolean {
+    return this._ACTIVE_APPT_STATES.includes(appt.estado);
+  }
+
+  clearMedsysPatient(): void {
+    this.medsysSelectedPatient.set(null);
+    this.medsysSelectedAppt.set(null);
+    this._appointmentCode.set(null);
+    this.medsysAppointments.set([]);
+    this.medsysSearchQuery.set('');
+    this.medsysSearchError.set(null);
+    this.patientForm.patchValue({
+      patient_document:    '',
+      patient_external_id: '',
+      patient_first_name:  '',
+      patient_last_name:   '',
+    });
+  }
+
+  private _fillPatientFromMedsys(patient: MedsysPatient): void {
+    this.medsysSelectedPatient.set(patient);
+    const { firstName, lastName } = this._splitMedsysName(patient.nombre);
+    this.patientForm.patchValue({
+      patient_document:    patient.documento,
+      patient_external_id: patient.codigo,
+      patient_first_name:  firstName,
+      patient_last_name:   lastName,
+    });
+  }
+
+  private _splitMedsysName(nombre: string): { firstName: string; lastName: string } {
+    const parts = nombre.trim().split(/\s+/);
+    if (parts.length >= 4) return { firstName: parts.slice(0, 2).join(' '), lastName: parts.slice(2).join(' ') };
+    if (parts.length === 3) return { firstName: parts[0], lastName: parts.slice(1).join(' ') };
+    if (parts.length === 2) return { firstName: parts[0], lastName: parts[1] };
+    return { firstName: nombre, lastName: '' };
   }
 
   // ── Suggestions handlers ───────────────────────────────────────

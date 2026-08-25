@@ -6,35 +6,163 @@
     <span class="patient-block-badge">Centro externo</span>
   </div>
 
-  <div class="patient-fields">
-    <mat-form-field appearance="outline">
-      <mat-label>Nombres *</mat-label>
-      <input matInput formControlName="patient_first_name" maxlength="100" placeholder="Carlos Andrés" />
+  <!-- ── Búsqueda MedSys ─────────────────────────────────────── -->
+  <div class="medsys-search-section">
+    <mat-form-field appearance="outline" class="full-width">
+      <mat-label>Buscar paciente en MedSys</mat-label>
+      <mat-icon matPrefix>person_search</mat-icon>
+      <input matInput
+             [value]="medsysSearchQuery()"
+             placeholder="Nombre o número de documento"
+             (input)="onMedsysSearchInput($any($event.target).value)" />
+      <mat-hint>Mínimo 3 caracteres · Solo dígitos busca por documento</mat-hint>
+      @if (medsysSearchLoading()) {
+        <mat-spinner matSuffix diameter="16"></mat-spinner>
+      }
     </mat-form-field>
-    <mat-form-field appearance="outline">
-      <mat-label>Apellidos *</mat-label>
-      <input matInput formControlName="patient_last_name" maxlength="100" placeholder="Pérez Gómez" />
-    </mat-form-field>
-  </div>
 
-  <div class="patient-fields">
-    <mat-form-field appearance="outline">
-      <mat-label>N° Documento *</mat-label>
-      <input matInput formControlName="patient_document" maxlength="50" placeholder="1012345678" />
-      <mat-hint>Cédula o documento</mat-hint>
-    </mat-form-field>
-    <mat-form-field appearance="outline">
-      <mat-label>ID en Sistema Clínico *</mat-label>
-      <input matInput formControlName="patient_external_id" maxlength="100" placeholder="EXT-00892" />
-      <mat-hint>ID en el HIS/EMR</mat-hint>
-    </mat-form-field>
-    <mat-form-field appearance="outline" class="field-full">
-      <mat-label>Fecha de Atención *</mat-label>
-      <input matInput [matDatepicker]="serviceDatePicker" formControlName="service_date" />
-      <mat-datepicker-toggle matIconSuffix [for]="serviceDatePicker"></mat-datepicker-toggle>
-      <mat-datepicker #serviceDatePicker></mat-datepicker>
-    </mat-form-field>
+    @if (medsysSearchError()) {
+      <div class="medsys-message medsys-message--error">
+        <mat-icon>error_outline</mat-icon>
+        <span>{{ medsysSearchError() }}</span>
+      </div>
+    }
+
+    <!-- Lista de pacientes (búsqueda por nombre) -->
+    @if (medsysPatientList().length > 0) {
+      <div class="medsys-patient-list">
+        @for (p of medsysPatientList(); track p.codigo) {
+          <button type="button" class="medsys-patient-item" (click)="selectMedsysPatient(p)">
+            <mat-icon class="mpi-icon">person</mat-icon>
+            <span class="mpi-name">{{ p.nombre }}</span>
+            <span class="mpi-doc">{{ p.tipodoc }} {{ p.documento }}</span>
+            <mat-icon class="mpi-arrow">chevron_right</mat-icon>
+          </button>
+        }
+      </div>
+    }
+
+    <!-- Cargando citas -->
+    @if (medsysApptLoading()) {
+      <div class="row-loading">
+        <mat-spinner diameter="14"></mat-spinner>
+        <span>Cargando citas de MedSys...</span>
+      </div>
+    }
+
+    <!-- Paciente seleccionado + citas -->
+    @if (medsysSelectedPatient() && !medsysApptLoading()) {
+      <div class="medsys-selected-patient">
+        <mat-icon>person_check</mat-icon>
+        <div class="msp-info">
+          <span class="msp-name">{{ medsysSelectedPatient()!.nombre }}</span>
+          <span class="msp-doc">{{ medsysSelectedPatient()!.tipodoc }} · {{ medsysSelectedPatient()!.documento }}</span>
+        </div>
+      </div>
+
+      @if (medsysAppointments().length > 0) {
+        <div class="medsys-appt-label">Historial de citas:</div>
+        @for (appt of medsysAppointments(); track appt.codcontrol) {
+          @if (isActiveAppointment(appt)) {
+            <!-- Cita activa → seleccionable -->
+            <button type="button"
+                    class="medsys-appt-item"
+                    [class.medsys-appt-item--selected]="medsysSelectedAppt()?.codcontrol === appt.codcontrol"
+                    [class.medsys-appt-item--unmapped]="!appt.is_mapped"
+                    (click)="selectMedsysAppointment(appt)">
+              <div class="mai-datetime">
+                <span class="mai-date">{{ appt.fecha | date:'dd/MM/yy':'UTC' }}</span>
+                <span class="mai-time">{{ appt.hora | slice:0:5 }}</span>
+              </div>
+              <div class="mai-info">
+                <span class="mai-service">{{ appt.servicio }}</span>
+                <span class="mai-estado mai-estado--active">{{ appt.estado }}</span>
+              </div>
+              @if (!appt.is_mapped) {
+                <span class="mai-badge mai-badge--warn">Sin mapeo SGA</span>
+              } @else if (medsysSelectedAppt()?.codcontrol === appt.codcontrol) {
+                <mat-icon class="mai-check">check_circle</mat-icon>
+              } @else {
+                <mat-icon class="mai-check mai-check--empty">radio_button_unchecked</mat-icon>
+              }
+            </button>
+          } @else {
+            <!-- Cita histórica → solo contexto -->
+            <div class="medsys-appt-history">
+              <div class="mai-datetime">
+                <span class="mai-date">{{ appt.fecha | date:'dd/MM/yy':'UTC' }}</span>
+                <span class="mai-time">{{ appt.hora | slice:0:5 }}</span>
+              </div>
+              <div class="mai-info">
+                <span class="mai-service">{{ appt.servicio }}</span>
+                <span class="mai-estado mai-estado--past">{{ appt.estado }}</span>
+              </div>
+              <mat-icon class="mai-check mai-check--past">check_circle</mat-icon>
+            </div>
+          }
+        }
+      } @else {
+        <div class="medsys-message medsys-message--info">
+          <mat-icon>event_busy</mat-icon>
+          <span>No hay citas registradas para este paciente</span>
+        </div>
+      }
+    }
   </div>
+  <!-- /Búsqueda MedSys -->
+
+  <div class="medsys-divider"></div>
+
+  @if (medsysSelectedPatient()) {
+    <!-- Card de paciente seleccionado desde MedSys -->
+    <div class="patient-card">
+      <mat-icon class="patient-card-icon">badge</mat-icon>
+      <div class="patient-card-info">
+        <div class="patient-card-name">{{ medsysSelectedPatient()!.nombre }}</div>
+        <div class="patient-card-meta">
+          <span>{{ medsysSelectedPatient()!.tipodoc }} {{ medsysSelectedPatient()!.documento }}</span>
+          <span class="patient-card-sep">·</span>
+          <span>Cód. MedSys: {{ medsysSelectedPatient()!.codigo }}</span>
+        </div>
+      </div>
+      <button type="button" mat-icon-button (click)="clearMedsysPatient()"
+              matTooltip="Cambiar paciente" class="patient-card-clear">
+        <mat-icon>close</mat-icon>
+      </button>
+    </div>
+  } @else {
+    <!-- Campos manuales (cuando no hay paciente de MedSys) -->
+    <div class="patient-fields">
+      <mat-form-field appearance="outline">
+        <mat-label>Nombres *</mat-label>
+        <input matInput formControlName="patient_first_name" maxlength="100" placeholder="Carlos Andrés" />
+      </mat-form-field>
+      <mat-form-field appearance="outline">
+        <mat-label>Apellidos *</mat-label>
+        <input matInput formControlName="patient_last_name" maxlength="100" placeholder="Pérez Gómez" />
+      </mat-form-field>
+    </div>
+    <div class="patient-fields">
+      <mat-form-field appearance="outline">
+        <mat-label>N° Documento *</mat-label>
+        <input matInput formControlName="patient_document" maxlength="50" placeholder="1012345678" />
+        <mat-hint>Cédula o documento</mat-hint>
+      </mat-form-field>
+      <mat-form-field appearance="outline">
+        <mat-label>ID en Sistema Clínico *</mat-label>
+        <input matInput formControlName="patient_external_id" maxlength="100" placeholder="EXT-00892" />
+        <mat-hint>ID en el HIS/EMR</mat-hint>
+      </mat-form-field>
+    </div>
+  }
+
+  <!-- Fecha de atención (siempre visible) -->
+  <mat-form-field appearance="outline" class="full-width">
+    <mat-label>Fecha de Atención *</mat-label>
+    <input matInput [matDatepicker]="serviceDatePicker" formControlName="service_date" />
+    <mat-datepicker-toggle matIconSuffix [for]="serviceDatePicker"></mat-datepicker-toggle>
+    <mat-datepicker #serviceDatePicker></mat-datepicker>
+  </mat-form-field>
 
   <div class="patient-fields">
     <mat-form-field appearance="outline">
