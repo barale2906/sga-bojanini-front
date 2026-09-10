@@ -1,0 +1,312 @@
+<app-page-header title="Nueva Salida de Stock" icon="output">
+  <button mat-stroked-button type="button" (click)="goBack()">
+    <mat-icon>arrow_back</mat-icon>
+    Volver al inventario
+  </button>
+</app-page-header>
+
+<app-form-errors [errors]="errors()"></app-form-errors>
+
+<div class="exit-page">
+
+  <!-- ══════════════════ SECCIÓN 1: CABECERA ══════════════════ -->
+  <section class="form-section header-section">
+    <div class="section-heading">
+      <span class="section-num">1</span>
+      <span>Datos del despacho</span>
+    </div>
+
+    <div class="two-col">
+      <!-- Centro de costo -->
+      <mat-form-field appearance="outline">
+        <mat-label>Centro de costo *</mat-label>
+        @if (loadingCostCenters()) {
+          <mat-spinner matPrefix diameter="16" style="margin:0 6px 0 4px"></mat-spinner>
+        } @else {
+          <mat-icon matPrefix>business</mat-icon>
+        }
+        <mat-select [ngModel]="costCenterId()" (ngModelChange)="onCostCenterChange($event)">
+          @for (cc of costCenters(); track cc.id) {
+            <mat-option [value]="cc.id">
+              {{ cc.name }}
+              @if (cc.is_external) { <span class="cc-ext"> · Externo</span> }
+            </mat-option>
+          }
+        </mat-select>
+      </mat-form-field>
+
+      <!-- Almacén -->
+      <mat-form-field appearance="outline">
+        <mat-label>Almacén *</mat-label>
+        <mat-select [ngModel]="warehouseId()" (ngModelChange)="onWarehouseChange($event)">
+          @for (w of warehouses(); track w.id) {
+            <mat-option [value]="w.id">{{ w.name }}</mat-option>
+          }
+        </mat-select>
+        <mat-icon matSuffix>warehouse</mat-icon>
+      </mat-form-field>
+    </div>
+
+    <div class="two-col">
+      <!-- Fecha del movimiento -->
+      <mat-form-field appearance="outline">
+        <mat-label>Fecha del movimiento</mat-label>
+        <input matInput type="date" [max]="today"
+               [ngModel]="movementDate()" (ngModelChange)="movementDate.set($event)" />
+        <mat-hint>Vacío = fecha actual</mat-hint>
+      </mat-form-field>
+
+      <!-- Motivo -->
+      <mat-form-field appearance="outline">
+        <mat-label>Motivo / Observación</mat-label>
+        <input matInput [ngModel]="reason()" (ngModelChange)="reason.set($event)"
+               placeholder="Ej. Consumo cirugía" />
+        <mat-icon matSuffix>notes</mat-icon>
+      </mat-form-field>
+    </div>
+
+    <!-- Datos de paciente / servicio para CC externos -->
+    @if (isExternalCC) {
+      <div class="external-cc-section">
+        <div class="external-cc-label">
+          <mat-icon>person_pin</mat-icon>
+          Datos del paciente / servicio externo
+        </div>
+        <div class="two-col">
+          <mat-form-field appearance="outline">
+            <mat-label>Servicio médico</mat-label>
+            @if (loadingServices()) {
+              <mat-spinner matPrefix diameter="16" style="margin:0 6px 0 4px"></mat-spinner>
+            } @else {
+              <mat-icon matPrefix>medical_services</mat-icon>
+            }
+            <mat-select [ngModel]="serviceId()" (ngModelChange)="serviceId.set($event)">
+              @for (s of medicalServices(); track s.id) {
+                <mat-option [value]="s.id">{{ s.name }}</mat-option>
+              }
+            </mat-select>
+          </mat-form-field>
+          <mat-form-field appearance="outline">
+            <mat-label>Documento del paciente</mat-label>
+            <input matInput [ngModel]="patientDocument()" (ngModelChange)="patientDocument.set($event)" />
+            <mat-icon matSuffix>badge</mat-icon>
+          </mat-form-field>
+        </div>
+        <mat-form-field appearance="outline" class="full-field">
+          <mat-label>ID externo del paciente</mat-label>
+          <input matInput [ngModel]="patientExternalId()" (ngModelChange)="patientExternalId.set($event)" />
+          <mat-icon matSuffix>fingerprint</mat-icon>
+        </mat-form-field>
+      </div>
+    }
+  </section>
+
+  <!-- ══════════════════ COLUMNAS: FORMULARIO + LISTA ══════════ -->
+  <div class="exit-layout">
+
+    <!-- ── Panel izquierdo: formulario progresivo ───────────── -->
+    <div class="exit-form-panel">
+      <section class="form-section" [class.form-section--disabled]="!headersComplete">
+        <div class="section-heading">
+          <span class="section-num">2</span>
+          <span>Producto a despachar</span>
+          @if (!headersComplete) {
+            <span class="inactive-hint">Completa CC y almacén primero</span>
+          }
+        </div>
+
+        @if (headersComplete) {
+
+          <!-- Búsqueda de producto -->
+          <app-product-search #productScanner
+            label="Buscar producto (nombre, código o barras)"
+            [required]="false"
+            [selectedProduct]="draftProduct()"
+            (productSelected)="onDraftProductSelected($event)">
+          </app-product-search>
+
+          <!-- Cargando stock -->
+          @if (loadingDraftFefo()) {
+            <div class="status-row status-row--loading">
+              <mat-spinner diameter="16"></mat-spinner>
+              Verificando stock en almacén…
+            </div>
+          }
+
+          <!-- Error al cargar stock -->
+          @if (!loadingDraftFefo() && draftFetchError()) {
+            <div class="status-row status-row--error">
+              <mat-icon>warning</mat-icon>
+              {{ draftFetchError() }}
+            </div>
+          }
+
+          <!-- Lotes disponibles con cantidad seleccionable por lote -->
+          @if (draftProduct() && !loadingDraftFefo() && !draftFetchError() && draftFefo().length > 0) {
+            <div class="fefo-panel">
+              <div class="fefo-panel-label">
+                <mat-icon>sort</mat-icon>
+                Selecciona cantidad por lote (sugerencia FEFO)
+                <span class="fefo-total-badge">{{ draftAvailableQty() }} u. disponibles</span>
+              </div>
+
+              @for (b of draftFefo(); track b.lot_number; let first = $first) {
+                <div class="fefo-lot-row" [class.fefo-lot-row--first]="first"
+                     [class.fefo-lot-row--selected]="(draftLotQtys()[b.lot_number] || 0) > 0">
+                  <div class="lot-info">
+                    <span class="lot-cell lot-num"><mat-icon>tag</mat-icon>{{ b.lot_number }}</span>
+                    <span class="lot-cell lot-expiry"><mat-icon>event</mat-icon>{{ b.expiration_date }}</span>
+                    <span class="lot-cell lot-qty">{{ b.quantity_available }} disp.</span>
+                    @if (first) { <span class="fefo-badge">FEFO</span> }
+                  </div>
+                  <div class="lot-qty-input">
+                    <mat-form-field appearance="outline" class="lot-field">
+                      <mat-label>Cant.</mat-label>
+                      <input matInput type="number" min="0" [max]="b.quantity_available" step="any"
+                             [ngModel]="draftLotQtys()[b.lot_number] || 0"
+                             (ngModelChange)="setLotQty(b.lot_number, $event ? +$event : 0)" />
+                      <mat-hint>máx {{ b.quantity_available }}</mat-hint>
+                    </mat-form-field>
+                  </div>
+                </div>
+              }
+
+              <!-- Total seleccionado -->
+              <div class="fefo-total-row" [class.fefo-total-row--ready]="draftTotalQty() > 0">
+                <mat-icon>calculate</mat-icon>
+                Total a despachar:
+                <strong>{{ draftTotalQty() }}</strong> u.
+                @if (draftTotalQty() > draftAvailableQty()) {
+                  <span class="total-over">— excede el stock disponible</span>
+                }
+              </div>
+            </div>
+          }
+
+          <!-- Kit: cantidad directa -->
+          @if (draftProduct()?.product_type === 'kit' && !loadingDraftFefo() && !draftFetchError()) {
+            <div class="status-row status-row--checking">
+              <mat-icon>widgets</mat-icon>
+              Kits disponibles: <strong>{{ _kitAvailable() }}</strong>
+            </div>
+            <mat-form-field appearance="outline" class="full-field">
+              <mat-label>Cantidad de kits *</mat-label>
+              <input matInput type="number" min="1" step="1"
+                     [ngModel]="draftQtyKit()" (ngModelChange)="draftQtyKit.set($event ? +$event : null)" />
+              @if (_kitAvailable()) {
+                <mat-hint>Máx. {{ _kitAvailable() }}</mat-hint>
+              }
+              <mat-icon matSuffix>numbers</mat-icon>
+            </mat-form-field>
+          }
+
+          <!-- Ubicación de origen + botón agregar -->
+          @if (draftProduct() && !loadingDraftFefo() && !draftFetchError()) {
+            @if (locations().length > 0) {
+              <mat-form-field appearance="outline" class="full-field">
+                <mat-label>Ubicación de origen</mat-label>
+                @if (loadingLocations()) {
+                  <mat-spinner matPrefix diameter="16" style="margin:0 6px 0 4px"></mat-spinner>
+                } @else {
+                  <mat-icon matPrefix>place</mat-icon>
+                }
+                <mat-select [ngModel]="draftLocationId()" (ngModelChange)="draftLocationId.set($event)">
+                  <mat-option [value]="null">Sin ubicación específica</mat-option>
+                  @for (l of locations(); track l.id) {
+                    <mat-option [value]="l.id">
+                      {{ l.name }} <span class="loc-code">({{ l.code }})</span>
+                    </mat-option>
+                  }
+                </mat-select>
+              </mat-form-field>
+            }
+
+            <div class="add-btn-row">
+              <button mat-raised-button color="accent" type="button"
+                      [disabled]="!canAdd()"
+                      (click)="addItem()">
+                <mat-icon>add_circle</mat-icon>
+                Agregar a la lista
+              </button>
+            </div>
+          }
+
+        }<!-- /headersComplete -->
+      </section>
+    </div><!-- /exit-form-panel -->
+
+    <!-- ── Panel derecho: lista de ítems ────────────────────── -->
+    <div class="exit-list-panel">
+      <div class="list-panel-header">
+        <mat-icon>output</mat-icon>
+        <span>Productos a despachar</span>
+        @if (cartItems().length > 0) {
+          <span class="list-count-badge">{{ cartItems().length }}</span>
+        }
+      </div>
+
+      @if (cartItems().length === 0) {
+        <div class="list-empty">
+          <mat-icon>remove_shopping_cart</mat-icon>
+          <span>Agrega productos usando el formulario</span>
+        </div>
+      }
+
+      @for (item of cartItems(); track $index; let i = $index) {
+        <div class="list-item-card">
+          <div class="list-item-header">
+            <span class="list-item-num">#{{ i + 1 }}</span>
+            <div class="list-item-name">
+              <strong>{{ item.product.name }}</strong>
+              <span class="list-item-code">{{ item.product.barcode }}</span>
+            </div>
+            <button mat-icon-button type="button" color="warn"
+                    (click)="removeItem(i)"
+                    matTooltip="Eliminar">
+              <mat-icon>delete_outline</mat-icon>
+            </button>
+          </div>
+          <div class="list-item-meta">
+            <span class="meta-chip meta-chip--qty">
+              <mat-icon>numbers</mat-icon>{{ item.quantity }} u.
+            </span>
+            @if (item.isKit) {
+              <span class="meta-chip meta-chip--kit">
+                <mat-icon>widgets</mat-icon>Kit
+              </span>
+            } @else {
+              @for (b of item.fefo; track b.lot_number) {
+                <span class="meta-chip meta-chip--lot">
+                  <mat-icon>tag</mat-icon>{{ b.lot_number }}
+                </span>
+                @if (b.expiration_date) {
+                  <span class="meta-chip">
+                    <mat-icon>event</mat-icon>{{ b.expiration_date }}
+                  </span>
+                }
+              }
+            }
+          </div>
+        </div>
+      }
+
+      <!-- Botón de registro -->
+      @if (cartItems().length > 0) {
+        <div class="submit-row">
+          <button mat-raised-button color="primary" type="button"
+                  [disabled]="!canSubmit()"
+                  (click)="save()">
+            @if (saving()) {
+              <mat-spinner diameter="18" class="btn-spinner"></mat-spinner>
+              Registrando…
+            } @else {
+              <mat-icon>send</mat-icon>
+              Registrar Salida ({{ cartItems().length }} producto{{ cartItems().length !== 1 ? 's' : '' }})
+            }
+          </button>
+        </div>
+      }
+    </div><!-- /exit-list-panel -->
+
+  </div><!-- /exit-layout -->
+</div><!-- /exit-page -->

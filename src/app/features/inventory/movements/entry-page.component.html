@@ -1,0 +1,300 @@
+<app-page-header title="Nueva Entrada de Mercancía" icon="add_box">
+  <button mat-stroked-button type="button" (click)="goBack()">
+    <mat-icon>arrow_back</mat-icon>
+    Volver al inventario
+  </button>
+</app-page-header>
+
+<app-form-errors [errors]="errors()"></app-form-errors>
+
+<div class="entry-layout">
+
+  <!-- ══════════════════ PANEL FORMULARIO ══════════════════ -->
+  <div class="entry-form-panel">
+
+    <!-- ── Sección 1: Datos generales ───────────────────── -->
+    <section class="form-section">
+      <div class="section-heading">
+        <span class="section-num">1</span>
+        <span>Datos generales</span>
+      </div>
+
+      <!-- Almacén (siempre activo) -->
+      <mat-form-field appearance="outline" class="full-field">
+        <mat-label>Almacén *</mat-label>
+        <mat-select [ngModel]="warehouseId()" (ngModelChange)="onWarehouseChange($event)">
+          @for (w of warehouses(); track w.id) {
+            <mat-option [value]="w.id">{{ w.name }}</mat-option>
+          }
+        </mat-select>
+        <mat-icon matSuffix>warehouse</mat-icon>
+      </mat-form-field>
+
+      <!-- Campos que se activan al seleccionar almacén -->
+      @if (warehouseSelected) {
+        <div class="two-col">
+          <mat-form-field appearance="outline">
+            <mat-label>N° Factura / Remisión</mat-label>
+            <input matInput [ngModel]="invoiceNumber()" (ngModelChange)="invoiceNumber.set($event)"
+                   placeholder="Ej. FAC-2026-001" />
+            <mat-icon matSuffix>receipt</mat-icon>
+          </mat-form-field>
+
+          <mat-form-field appearance="outline">
+            <mat-label>Fecha del movimiento</mat-label>
+            <input matInput type="date" [max]="today"
+                   [ngModel]="movementDate()" (ngModelChange)="movementDate.set($event)" />
+            <mat-hint>Vacío = fecha actual</mat-hint>
+          </mat-form-field>
+        </div>
+
+        <div class="two-col">
+          <mat-form-field appearance="outline">
+            <mat-label>Temperatura de entrada (°C)</mat-label>
+            <input matInput type="number" step="0.1"
+                   [ngModel]="temperature()" (ngModelChange)="temperature.set($event ? +$event : null)" />
+            <mat-icon matSuffix>thermostat</mat-icon>
+          </mat-form-field>
+
+          <mat-form-field appearance="outline">
+            <mat-label>Motivo / Observación general</mat-label>
+            <input matInput [ngModel]="reason()" (ngModelChange)="reason.set($event)"
+                   placeholder="Ej. Compra ordinaria" />
+            <mat-icon matSuffix>notes</mat-icon>
+          </mat-form-field>
+        </div>
+      }
+    </section>
+
+    <mat-divider></mat-divider>
+
+    <!-- ── Sección 2: Producto a ingresar ───────────────── -->
+    <section class="form-section" [class.section--disabled]="!warehouseSelected">
+      <div class="section-heading">
+        <span class="section-num">2</span>
+        <span>Producto a ingresar</span>
+        @if (!warehouseSelected) {
+          <span class="inactive-hint">Selecciona el almacén primero</span>
+        }
+      </div>
+
+      @if (warehouseSelected) {
+
+        <!-- Búsqueda de producto -->
+        <app-product-search #productScanner
+          label="Buscar producto (nombre, código o barras)"
+          [required]="false"
+          [selectedProduct]="draftProduct()"
+          (productSelected)="onDraftProductSelected($event)">
+        </app-product-search>
+
+        <!-- Variante — aparece tras seleccionar producto -->
+        @if (draftProduct()) {
+          <mat-form-field appearance="outline" class="full-field">
+            <mat-label>Marca / Variante *</mat-label>
+            @if (loadingVariants()) {
+              <mat-spinner matPrefix diameter="16" style="margin:0 6px 0 4px"></mat-spinner>
+            } @else {
+              <mat-icon matPrefix>science</mat-icon>
+            }
+            <mat-select [ngModel]="draftVariantId()" (ngModelChange)="onDraftVariantChange($event)">
+              @for (v of draftVariants(); track v.id) {
+                <mat-option [value]="v.id">
+                  {{ v.lab_brand || 'Sin marca' }}
+                  @if (v.brand_sku) { <span style="color:#718096"> — {{ v.brand_sku }}</span> }
+                </mat-option>
+              }
+              @if (!loadingVariants() && draftVariants().length === 0 && draftProduct()) {
+                <mat-option disabled>Sin variantes activas</mat-option>
+              }
+            </mat-select>
+          </mat-form-field>
+        }
+
+        <!-- Lote y fechas — aparecen tras seleccionar variante -->
+        @if (draftVariantId()) {
+          <div class="three-col">
+            <mat-form-field appearance="outline">
+              <mat-label>N° de Lote *</mat-label>
+              <input matInput [ngModel]="draftLot()" (ngModelChange)="draftLot.set($event)"
+                     placeholder="Ej. LOT-2026-001" />
+              <mat-icon matSuffix>tag</mat-icon>
+            </mat-form-field>
+
+            <mat-form-field appearance="outline">
+              <mat-label>Fecha de vencimiento *</mat-label>
+              <input matInput type="date"
+                     [ngModel]="draftExpiry()" (ngModelChange)="draftExpiry.set($event)" />
+              <mat-icon matSuffix>event</mat-icon>
+            </mat-form-field>
+
+            <mat-form-field appearance="outline">
+              <mat-label>Fecha de fabricación</mat-label>
+              <input matInput type="date"
+                     [ngModel]="draftMfg()" (ngModelChange)="draftMfg.set($event)" />
+              <mat-icon matSuffix>factory</mat-icon>
+              <mat-hint>Opcional</mat-hint>
+            </mat-form-field>
+          </div>
+        }
+
+        <!-- Ubicación — aparece cuando el almacén tiene ubicaciones cargadas -->
+        @if (draftVariantId() && locations().length > 0) {
+          <mat-form-field appearance="outline" class="full-field">
+            <mat-label>Ubicación de almacenamiento *</mat-label>
+            @if (loadingLoc()) {
+              <mat-spinner matPrefix diameter="16" style="margin:0 6px 0 4px"></mat-spinner>
+            } @else {
+              <mat-icon matPrefix>place</mat-icon>
+            }
+            <mat-select [ngModel]="draftLocationId()" (ngModelChange)="onDraftLocationChange($event)">
+              @for (l of locations(); track l.id) {
+                <mat-option [value]="l.id">{{ l.name }} <span class="loc-code">({{ l.code }})</span></mat-option>
+              }
+            </mat-select>
+          </mat-form-field>
+        }
+
+        <!-- Cantidad — aparece tras seleccionar ubicación (o variante si no hay ubicaciones) -->
+        @if (draftVariantId() && draftLot() && draftExpiry()) {
+          <div class="qty-section">
+
+            <!-- Toggle modo presentación — siempre visible; empaque deshabilitado si no hay presentaciones -->
+            <div class="mode-toggle">
+              <span class="mode-label">Modo de ingreso:</span>
+              <button mat-stroked-button type="button" class="mode-btn"
+                      [class.mode-btn--active]="!draftPresMode()"
+                      (click)="togglePresMode(false)">
+                <mat-icon>scale</mat-icon>Unidad base directa
+              </button>
+              <button mat-stroked-button type="button" class="mode-btn"
+                      [class.mode-btn--active]="draftPresMode()"
+                      [disabled]="draftPresentations().length === 0"
+                      (click)="togglePresMode(true)"
+                      [matTooltip]="draftPresentations().length === 0 ? 'Sin presentaciones configuradas para este producto' : ''">
+                <mat-icon>inventory_2</mat-icon>Por empaque / presentación
+              </button>
+            </div>
+
+            @if (!draftPresMode()) {
+              <mat-form-field appearance="outline" class="full-field">
+                <mat-label>Cantidad (unidades base) *</mat-label>
+                <input matInput type="number" min="0.001" step="any"
+                       [ngModel]="draftQtyBase()" (ngModelChange)="draftQtyBase.set($event ? +$event : null)" />
+                <mat-icon matSuffix>numbers</mat-icon>
+              </mat-form-field>
+            } @else {
+              <div class="two-col">
+                <mat-form-field appearance="outline">
+                  <mat-label>Presentación *</mat-label>
+                  <mat-select [ngModel]="draftPresId()" (ngModelChange)="draftPresId.set($event)">
+                    @for (p of draftPresentations(); track p.id) {
+                      <mat-option [value]="p.id">{{ p.name }}</mat-option>
+                    }
+                  </mat-select>
+                </mat-form-field>
+                <mat-form-field appearance="outline">
+                  <mat-label>Cantidad *</mat-label>
+                  <input matInput type="number" min="1" step="1"
+                         [ngModel]="draftQtyInPres()" (ngModelChange)="draftQtyInPres.set($event ? +$event : null)" />
+                  @if (draftPreviewBaseUnits()) {
+                    <mat-hint>≈ {{ draftPreviewBaseUnits() }} u. base</mat-hint>
+                  }
+                </mat-form-field>
+              </div>
+            }
+          </div>
+
+          <mat-form-field appearance="outline" class="full-field">
+            <mat-label>Notas del ítem</mat-label>
+            <input matInput [ngModel]="draftNotes()" (ngModelChange)="draftNotes.set($event)"
+                   placeholder="Observaciones específicas para este lote (opcional)" />
+            <mat-icon matSuffix>sticky_note_2</mat-icon>
+          </mat-form-field>
+        }
+
+        <!-- Botón Agregar -->
+        <div class="add-btn-row">
+          <button mat-raised-button color="accent" type="button"
+                  [disabled]="!canAdd()"
+                  (click)="addItem()">
+            <mat-icon>add_circle</mat-icon>
+            Agregar a la lista
+          </button>
+        </div>
+
+      }<!-- /warehouseSelected -->
+    </section>
+
+  </div><!-- /entry-form-panel -->
+
+  <!-- ══════════════════ PANEL LISTA ════════════════════════ -->
+  <div class="entry-list-panel">
+    <div class="list-panel-header">
+      <mat-icon>inventory_2</mat-icon>
+      <span>Productos a registrar</span>
+      @if (items().length > 0) {
+        <span class="list-count-badge">{{ items().length }}</span>
+      }
+    </div>
+
+    @if (items().length === 0) {
+      <div class="list-empty">
+        <mat-icon>add_box</mat-icon>
+        <span>Agrega productos usando el formulario</span>
+      </div>
+    }
+
+    @for (item of items(); track $index; let i = $index) {
+      <div class="list-item-card">
+        <div class="list-item-header">
+          <span class="list-item-num">#{{ i + 1 }}</span>
+          <div class="list-item-name">
+            <strong>{{ item.product_name }}</strong>
+            <span class="list-item-variant">{{ item.variant_label }}</span>
+          </div>
+          <button mat-icon-button type="button" color="warn"
+                  (click)="removeItem(i)"
+                  matTooltip="Eliminar">
+            <mat-icon>delete_outline</mat-icon>
+          </button>
+        </div>
+        <div class="list-item-meta">
+          <span class="meta-chip meta-chip--lot">
+            <mat-icon>tag</mat-icon>{{ item.lot_number }}
+          </span>
+          <span class="meta-chip">
+            <mat-icon>event</mat-icon>{{ item.expiration_date }}
+          </span>
+          <span class="meta-chip">
+            <mat-icon>place</mat-icon>{{ item.location_name }}
+          </span>
+          <span class="meta-chip meta-chip--qty">
+            <mat-icon>numbers</mat-icon>{{ item.qty_display }}
+          </span>
+        </div>
+        @if (item.notes) {
+          <div class="list-item-notes">{{ item.notes }}</div>
+        }
+      </div>
+    }
+
+    <!-- Botón de registro -->
+    @if (items().length > 0) {
+      <div class="submit-row">
+        <button mat-raised-button color="primary" type="button"
+                [disabled]="!canSubmit()"
+                (click)="save()">
+          @if (saving()) {
+            <mat-spinner diameter="18" class="btn-spinner"></mat-spinner>
+            Registrando…
+          } @else {
+            <mat-icon>save</mat-icon>
+            Registrar Entrada ({{ items().length }} producto{{ items().length !== 1 ? 's' : '' }})
+          }
+        </button>
+      </div>
+    }
+  </div><!-- /entry-list-panel -->
+
+</div><!-- /entry-layout -->

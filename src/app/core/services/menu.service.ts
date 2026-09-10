@@ -43,6 +43,14 @@ export class MenuService {
     // Integraciones
     'consumptions.index': '/integrations',
     'integrations.index': '/integrations',
+    // Órdenes de Servicio
+    'service-orders.index':     '/service-orders/generar',
+    'service-orders.create':    '/service-orders/generar',
+    'service-orders.generate':  '/service-orders/generar',
+    'service-orders.discounts': '/service-orders/descuentos',
+    'service-orders.approve':   '/service-orders/descuentos',
+    'price-lists.index':        '/service-orders/precios',
+    'price-lists.create':       '/service-orders/precios',
     // Reportes / Auditoría
     'reports.index': '/reports',
     'audit.index': '/audit',

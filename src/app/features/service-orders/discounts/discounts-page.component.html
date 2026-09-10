@@ -1,0 +1,81 @@
+<app-page-header
+  title="Descuentos Pendientes"
+  subtitle="Órdenes de servicio con descuentos que requieren aprobación"
+  icon="pending_actions"
+>
+  <button mat-stroked-button (click)="goToApprovers()">
+    <mat-icon>manage_accounts</mat-icon>
+    Aprobadores
+  </button>
+  <button mat-stroked-button (click)="loadDiscounts()">
+    <mat-icon>refresh</mat-icon>
+    Actualizar
+  </button>
+</app-page-header>
+
+@if (loading()) {
+  <app-loading-spinner message="Cargando órdenes pendientes..."></app-loading-spinner>
+}
+
+@if (!loading()) {
+  @if (orders().length === 0) {
+    <div class="empty-state">
+      <mat-icon>check_circle</mat-icon>
+      <p>No hay descuentos pendientes de aprobación.</p>
+    </div>
+  } @else {
+    <div class="table-wrap mat-elevation-z1">
+      <table class="discounts-table">
+        <thead>
+          <tr>
+            <th class="col-action"></th>
+            <th>Paciente</th>
+            <th>Procedimientos</th>
+            <th class="col-num">Total</th>
+            <th class="col-num">Descuento</th>
+            <th class="col-num">Neto a Pagar</th>
+            <th class="col-num">Fecha</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (order of orders(); track order.order_number) {
+            <tr>
+              <td class="col-action">
+                <button mat-raised-button color="primary" class="approve-btn"
+                        [disabled]="approving() === order.order_number"
+                        (click)="approve(order)">
+                  @if (approving() === order.order_number) {
+                    <mat-spinner diameter="16"></mat-spinner>
+                  } @else {
+                    <mat-icon>check_circle</mat-icon>
+                  }
+                  Aprobar
+                </button>
+              </td>
+              <td>
+                <div class="patient-cell">
+                  <span class="patient-name">{{ order.patient_first_name }} {{ order.patient_last_name }}</span>
+                  <span class="patient-doc">{{ order.patient_document }}</span>
+                </div>
+              </td>
+              <td>
+                <div class="procs-cell">
+                  @for (rec of order.records; track rec.id) {
+                    <span class="proc-row">
+                      <span class="proc-name">{{ rec.medical_service_name }}</span>
+                      <span class="proc-discount text-warn">{{ discountLabel(rec) }}</span>
+                    </span>
+                  }
+                </div>
+              </td>
+              <td class="col-num">{{ formatCurrency(orderGrandTotal(order)) }}</td>
+              <td class="col-num text-warn">− {{ formatCurrency(orderTotalDiscount(order)) }}</td>
+              <td class="col-num text-success"><strong>{{ formatCurrency(orderGrandTotal(order) - orderTotalDiscount(order)) }}</strong></td>
+              <td class="col-num col-date">{{ formatDate(order.service_date) }}</td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+  }
+}

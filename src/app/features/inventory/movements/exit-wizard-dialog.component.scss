@@ -461,6 +461,35 @@
   mat-icon { font-size: 1.4rem; height: 1.4rem; width: 1.4rem; color: #cbd5e0; }
 }
 
+// ── Location selector per cart item ──────────────────────────
+.loc-field {
+  width: 100%; display: block;
+  .mat-mdc-form-field-subscript-wrapper { display: none; }
+}
+
+.loc-code { font-size: 0.82em; color: #718096; }
+
+// ── External CC / patient section ─────────────────────────────
+.cc-external-badge { color: #6b46c1; font-weight: 700; }
+
+.external-cc-section {
+  background: #faf5ff; border: 1.5px solid #d6bcfa; border-radius: 10px;
+  padding: 0.75rem 1rem; margin-bottom: 0.75rem;
+  display: flex; flex-direction: column; gap: 0.35rem;
+}
+
+.section-title--sub {
+  mat-icon { color: #6b46c1; }
+  color: #553c9a;
+}
+
+.two-col-form {
+  display: grid; grid-template-columns: 1fr 1fr;
+  gap: 0 0.65rem;
+  mat-form-field { width: 100%; }
+  @media (max-width: 480px) { grid-template-columns: 1fr; }
+}
+
 // ── Empty state hints ─────────────────────────────────────────
 .empty-procedures,
 .select-service-hint {

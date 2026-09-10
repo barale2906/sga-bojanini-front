@@ -3,10 +3,12 @@ import { inject } from '@angular/core';
 import { Router } from '@angular/router';
 import { catchError, throwError } from 'rxjs';
 import { MatSnackBar } from '@angular/material/snack-bar';
+import { MatDialog } from '@angular/material/dialog';
 
 export const errorInterceptor: HttpInterceptorFn = (req, next) => {
-  const router = inject(Router);
+  const router   = inject(Router);
   const snackBar = inject(MatSnackBar);
+  const matDialog = inject(MatDialog);
 
   return next(req).pipe(
     catchError((error: HttpErrorResponse) => {
@@ -14,6 +16,7 @@ export const errorInterceptor: HttpInterceptorFn = (req, next) => {
         case 401:
           localStorage.removeItem('sga_token');
           localStorage.removeItem('sga_user');
+          matDialog.closeAll();
           router.navigate(['/login']);
           break;
         case 403:

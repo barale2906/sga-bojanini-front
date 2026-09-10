@@ -12,19 +12,15 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { MatDividerModule } from '@angular/material/divider';
-import { DateAdapter, MAT_DATE_FORMATS } from '@angular/material/core';
-import { MatDatepickerModule } from '@angular/material/datepicker';
-import { forkJoin, finalize, switchMap, of } from 'rxjs';
+import { finalize } from 'rxjs';
 import { InventoryService, StockSummary, BatchDetail, CostCenter, MovementDocument } from '../inventory.service';
 import { MovementConfirmDialogComponent, MovementConfirmResult } from './movement-confirm-dialog.component';
 import { MovementPdfSignature } from '../../../shared/services/movement-pdf.service';
-import { WarehouseService, Warehouse } from '../../warehouse/warehouse.service';
+import { WarehouseService, Warehouse, Location } from '../../warehouse/warehouse.service';
 import { Product } from '../../catalog/catalog.service';
-import { MedicalServicesService } from '../medical-services.service';
+import { MedicalServicesService, MedicalService } from '../medical-services.service';
 import { FormErrorsComponent } from '../../../shared/components/form-errors/form-errors.component';
 import { ProductSearchComponent } from '../../../shared/components/product-search/product-search.component';
-import { PatientSaleFormComponent } from '../../../shared/components/patient-sale-form/patient-sale-form.component';
-import { EsDateAdapter, ES_DATE_FORMATS } from '../../../shared/adapters/es-date.adapter';
 import { MovementPdfService } from '../../../shared/services/movement-pdf.service';
 
 export interface ExitWizardDialogData {
@@ -55,6 +51,7 @@ interface ExitSummaryData {
 interface CartItem {
   product:         Product;
   quantity:        number;
+  location_id:     number | null;
   summary:         StockSummary | null;
   fefo:            BatchDetail[];
   loadingStock:    boolean;
@@ -77,30 +74,25 @@ interface DispatchLine {
 @Component({
   selector: 'app-exit-wizard-dialog',
   standalone: true,
-  providers: [
-    { provide: DateAdapter, useClass: EsDateAdapter },
-    { provide: MAT_DATE_FORMATS, useValue: ES_DATE_FORMATS },
-  ],
   imports: [
     CommonModule, ReactiveFormsModule, MatDialogModule, MatFormFieldModule,
     MatInputModule, MatSelectModule, MatButtonModule, MatIconModule,
     MatProgressSpinnerModule, MatTooltipModule, MatDividerModule,
-    FormErrorsComponent, ProductSearchComponent, PatientSaleFormComponent,
+    FormErrorsComponent, ProductSearchComponent,
   ],
   templateUrl: './exit-wizard-dialog.component.html',
   styleUrl:    './exit-wizard-dialog.component.scss',
 })
 export class ExitWizardDialogComponent implements OnInit {
-  @ViewChild('scanner')        scannerRef?: ProductSearchComponent;
-  @ViewChild('patientFormRef') patientFormRef?: PatientSaleFormComponent;
+  @ViewChild('scanner') scannerRef?: ProductSearchComponent;
 
   data: ExitWizardDialogData = inject(MAT_DIALOG_DATA);
-  private ref    = inject(MatDialogRef<ExitWizardDialogComponent>);
-  private fb     = inject(FormBuilder);
-  private wSvc   = inject(WarehouseService);
-  private medSvc = inject(MedicalServicesService);
-  private pdfSvc = inject(MovementPdfService);
-  private dialog = inject(MatDialog);
+  private ref     = inject(MatDialogRef<ExitWizardDialogComponent>);
+  private fb      = inject(FormBuilder);
+  private wSvc    = inject(WarehouseService);
+  private medSvc  = inject(MedicalServicesService);
+  private pdfSvc  = inject(MovementPdfService);
+  private dialog  = inject(MatDialog);
 
   // ── Wizard state ─────────────────────────────────────────────
   step            = signal<1 | 2 | 3>(1);
@@ -114,13 +106,21 @@ export class ExitWizardDialogComponent implements OnInit {
   cartItems         = signal<CartItem[]>([]);
   scannerChecking   = signal(false);
   scanError         = signal<string | null>(null);
+  locations         = signal<Location[]>([]);
+  loadingLocations  = signal(false);
 
   // ── Step 2: Centro de costos ──────────────────────────────────
   centerForm = this.fb.group({
-    cost_center_id: [null as number | null, Validators.required],
-    movement_date:  [''],
-    reason:         [''],
+    cost_center_id:      [null as number | null, Validators.required],
+    movement_date:       [''],
+    reason:              [''],
+    service_id:          [null as number | null],
+    patient_document:    [''],
+    patient_external_id: [''],
   });
+
+  medicalServices     = signal<MedicalService[]>([]);
+  loadingServices     = signal(false);
 
   readonly today = new Date().toISOString().split('T')[0];
 
@@ -133,8 +133,8 @@ export class ExitWizardDialogComponent implements OnInit {
     return this.costCenters().find(c => c.id === id) ?? null;
   }
 
-  get isExternalCenter(): boolean {
-    return this.selectedCostCenter?.is_external === true;
+  get isExternalCC(): boolean {
+    return this.selectedCostCenter?.is_external ?? false;
   }
 
   dispatchPreview = computed((): DispatchLine[] => {
@@ -177,18 +177,16 @@ export class ExitWizardDialogComponent implements OnInit {
   }
 
   get isStep2Valid(): boolean {
-    if (!this.centerForm.get('cost_center_id')?.value) return false;
-    if (this.isExternalCenter) {
-      return this.patientFormRef?.isValid ?? false;
-    }
-    return true;
+    return !!this.centerForm.get('cost_center_id')?.value;
   }
 
   ngOnInit(): void {
     this.warehouseControl.valueChanges.subscribe(wId => {
       if (wId) {
+        this._loadWarehouseLocations(Number(wId));
         this.cartItems().forEach((_, i) => this._loadCartItemStock(i));
       } else {
+        this.locations.set([]);
         this.cartItems.update(arr => arr.map(item => ({
           ...item,
           summary: null, fefo: [], checkingExpired: false, expiredOnly: false,
@@ -197,10 +195,39 @@ export class ExitWizardDialogComponent implements OnInit {
       }
     });
 
+    this.centerForm.get('cost_center_id')!.valueChanges.subscribe(ccId => {
+      this.centerForm.patchValue({ service_id: null, patient_document: '', patient_external_id: '' }, { emitEvent: false });
+      this.medicalServices.set([]);
+      if (ccId) {
+        const cc = this.costCenters().find(c => c.id === ccId);
+        if (cc?.is_external) this._loadMedicalServices();
+      }
+    });
+
     this.loadingCostCenters.set(true);
     this.data.inventorySvc.getCostCenters({ is_active: true })
       .pipe(finalize(() => this.loadingCostCenters.set(false)))
       .subscribe({ next: r => this.costCenters.set(r.data), error: () => {} });
+  }
+
+  private _loadWarehouseLocations(wId: number): void {
+    this.loadingLocations.set(true);
+    this.wSvc.getWarehouseLocations(wId)
+      .pipe(finalize(() => this.loadingLocations.set(false)))
+      .subscribe({
+        next:  r => this.locations.set(r.data),
+        error: () => this.locations.set([]),
+      });
+  }
+
+  private _loadMedicalServices(): void {
+    this.loadingServices.set(true);
+    this.medSvc.getMedicalServices({ is_active: true })
+      .pipe(finalize(() => this.loadingServices.set(false)))
+      .subscribe({
+        next:  r => this.medicalServices.set(r.data),
+        error: () => this.medicalServices.set([]),
+      });
   }
 
   // ── Gestión del carrito ───────────────────────────────────────
@@ -251,7 +278,7 @@ export class ExitWizardDialogComponent implements OnInit {
               this.scanError.set(`Sin stock de "${product.name}" en ${this.selectedWarehouseName}`);
             } else {
               this.cartItems.update(arr => [...arr, {
-                product, quantity: 1,
+                product, quantity: 1, location_id: null,
                 summary: null, fefo: [], loadingStock: false, loadingFefo: false,
                 checkingExpired: false, expiredOnly: false,
                 isKit: true, kitAvailable: r.data.available_kits,
@@ -279,7 +306,7 @@ export class ExitWizardDialogComponent implements OnInit {
           }
           const newIdx = this.cartItems().length;
           this.cartItems.update(arr => [...arr, {
-            product, quantity: 1,
+            product, quantity: 1, location_id: null,
             summary: null, fefo: available,
             loadingStock: true, loadingFefo: false,
             checkingExpired: false, expiredOnly: false,
@@ -298,6 +325,12 @@ export class ExitWizardDialogComponent implements OnInit {
   private _loadCartItemSummaryOnly(idx: number): void {
     this.cartItems.update(arr => {
       const u = [...arr]; if (u[idx]) u[idx] = { ...u[idx], loadingStock: false }; return u;
+    });
+  }
+
+  setCartItemLocation(i: number, locationId: number | null): void {
+    this.cartItems.update(arr => {
+      const u = [...arr]; u[i] = { ...u[i], location_id: locationId }; return u;
     });
   }
 
@@ -441,20 +474,15 @@ export class ExitWizardDialogComponent implements OnInit {
       cost_center_id: cv.cost_center_id,
       movement_date:  cv.movement_date || undefined,
       reason:         cv.reason || undefined,
+      ...(cv.service_id          ? { service_id: cv.service_id }                           : {}),
+      ...(cv.patient_document    ? { patient_document: cv.patient_document }               : {}),
+      ...(cv.patient_external_id ? { patient_external_id: cv.patient_external_id }         : {}),
       items: this.cartItems().map(item => ({
         generic_product_id: item.product.id,
         quantity:           Number(item.quantity),
+        ...(item.location_id ? { location_id: item.location_id } : {}),
       })),
     };
-
-    if (this.isExternalCenter && this.patientFormRef) {
-      const pd = this.patientFormRef.getValue();
-      payload['patient_document']    = pd.patient_document;
-      payload['patient_external_id'] = pd.patient_external_id;
-      payload['seller']              = pd.seller;
-      payload['referrer']            = pd.referrer;
-      if (pd.procedures[0]?.procedure_id) payload['service_id'] = pd.procedures[0].procedure_id;
-    }
 
     this.data.inventorySvc.exit(payload).subscribe({
       next: (res) => {
@@ -487,93 +515,63 @@ export class ExitWizardDialogComponent implements OnInit {
           cost_center_name: cc?.name ?? null,
           reason:           cv.reason || null,
           lines:            summaryLines,
-          withRecords: false,
+          withRecords:      false,
         });
 
         const needsSignature = document.status === 'pending_signature';
+        this.saving.set(false);
 
-        const afterMovements = (withRecords: boolean) => {
-          this.exitSummaryData.update(d => d ? { ...d, withRecords } : d);
-          this.saving.set(false);
-
-          if (needsSignature) {
-            const ref = this.dialog.open(MovementConfirmDialogComponent, {
-              width: '560px', maxWidth: '96vw', disableClose: true,
-              data: {
-                document_id: document.id,
-                movements: flatMovements.map((m, i) => ({
-                  id:               m.id,
-                  product_name:     previewLines[i]?.product_name ?? m.product_name ?? null,
-                  batch_lot_number: m.batch_lot_number ?? null,
-                  quantity:         m.quantity,
-                  movement_type:    m.movement_type,
-                })),
-                warehouseName: wh?.name ?? `Almacén ${wId}`,
-                inventorySvc:  this.data.inventorySvc,
-              },
-            });
-            ref.afterClosed().subscribe((result: MovementConfirmResult | { cancelled: true } | undefined) => {
-              if (result && 'confirmed' in result) {
-                this.exitSignatures.set({ delivered_by: result.delivered_by, received_by: result.received_by });
-                this.step.set(3);
-              } else if (result && 'cancelled' in result) {
-                this.ref.close(false);
-              }
-            });
-          } else {
-            this.step.set(3);
-          }
-        };
-
-        if (this.isExternalCenter && this.patientFormRef) {
-          const pd          = this.patientFormRef.getValue();
-          const serviceDate = this._toApiDate(pd.service_date);
-          const recordCalls = pd.procedures.map(rv =>
-            this.medSvc.createPatientProcedureRecord({
-              medical_service_id:  rv.procedure_id,
-              patient_external_id: pd.patient_external_id,
-              patient_document:    pd.patient_document,
-              patient_first_name:  pd.patient_first_name,
-              patient_last_name:   pd.patient_last_name,
-              quantity:            rv.quantity,
-              unit_price:          rv.unit_price,
-              service_date:        serviceDate,
-              notes:               rv.notes || undefined,
-              seller:              pd.seller || undefined,
-              referrer:            pd.referrer || undefined,
-              appointment_code:    pd.appointment_code ?? undefined,
-            }).pipe(
-              switchMap(res => rv.notes
-                ? this.medSvc.createEvolution(res.data.id, { content: rv.notes })
-                : of(null)
-              )
-            )
-          );
-          forkJoin(recordCalls).subscribe({
-            next:  () => afterMovements(true),
-            error: err => {
-              this.saving.set(false);
-              this.errors.set([
-                'Las salidas de inventario se registraron correctamente, pero ocurrió un error al guardar los registros de procedimientos del paciente: ' +
-                (err.error?.message || 'Error desconocido'),
-              ]);
-              this.step.set(3);
+        if (needsSignature) {
+          const ref = this.dialog.open(MovementConfirmDialogComponent, {
+            width: '560px', maxWidth: '96vw', disableClose: true,
+            data: {
+              document_id: document.id,
+              movements: flatMovements.map((m, i) => ({
+                id:               m.id,
+                product_name:     previewLines[i]?.product_name ?? m.product_name ?? null,
+                batch_lot_number: m.batch_lot_number ?? null,
+                quantity:         m.quantity,
+                movement_type:    m.movement_type,
+              })),
+              warehouseName: wh?.name ?? `Almacén ${wId}`,
+              inventorySvc:  this.data.inventorySvc,
             },
           });
+          ref.afterClosed().subscribe((result: MovementConfirmResult | { cancelled: true } | undefined) => {
+            if (result && 'confirmed' in result) {
+              this.exitSignatures.set({ delivered_by: result.delivered_by, received_by: result.received_by });
+              this.step.set(3);
+            } else if (result && 'cancelled' in result) {
+              this.ref.close(false);
+            }
+          });
         } else {
-          afterMovements(false);
+          this.step.set(3);
         }
       },
       error: err => {
         this.saving.set(false);
-        if (err.status === 422)
-          this.errors.set(Object.values(err.error?.errors || {}).flat() as string[]);
-        else if (err.status === 409 && err.error?.error_code === 'EXPIRED_STOCK')
+        if (err.status === 422) {
+          const rawErrors: Record<string, string[]> = err.error?.errors || {};
+          const msgs: string[] = [];
+          for (const [key, messages] of Object.entries(rawErrors)) {
+            const match = key.match(/^items\.(\d+)\.(.+)$/);
+            if (match) {
+              const idx   = parseInt(match[1], 10);
+              const field = match[2];
+              msgs.push(...(messages as string[]).map(m => `Producto ${idx + 1} — ${field}: ${m}`));
+            } else {
+              msgs.push(...(messages as string[]));
+            }
+          }
+          this.errors.set(msgs);
+        } else if (err.status === 409 && err.error?.error_code === 'EXPIRED_STOCK') {
           this.errors.set([err.error?.message || 'El producto solo tiene stock vencido en este almacén.']);
-        else if (err.status === 409)
+        } else if (err.status === 409) {
           this.errors.set([err.error?.message || 'Error de stock o negocio']);
-        else
+        } else {
           this.errors.set([err.error?.message || 'Error al registrar la salida']);
+        }
       },
     });
   }

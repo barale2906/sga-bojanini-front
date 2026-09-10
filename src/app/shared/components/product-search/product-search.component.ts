@@ -1,6 +1,6 @@
 import {
   Component, Input, Output, EventEmitter, OnInit, OnChanges,
-  SimpleChanges, inject, signal, OnDestroy,
+  SimpleChanges, inject, signal, OnDestroy, ViewChild, ElementRef,
 } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormControl, ReactiveFormsModule } from '@angular/forms';
@@ -33,6 +33,8 @@ export class ProductSearchComponent implements OnInit, OnChanges, OnDestroy {
   @Input() productType?: 'simple' | 'kit';
   @Input() selectedProduct: Product | null = null;
   @Output() productSelected = new EventEmitter<Product | null>();
+
+  @ViewChild('searchInput') private searchInputRef?: ElementRef<HTMLInputElement>;
 
   private cSvc          = inject(CatalogService);
   private destroy$      = new Subject<void>();
@@ -125,6 +127,10 @@ export class ProductSearchComponent implements OnInit, OnChanges, OnDestroy {
     this.searched.set(false);
     this.showClear.set(false);
     this.productSelected.emit(null);
+  }
+
+  focus(): void {
+    this.searchInputRef?.nativeElement.focus();
   }
 
   private _search(term: string, immediate = false): void {

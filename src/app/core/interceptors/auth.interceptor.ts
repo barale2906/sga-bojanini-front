@@ -2,12 +2,14 @@ import { HttpInterceptorFn } from '@angular/common/http';
 import { inject } from '@angular/core';
 import { catchError, throwError } from 'rxjs';
 import { MatSnackBar } from '@angular/material/snack-bar';
+import { MatDialog } from '@angular/material/dialog';
 import { AuthService } from '../services/auth.service';
 
 export const authInterceptor: HttpInterceptorFn = (req, next) => {
   const token = localStorage.getItem('sga_token');
   const auth = inject(AuthService);
   const snackBar = inject(MatSnackBar);
+  const matDialog = inject(MatDialog);
 
   if (token) {
     req = req.clone({
@@ -21,6 +23,7 @@ export const authInterceptor: HttpInterceptorFn = (req, next) => {
   return next(req).pipe(
     catchError(err => {
       if (err.status === 401 && !req.url.includes('/auth/login')) {
+        matDialog.closeAll();
         auth.clearSession();
       }
       if (err.status === 403) {

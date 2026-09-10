@@ -1,0 +1,88 @@
+:host { display: block; padding-bottom: 3rem; }
+
+.table-wrap {
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.discounts-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+
+  th, td {
+    padding: 0.65rem 0.85rem;
+    text-align: left;
+    border-bottom: 1px solid var(--mat-divider-color, rgba(0,0,0,.1));
+    vertical-align: middle;
+  }
+
+  th {
+    font-weight: 600;
+    font-size: 0.78rem;
+    color: var(--mat-secondary-text, rgba(0,0,0,.54));
+    background: var(--mat-row-hover-color, rgba(0,0,0,.02));
+  }
+
+  tbody tr:hover { background: rgba(0,0,0,.02); }
+  tbody tr:last-child td { border-bottom: none; }
+}
+
+.col-action { width: 110px; }
+.col-num    { text-align: right; white-space: nowrap; }
+.col-date   { font-size: 0.8rem; color: var(--mat-secondary-text, rgba(0,0,0,.54)); }
+
+.approve-btn {
+  font-size: 0.8rem;
+  font-weight: 700;
+  gap: 4px;
+  mat-icon { font-size: 1.1rem; height: 1.1rem; width: 1.1rem; }
+  mat-spinner { margin: 0 auto; }
+}
+
+.order-num {
+  font-size: 0.8rem;
+  background: #e9d8fd;
+  color: #553c9a;
+  padding: 2px 7px;
+  border-radius: 9999px;
+}
+
+.patient-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+}
+.patient-name { font-weight: 600; color: #2d3748; }
+.patient-doc  { font-size: 0.78rem; color: #718096; }
+
+.procs-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.proc-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.82rem;
+}
+
+.proc-name     { color: #4a5568; }
+.proc-discount { font-size: 0.76rem; font-weight: 600; }
+
+.text-warn    { color: #e65100; }
+.text-success { color: #276749; }
+
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 3rem 1rem;
+  color: var(--mat-secondary-text, rgba(0,0,0,.54));
+
+  mat-icon { font-size: 3rem; width: 3rem; height: 3rem; color: #4caf50; }
+  p { margin: 0; font-size: 1rem; }
+}

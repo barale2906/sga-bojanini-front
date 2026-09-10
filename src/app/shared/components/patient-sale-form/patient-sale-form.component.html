@@ -42,16 +42,8 @@
       </div>
     }
 
-    <!-- Cargando citas -->
-    @if (medsysApptLoading()) {
-      <div class="row-loading">
-        <mat-spinner diameter="14"></mat-spinner>
-        <span>Cargando citas de MedSys...</span>
-      </div>
-    }
-
-    <!-- Paciente seleccionado + citas -->
-    @if (medsysSelectedPatient() && !medsysApptLoading()) {
+    <!-- Paciente seleccionado + últimas 3 citas (más antigua → más reciente) -->
+    @if (medsysSelectedPatient()) {
       <div class="medsys-selected-patient">
         <mat-icon>person_check</mat-icon>
         <div class="msp-info">
@@ -61,7 +53,7 @@
       </div>
 
       @if (medsysAppointments().length > 0) {
-        <div class="medsys-appt-label">Historial de citas:</div>
+        <div class="medsys-appt-label">Últimas 3 citas en MedSys:</div>
         @for (appt of medsysAppointments(); track appt.codcontrol) {
           @if (isActiveAppointment(appt)) {
             <!-- Cita activa → seleccionable -->
@@ -201,113 +193,125 @@
     <span>Procedimientos {{ mode === 'exit' ? 'aplicados' : 'a vender' }}</span>
   </div>
 
-  @if (loadingTree()) {
-    <div class="row-loading">
-      <mat-spinner diameter="14"></mat-spinner>
-      <span>Cargando servicios médicos...</span>
-    </div>
-  }
-
-  @if (!loadingTree() && servicesTree().length > 0) {
-    <mat-form-field appearance="outline" class="full-width">
-      <mat-label>Servicio médico</mat-label>
-      <mat-select formControlName="filter_service_id">
-        <mat-option [value]="null">Seleccionar servicio...</mat-option>
-        @for (svc of servicesTree(); track svc.id) {
-          <mat-option [value]="svc.id">{{ svc.code }} — {{ svc.name }}</mat-option>
+  @for (row of procedureRows.controls; track $index; let i = $index) {
+    <div class="procedure-row-card" [formGroup]="asGroup(row)">
+      <div class="procedure-row-header">
+        <span class="procedure-row-num">Procedimiento {{ i + 1 }}</span>
+        @if (procedureRows.length > 1) {
+          <button mat-icon-button type="button" color="warn"
+                  (click)="removeProcedureRow(i)" matTooltip="Quitar procedimiento">
+            <mat-icon>remove_circle_outline</mat-icon>
+          </button>
         }
-      </mat-select>
-      <mat-hint>Filtra los procedimientos disponibles</mat-hint>
-    </mat-form-field>
-  }
+      </div>
 
-  @if (patientForm.get('filter_service_id')?.value && selectedProcedures().length > 0) {
-    @for (row of procedureRows.controls; track $index; let i = $index) {
-      <div class="procedure-row-card" [formGroup]="asGroup(row)">
-        <div class="procedure-row-header">
-          <span class="procedure-row-num">Procedimiento {{ i + 1 }}</span>
-          @if (procedureRows.length > 1) {
-            <button mat-icon-button type="button" color="warn"
-                    (click)="removeProcedureRow(i)" matTooltip="Quitar procedimiento">
-              <mat-icon>remove_circle_outline</mat-icon>
+      <!-- Búsqueda de procedimiento -->
+      <div class="proc-search-wrap">
+        <mat-form-field appearance="outline" class="full-width">
+          <mat-label>Buscar procedimiento (código o nombre) *</mat-label>
+          <mat-icon matPrefix>search</mat-icon>
+          <input matInput
+                 [value]="procSearch()[i]?.query ?? ''"
+                 (input)="onProcSearchInput(i, $any($event.target).value)"
+                 placeholder="Ej: CUR-001 o Curaciones simples" />
+          <mat-hint>Mínimo 2 caracteres</mat-hint>
+          @if (procSearch()[i]?.loading) {
+            <mat-spinner matSuffix diameter="16"></mat-spinner>
+          }
+          @if (procSearch()[i]?.selected) {
+            <button matSuffix mat-icon-button type="button"
+                    (click)="clearProcedure(i)" matTooltip="Limpiar procedimiento">
+              <mat-icon>close</mat-icon>
             </button>
           }
-        </div>
-        <div class="procedure-row-fields">
-          <mat-form-field appearance="outline" class="field-procedure">
-            <mat-label>Procedimiento *</mat-label>
-            <mat-select formControlName="procedure_id">
-              @for (proc of selectedProcedures(); track proc.id) {
-                <mat-option [value]="proc.id">{{ proc.code }} — {{ proc.name }}</mat-option>
-              }
-            </mat-select>
-          </mat-form-field>
-          <mat-form-field appearance="outline" class="field-qty-sm">
-            <mat-label>Cantidad *</mat-label>
-            <input matInput type="number" formControlName="quantity" min="1" />
-          </mat-form-field>
-          <mat-form-field appearance="outline" class="field-price">
-            <mat-label>$ Valor unitario *</mat-label>
-            <input matInput type="number" formControlName="unit_price" min="0" step="100" />
-            <span matTextPrefix>$&nbsp;</span>
-            @if (rowPricesLoading()[i]) {
-              <mat-hint>Cargando tarifa vigente...</mat-hint>
-            } @else if (rowPrices()[i]?.is_currently_valid) {
-              <mat-hint class="price-hint--ok">Tarifa vigente cargada</mat-hint>
-            }
-          </mat-form-field>
-        </div>
-        <div class="procedure-row-total">
-          Total: <strong>{{ rowProcedureTotal(i) | currency:'COP':'symbol':'1.0-0' }}</strong>
-        </div>
+        </mat-form-field>
 
-        @if (mode === 'exit') {
-          <div class="evolution-field">
-            @if (rowTemplatesLoading()[i]) {
-              <div class="row-loading">
-                <mat-spinner diameter="14"></mat-spinner>
-                <span>Cargando plantilla de evolución...</span>
-              </div>
-            }
-            @if (!rowTemplatesLoading()[i] && rowTemplates()[i]) {
-              <div class="template-hint">
-                <mat-icon>auto_awesome</mat-icon>
-                <span>Plantilla cargada: <strong>{{ rowTemplates()[i]!.title }}</strong>. Puede editarla libremente.</span>
-              </div>
-            }
-            <app-rich-text-editor
-              formControlName="notes"
-              label="Evolución Clínica"
-              [required]="true"
-              placeholder="Describa la evolución clínica del paciente...">
-            </app-rich-text-editor>
-            @if (!_htmlHasText(asGroup(row).get('notes')?.value) && asGroup(row).get('notes')?.touched) {
-              <span class="evolution-error">La evolución clínica es obligatoria</span>
+        @if (procSearch()[i]?.results?.length) {
+          <div class="proc-results-list">
+            @for (res of procSearch()[i].results; track res.id) {
+              <button type="button" class="proc-result-item" (click)="selectProcedureResult(i, res)">
+                <code class="proc-result-code">{{ res.code }}</code>
+                <span class="proc-result-name">{{ res.name }}</span>
+                @if (res.current_price) {
+                  <span class="proc-result-price">{{ res.current_price.unit_price | currency:'COP':'symbol':'1.0-0' }}</span>
+                } @else {
+                  <span class="proc-result-no-price">Sin tarifa</span>
+                }
+              </button>
             }
           </div>
         }
 
+        @if (procSearch()[i]?.selected) {
+          <div class="proc-selected-badge">
+            <mat-icon>check_circle</mat-icon>
+            <span>{{ procSearch()[i].selected!.code }} — {{ procSearch()[i].selected!.name }}</span>
+            @if (!procSearch()[i].selected!.current_price) {
+              <span class="proc-no-price-warn">Sin tarifa activa — ingrese el precio manualmente</span>
+            }
+          </div>
+        }
       </div>
-    }
-    <button mat-stroked-button type="button" class="add-row-btn" (click)="addProcedureRow()">
-      <mat-icon>add</mat-icon>
-      Agregar procedimiento
-    </button>
-    @if (procedureRows.length > 0) {
-      <div class="procedures-total-bar">
-        <span>Total procedimientos:</span>
-        <strong>{{ proceduresGrandTotal | currency:'COP':'symbol':'1.0-0' }}</strong>
+
+      <div class="procedure-row-fields">
+        <mat-form-field appearance="outline" class="field-qty-sm">
+          <mat-label>Cantidad *</mat-label>
+          <input matInput type="number" formControlName="quantity" min="1" />
+        </mat-form-field>
+        <mat-form-field appearance="outline" class="field-price">
+          <mat-label>$ Valor unitario *</mat-label>
+          <input matInput type="number" formControlName="unit_price" min="0" step="100" />
+          <span matTextPrefix>$&nbsp;</span>
+          @if (!procSearch()[i]?.selected) {
+            <mat-hint>Seleccione un procedimiento</mat-hint>
+          } @else if (!procSearch()[i].selected!.current_price) {
+            <mat-hint class="price-hint--warn">Sin tarifa — ingrese manualmente</mat-hint>
+          } @else {
+            <mat-hint class="price-hint--ok">Tarifa vigente cargada</mat-hint>
+          }
+        </mat-form-field>
       </div>
-    }
-  } @else if (patientForm.get('filter_service_id')?.value) {
-    <div class="empty-procedures">
-      <mat-icon>info</mat-icon>
-      <span>El servicio seleccionado no tiene procedimientos activos.</span>
+      <div class="procedure-row-total">
+        Total: <strong>{{ rowProcedureTotal(i) | currency:'COP':'symbol':'1.0-0' }}</strong>
+      </div>
+
+      @if (mode === 'exit') {
+        <div class="evolution-field">
+          @if (rowTemplatesLoading()[i]) {
+            <div class="row-loading">
+              <mat-spinner diameter="14"></mat-spinner>
+              <span>Cargando plantilla de evolución...</span>
+            </div>
+          }
+          @if (!rowTemplatesLoading()[i] && rowTemplates()[i]) {
+            <div class="template-hint">
+              <mat-icon>auto_awesome</mat-icon>
+              <span>Plantilla cargada: <strong>{{ rowTemplates()[i]!.title }}</strong>. Puede editarla libremente.</span>
+            </div>
+          }
+          <app-rich-text-editor
+            formControlName="notes"
+            label="Evolución Clínica"
+            [required]="true"
+            placeholder="Describa la evolución clínica del paciente...">
+          </app-rich-text-editor>
+          @if (!_htmlHasText(asGroup(row).get('notes')?.value) && asGroup(row).get('notes')?.touched) {
+            <span class="evolution-error">La evolución clínica es obligatoria</span>
+          }
+        </div>
+      }
+
     </div>
-  } @else if (!loadingTree()) {
-    <div class="select-service-hint">
-      <mat-icon>arrow_upward</mat-icon>
-      <span>Selecciona un servicio médico para ver los procedimientos disponibles.</span>
+  }
+
+  <button mat-stroked-button type="button" class="add-row-btn" (click)="addProcedureRow()">
+    <mat-icon>add</mat-icon>
+    Agregar procedimiento
+  </button>
+  @if (procedureRows.length > 0) {
+    <div class="procedures-total-bar">
+      <span>Total procedimientos:</span>
+      <strong>{{ proceduresGrandTotal | currency:'COP':'symbol':'1.0-0' }}</strong>
     </div>
   }
 

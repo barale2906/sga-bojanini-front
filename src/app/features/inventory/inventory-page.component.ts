@@ -32,8 +32,6 @@ import { ProductSearchComponent } from '../../shared/components/product-search/p
 import { PermissionDirective } from '../../shared/directives/permission.directive';
 import { DateFormatPipe } from '../../shared/pipes/date-format.pipe';
 import { MovementFormDialogComponent } from './movements/movement-form-dialog.component';
-import { ExitWizardDialogComponent } from './movements/exit-wizard-dialog.component';
-import { WarehouseTransferDialogComponent } from './movements/warehouse-transfer-dialog.component';
 import { InitialEntriesImportDialogComponent } from './initial-entries/initial-entries-import-dialog.component';
 import { ConfirmDialogComponent } from '../../shared/components/confirm-dialog/confirm-dialog.component';
 import { SendDocumentEmailDialogComponent, SendDocumentEmailDialogData } from '../../shared/components/send-document-email-dialog/send-document-email-dialog.component';
@@ -221,42 +219,8 @@ export class InventoryPageComponent implements OnInit {
   }
 
   private _openPoReceiveSequentially(order: PurchaseOrder): void {
-    const items = order.items ?? [];
-    if (!items.length) return;
-
-    const openItem = (idx: number): void => {
-      if (idx >= items.length) return;
-      const item = items[idx];
-      const pending = item.quantity_requested - (item.quantity_received ?? 0);
-      // Saltar ítems ya completamente recibidos
-      if (pending <= 0) { openItem(idx + 1); return; }
-
-      this.dialog.open(MovementFormDialogComponent, {
-        data: {
-          type: 'entry',
-          warehouses: this.warehouses(),
-          products: this.products(),
-          inventorySvc: this.svc,
-          purchaseOrder: order,
-          purchaseOrderItem: item,
-          itemIndex: idx,
-          itemTotal: items.length,
-        },
-        width: '820px', maxWidth: '96vw', maxHeight: '94vh',
-      }).afterClosed().subscribe(result => {
-        const ok = result === true || result?.ok;
-        if (ok) {
-          this.loadStock(); this.loadMovements(); this.loadBatches();
-          this.snack.open(
-            items.length > 1 ? `Entrada ítem ${idx + 1}/${items.length} registrada` : 'Entrada registrada',
-            'OK', { duration: 3000 },
-          );
-        }
-        openItem(idx + 1);
-      });
-    };
-
-    openItem(0);
+    // Navegar a la página de entradas pasando el ID de la OC para pre-cargar los ítems
+    this.router.navigate(['/inventory/entry'], { queryParams: { po_id: order.id } });
   }
 
   loadBatches(page = 1): void {
@@ -337,50 +301,29 @@ export class InventoryPageComponent implements OnInit {
   }
 
   openMovement(type: string): void {
+    if (type === 'entry') {
+      this.router.navigate(['/inventory/entry']);
+      return;
+    }
+
     if (type === 'exit') {
-      this._openExitWizard();
+      this.router.navigate(['/inventory/exit']);
       return;
     }
 
     if (type === 'transfer') {
-      this._openTransferDialog();
+      this.router.navigate(['/inventory/transfer']);
       return;
     }
 
-    const needsWide = type === 'entry';
     this.dialog.open(MovementFormDialogComponent, {
       data: { type, warehouses: this.warehouses(), products: this.products(), inventorySvc: this.svc },
-      width: needsWide ? '760px' : '620px', maxWidth: '95vw', maxHeight: '94vh',
+      width: '620px', maxWidth: '95vw', maxHeight: '94vh',
     }).afterClosed().subscribe(result => {
       const ok = result === true || (result && result.ok);
       if (!ok) return;
       this.loadStock(); this.loadMovements(); this.loadBatches();
       this.snack.open('Movimiento registrado', 'OK', { duration: 3000 });
-    });
-  }
-
-  private _openTransferDialog(): void {
-    this.dialog.open(WarehouseTransferDialogComponent, {
-      data: { warehouses: this.warehouses(), products: this.products(), inventorySvc: this.svc, catalogSvc: this.cSvc },
-      width: '720px', maxWidth: '96vw', maxHeight: '94vh',
-    }).afterClosed().subscribe(result => {
-      if (!result) return;
-      this.loadStock(); this.loadMovements(); this.loadBatches();
-      this.snack.open('Traslado registrado exitosamente', 'OK', { duration: 3500 });
-    });
-  }
-
-  private _openExitWizard(): void {
-    this.dialog.open(ExitWizardDialogComponent, {
-      data: { warehouses: this.warehouses(), products: this.products(), inventorySvc: this.svc },
-      width: '95vw', maxWidth: '1020px', height: '93vh', maxHeight: '93vh',
-    }).afterClosed().subscribe(result => {
-      if (!result?.ok) return;
-      this.loadStock(); this.loadMovements(); this.loadBatches();
-      const msg = result.withRecords
-        ? 'Salida registrada con procedimientos del paciente'
-        : 'Salida de stock registrada';
-      this.snack.open(msg, 'OK', { duration: 4000 });
     });
   }
 

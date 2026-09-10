@@ -1,0 +1,140 @@
+<app-page-header
+  title="Listas de Precios"
+  subtitle="Descargue la plantilla, actualice precios y cargue el archivo"
+  icon="price_change"
+>
+</app-page-header>
+
+<div class="page-content">
+
+  <!-- ── Instrucciones ─────────────────────────────────────────── -->
+  <div class="instructions-card">
+    <div class="instructions-card__header">
+      <mat-icon>info_outline</mat-icon>
+      <h3>¿Cómo actualizar los precios?</h3>
+    </div>
+    <ol class="instructions-list">
+      <li>Descargue la plantilla Excel con todos los procedimientos activos y sus precios vigentes.</li>
+      <li>Edite únicamente la columna <strong>D (Precio)</strong> con los nuevos valores.</li>
+      <li>Guarde el archivo sin cambiar su formato.</li>
+      <li>Cargue el archivo en la sección de abajo.</li>
+    </ol>
+    <p class="instructions-note">
+      <mat-icon>warning_amber</mat-icon>
+      Al cargar un archivo válido, la lista de precios anterior se inactiva y se crea la nueva.
+      Las filas con errores se reportan pero no detienen la carga.
+    </p>
+  </div>
+
+  <!-- ── Descargar plantilla ────────────────────────────────────── -->
+  <div class="action-card">
+    <div class="action-card__info">
+      <mat-icon class="action-card__icon">download</mat-icon>
+      <div>
+        <div class="action-card__title">Descargar Plantilla</div>
+        <div class="action-card__desc">
+          Archivo Excel con todos los procedimientos activos y precios vigentes.
+          Columnas: Código, Nombre, Servicio y Precio.
+        </div>
+      </div>
+    </div>
+    <button mat-raised-button color="primary"
+            [disabled]="downloading()"
+            (click)="downloadTemplate()">
+      @if (downloading()) { <mat-spinner diameter="18"></mat-spinner> }
+      <mat-icon>download</mat-icon>
+      Descargar Plantilla
+    </button>
+  </div>
+
+  <!-- ── Cargar lista de precios ────────────────────────────────── -->
+  <div class="action-card">
+    <div class="action-card__info">
+      <mat-icon class="action-card__icon">upload_file</mat-icon>
+      <div>
+        <div class="action-card__title">Cargar Lista de Precios</div>
+        <div class="action-card__desc">
+          Seleccione el archivo Excel modificado (.xlsx o .xls) y cárguelo.
+        </div>
+      </div>
+    </div>
+
+    <div class="upload-controls">
+      <input #fileInput type="file" accept=".xlsx,.xls"
+             class="file-input" (change)="onFileChange($event)" />
+
+      <button mat-stroked-button (click)="fileInput.click()">
+        <mat-icon>attach_file</mat-icon>
+        Seleccionar archivo
+      </button>
+
+      @if (selectedFile()) {
+        <div class="file-selected">
+          <mat-icon>description</mat-icon>
+          <span>{{ selectedFile()!.name }}</span>
+          <button mat-icon-button (click)="clearFile()" matTooltip="Quitar archivo">
+            <mat-icon>close</mat-icon>
+          </button>
+        </div>
+
+        <button mat-raised-button color="accent"
+                [disabled]="uploading()"
+                (click)="upload()">
+          @if (uploading()) { <mat-spinner diameter="18"></mat-spinner> }
+          <mat-icon>cloud_upload</mat-icon>
+          Cargar
+        </button>
+      }
+    </div>
+
+    @if (uploadError()) {
+      <div class="upload-error">
+        <mat-icon>error_outline</mat-icon>
+        <span>{{ uploadError() }}</span>
+      </div>
+    }
+
+    @if (uploadResult(); as result) {
+      <div class="upload-result">
+        <div class="result-summary">
+          <div class="result-item result-item--ok">
+            <mat-icon>check_circle</mat-icon>
+            <span>{{ result.processed }} precios actualizados</span>
+          </div>
+          @if (result.skipped > 0) {
+            <div class="result-item result-item--warn">
+              <mat-icon>warning</mat-icon>
+              <span>{{ result.skipped }} filas omitidas</span>
+            </div>
+          }
+        </div>
+
+        @if (result.skipped_detail.length > 0) {
+          <div class="skipped-detail">
+            <div class="skipped-detail__header">Detalle de filas omitidas:</div>
+            <table class="skipped-table">
+              <thead>
+                <tr>
+                  <th>Fila</th>
+                  <th>Código</th>
+                  <th>Motivo</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (row of result.skipped_detail; track row.row) {
+                  <tr>
+                    <td>{{ row.row }}</td>
+                    <td><code>{{ row.code }}</code></td>
+                    <td>{{ row.reason }}</td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        }
+      </div>
+    }
+
+  </div>
+
+</div>

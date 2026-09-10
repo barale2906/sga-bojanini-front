@@ -1,0 +1,113 @@
+:host { display: block; padding-bottom: 3rem; }
+
+.info-card {
+  display: flex;
+  gap: 0.75rem;
+  background: #f0f9ff;
+  border: 1px solid #bee3f8;
+  border-radius: 10px;
+  padding: 1rem 1.25rem;
+  margin-bottom: 1.5rem;
+
+  .info-icon {
+    font-size: 1.4rem;
+    height: 1.4rem;
+    width: 1.4rem;
+    color: #3182ce;
+    flex-shrink: 0;
+    margin-top: 0.1rem;
+  }
+
+  .info-text {
+    flex: 1;
+    font-size: 0.85rem;
+    color: #2b6cb0;
+    line-height: 1.5;
+
+    p { margin: 0 0 0.35rem; }
+    p:last-child { margin-bottom: 0; }
+    code { background: rgba(49,130,206,.12); padding: 1px 5px; border-radius: 3px; font-size: 0.82rem; }
+    strong { color: #1a4a80; }
+  }
+}
+
+.approvers-count {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: #4a5568;
+  margin-bottom: 0.65rem;
+
+  mat-icon { font-size: 1.1rem; height: 1.1rem; width: 1.1rem; color: #718096; }
+}
+
+.table-wrap {
+  border-radius: 10px;
+  overflow: hidden;
+  table { width: 100%; }
+}
+
+.name-cell {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-weight: 500;
+  color: #2d3748;
+}
+
+.user-icon { font-size: 1.1rem; height: 1.1rem; width: 1.1rem; color: #718096; }
+
+.email-cell { font-size: 0.85rem; color: #4a5568; }
+
+.roles-cell {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+}
+
+.role-chip {
+  font-size: 0.72rem !important;
+  height: 22px !important;
+  background: #e9d8fd;
+  color: #553c9a;
+}
+
+.col-dash { color: #a0aec0; }
+
+.badge {
+  display: inline-block;
+  font-size: 0.72rem; font-weight: 700;
+  padding: 0.15rem 0.55rem; border-radius: 9999px;
+
+  &--ok   { background: #c6f6d5; color: #276749; }
+  &--gray { background: #e2e8f0; color: #718096; }
+}
+
+.act { width: 48px; text-align: right; }
+
+.data-row:hover { background: #f7fafc; }
+
+.no-data {
+  padding: 2rem;
+  text-align: center;
+  color: #a0aec0;
+  font-size: 0.9rem;
+}
+
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 3rem 1rem;
+  color: #a0aec0;
+  text-align: center;
+
+  mat-icon { font-size: 2.5rem; height: 2.5rem; width: 2.5rem; }
+  p { margin: 0; font-size: 0.9rem; }
+  .empty-sub { font-size: 0.82rem; }
+  a { color: #3182ce; }
+  code { background: rgba(0,0,0,.06); padding: 1px 5px; border-radius: 3px; font-size: 0.8rem; }
+}

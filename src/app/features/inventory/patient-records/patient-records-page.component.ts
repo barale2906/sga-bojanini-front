@@ -59,7 +59,7 @@ export class PatientRecordsPageComponent implements OnInit {
   loading     = signal(false);
   procedures  = signal<MedicalServiceNode[]>([]);
 
-  cols = ['actions', 'procedure', 'patient', 'seller_referrer', 'quantity', 'unit_price', 'total', 'service_date'];
+  cols = ['actions', 'procedure', 'patient', 'seller_referrer', 'quantity', 'unit_price', 'total', 'discount', 'net_total', 'discount_status', 'service_date'];
 
   filters = this.fb.group({
     patient_document:    [''],
@@ -163,6 +163,13 @@ export class PatientRecordsPageComponent implements OnInit {
   }
 
   goBack(): void { this.router.navigate(['/inventory']); }
+
+  copy(value: string | null | undefined): void {
+    if (!value) return;
+    navigator.clipboard.writeText(value).then(() => {
+      this.snack.open('Copiado', '', { duration: 1500, panelClass: 'snack-copy' });
+    });
+  }
 
   private _toApiDate(date: Date): string {
     return date.toISOString().substring(0, 10);

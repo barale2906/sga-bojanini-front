@@ -102,6 +102,15 @@ export const routes: Routes = [
         data: { title: 'Centros de Costo', permission: 'centros_costo.ver' },
       },
 
+      // Órdenes de Servicio
+      {
+        path: 'service-orders',
+        loadChildren: () =>
+          import('./features/service-orders/service-orders.routes').then((m) => m.serviceOrdersRoutes),
+        canActivate: [permissionGuard],
+        data: { permission: 'ordenes_servicio.ver' },
+      },
+
       // Compras (Fase 5)
       {
         path: 'purchasing',

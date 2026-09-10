@@ -27,6 +27,18 @@ const TYPE_LABELS: Record<string, string> = {
   loss: 'Baja de Inventario',
 };
 
+export interface EntryItemState {
+  selectedProduct:      Product | null;
+  variants:             ProductVariant[];
+  presentations:        ProductPresentation[];
+  productDetail:        Product | null;
+  usePresentationMode:  boolean;
+  loadingVariants:      boolean;
+  loadingProductDetail: boolean;
+  locCapacity:          LocationCapacity | null;
+  loadingLocCap:        boolean;
+}
+
 /** Motivos predefinidos para una baja de inventario (daño, muestra, pérdida/robo, vencimiento, otro). */
 export const LOSS_REASON_OPTIONS: { value: string; label: string }[] = [
   { value: 'damage',      label: 'Producto dañado' },
@@ -130,6 +142,14 @@ export class MovementFormDialogComponent implements OnInit {
   // ── Selección explícita de lote — Baja de inventario ─────────
   lossBatches        = signal<BatchDetail[]>([]);
   loadingLossBatches = signal(false);
+
+  // ── Selección opcional de lote — Ajuste y Devolución ─────────
+  adjReturnBatches        = signal<BatchDetail[]>([]);
+  loadingAdjReturnBatches = signal(false);
+
+  // ── Entradas — array de ítems (múltiples productos) ──────────
+  readonly itemsArray = this.fb.array<FormGroup>([]);
+  readonly itemStates = signal<EntryItemState[]>([]);
 
   // ── Getters — OC vinculada ────────────────────────────────────
 
@@ -300,11 +320,17 @@ export class MovementFormDialogComponent implements OnInit {
     if (!this.isExit && !v.product_variant_id) return false;
 
     if (this.isEntry) {
-      if (this.useDistribution()) return !this.entryRows.invalid && this.entryRows.length > 0;
-      if (this.usePresentationMode()) {
-        return !!v.product_presentation_id && !!(v.quantity_in_presentation) && (v.quantity_in_presentation ?? 0) > 0;
-      }
-      return !!(v.quantity_base) && (v.quantity_base ?? 0) > 0;
+      if (!v.warehouse_id) return false;
+      if (this.itemsArray.length === 0) return false;
+      return this.itemsArray.controls.every((ctrl, i) => {
+        const g  = this.asGroup(ctrl);
+        const iv = g.value;
+        if (!iv.product_variant_id || !iv.lot_number?.trim() || !iv.expiration_date) return false;
+        const state = this.itemStates()[i];
+        if (!state) return false;
+        if (state.usePresentationMode) return !!iv.product_presentation_id && (iv.quantity_in_presentation ?? 0) > 0;
+        return (iv.quantity_base ?? 0) > 0;
+      });
     }
 
     if (this.isTransfer) {
@@ -397,6 +423,13 @@ export class MovementFormDialogComponent implements OnInit {
       this._resetDistRows();
       this.form.patchValue({ zone_id: null, location_id: null, batch_id: null }, { emitEvent: false });
       this.lossBatches.set([]);
+      // Para entradas: resetear ubicación de cada ítem al cambiar almacén
+      if (this.isEntry) {
+        this.itemsArray.controls.forEach(ctrl =>
+          this.asGroup(ctrl).patchValue({ location_id: null }, { emitEvent: false })
+        );
+        this.itemStates.update(arr => arr.map(s => ({ ...s, locCapacity: null, loadingLocCap: false })));
+      }
       if (wId) {
         this.wSvc.getWarehouseLocations(Number(wId)).subscribe({ next: r => this.locations.set(r.data), error: () => {} });
         this.wSvc.getWarehouseZones(Number(wId)).subscribe({ next: r => this.zones.set(r.data), error: () => {} });
@@ -507,6 +540,11 @@ export class MovementFormDialogComponent implements OnInit {
     this._addEntryRow();
     this._addTransferRow();
 
+    // Entradas: inicializar con un ítem vacío
+    if (this.isEntry) {
+      this.addItem();
+    }
+
     // Centros de costo — solo para salidas
     if (this.isExit) {
       this.loadingCostCenters.set(true);
@@ -540,16 +578,27 @@ export class MovementFormDialogComponent implements OnInit {
       const qty = pendingQty > 0 ? pendingQty : item.quantity_requested;
 
       this.form.patchValue({ warehouse_id: order.warehouse_id });
-      this.form.patchValue({ product_id: item.variant?.generic?.id });
 
-      // Sincronizar el buscador con el producto de la OC
-      const product = this.data.products.find(p => p.id === item.variant?.generic?.id) ?? null;
-      this._selectedProductFull.set(product);
-
-      if (item.product_presentation_id) {
-        this.form.patchValue({ quantity_in_presentation: qty });
+      if (this.isEntry) {
+        // Para entradas: pre-rellenar el primer ítem
+        const product = this.data.products.find(p => p.id === item.variant?.generic?.id) ?? null;
+        if (product) this.onItemProductSelected(0, product, item.variant?.id);
+        const firstCtrl = this.asGroup(this.itemsArray.at(0));
+        if (item.product_presentation_id) {
+          firstCtrl.patchValue({ quantity_in_presentation: qty }, { emitEvent: false });
+          this.toggleItemPresentationMode(0, true);
+        } else {
+          firstCtrl.patchValue({ quantity_base: qty }, { emitEvent: false });
+        }
       } else {
-        this.form.patchValue({ quantity_base: qty });
+        this.form.patchValue({ product_id: item.variant?.generic?.id });
+        const product = this.data.products.find(p => p.id === item.variant?.generic?.id) ?? null;
+        this._selectedProductFull.set(product);
+        if (item.product_presentation_id) {
+          this.form.patchValue({ quantity_in_presentation: qty });
+        } else {
+          this.form.patchValue({ quantity_base: qty });
+        }
       }
     }
   }
@@ -627,16 +676,25 @@ export class MovementFormDialogComponent implements OnInit {
     const pendingQty = item.quantity_requested - (item.quantity_received ?? 0);
     const qty = pendingQty > 0 ? pendingQty : item.quantity_requested;
 
-    this.form.patchValue({ product_id: item.variant?.generic?.id });
-
-    // Sincronizar el buscador con el producto de la OC
-    const product = this.data.products.find(p => p.id === item.variant?.generic?.id) ?? null;
-    this._selectedProductFull.set(product);
-
-    if (item.product_presentation_id) {
-      this.form.patchValue({ quantity_in_presentation: qty });
+    if (this.isEntry) {
+      const product = this.data.products.find(p => p.id === item.variant?.generic?.id) ?? null;
+      if (product) this.onItemProductSelected(0, product, item.variant?.id);
+      const firstCtrl = this.asGroup(this.itemsArray.at(0));
+      if (item.product_presentation_id) {
+        firstCtrl.patchValue({ quantity_in_presentation: qty }, { emitEvent: false });
+        this.toggleItemPresentationMode(0, true);
+      } else {
+        firstCtrl.patchValue({ quantity_base: qty }, { emitEvent: false });
+      }
     } else {
-      this.form.patchValue({ quantity_base: qty });
+      this.form.patchValue({ product_id: item.variant?.generic?.id });
+      const product = this.data.products.find(p => p.id === item.variant?.generic?.id) ?? null;
+      this._selectedProductFull.set(product);
+      if (item.product_presentation_id) {
+        this.form.patchValue({ quantity_in_presentation: qty });
+      } else {
+        this.form.patchValue({ quantity_base: qty });
+      }
     }
   }
 
@@ -665,8 +723,6 @@ export class MovementFormDialogComponent implements OnInit {
           error: () => this.fefoLotes.set([]),
         });
     } else if (this.isLoss) {
-      // La baja requiere selección explícita de lote: se listan los lotes
-      // (vigentes y vencidos) que tienen stock en el almacén seleccionado.
       this.form.patchValue({ batch_id: null, location_id: null }, { emitEvent: false });
       this.lossBatches.set([]);
       this.loadingLossBatches.set(true);
@@ -675,6 +731,16 @@ export class MovementFormDialogComponent implements OnInit {
         .subscribe({
           next: r => this.lossBatches.set(r.data.filter(b => b.quantity_available > 0)),
           error: () => this.lossBatches.set([]),
+        });
+    } else if (this.isAdjustment || this.isReturn) {
+      this.form.patchValue({ batch_id: null }, { emitEvent: false });
+      this.adjReturnBatches.set([]);
+      this.loadingAdjReturnBatches.set(true);
+      this.data.inventorySvc.getProductBatches(Number(pId), false, Number(wId))
+        .pipe(finalize(() => this.loadingAdjReturnBatches.set(false)))
+        .subscribe({
+          next: r => this.adjReturnBatches.set(r.data.filter(b => b.quantity_available > 0)),
+          error: () => this.adjReturnBatches.set([]),
         });
     }
   }
@@ -742,6 +808,163 @@ export class MovementFormDialogComponent implements OnInit {
         error: () => {},
       });
     }
+  }
+
+  // ── Entradas — ítems múltiples ───────────────────────────────
+
+  addItem(): void {
+    this.itemsArray.push(this._newItemGroup());
+    this.itemStates.update(arr => [...arr, this._defaultItemState()]);
+  }
+
+  removeItem(i: number): void {
+    if (this.itemsArray.length <= 1) return;
+    this.itemsArray.removeAt(i);
+    this.itemStates.update(arr => arr.filter((_, idx) => idx !== i));
+  }
+
+  private _newItemGroup(): FormGroup {
+    return this.fb.group({
+      product_id:               [null as number | null],
+      product_variant_id:       [null as number | null],
+      location_id:              [null as number | null],
+      lot_number:               [''],
+      expiration_date:          [''],
+      manufacturing_date:       [''],
+      quantity_base:            [null as number | null],
+      product_presentation_id:  [null as number | null],
+      quantity_in_presentation: [null as number | null],
+      notes:                    [''],
+    });
+  }
+
+  private _defaultItemState(): EntryItemState {
+    return {
+      selectedProduct: null, variants: [], presentations: [], productDetail: null,
+      usePresentationMode: false, loadingVariants: false, loadingProductDetail: false,
+      locCapacity: null, loadingLocCap: false,
+    };
+  }
+
+  onItemProductSelected(i: number, product: Product | null, prefillVariantId?: number): void {
+    this.itemStates.update(arr => {
+      const a = [...arr];
+      a[i] = { ...a[i], selectedProduct: product, variants: [], presentations: [], productDetail: null,
+                loadingVariants: !!product, loadingProductDetail: !!product };
+      return a;
+    });
+    const ctrl = this.asGroup(this.itemsArray.at(i));
+    ctrl.patchValue({ product_id: product?.id ?? null, product_variant_id: null }, { emitEvent: false });
+    if (!product) return;
+
+    this.cSvc.getVariants(product.id).subscribe({
+      next: r => {
+        const active = r.data.filter(v => v.is_active);
+        const toSelect = prefillVariantId
+          ? active.find(v => v.id === prefillVariantId)?.id
+          : (active.length === 1 ? active[0].id : undefined);
+        if (toSelect) ctrl.patchValue({ product_variant_id: toSelect }, { emitEvent: false });
+        this.itemStates.update(arr => { const a = [...arr]; a[i] = { ...a[i], variants: active, loadingVariants: false }; return a; });
+      },
+      error: () => this.itemStates.update(arr => { const a = [...arr]; a[i] = { ...a[i], loadingVariants: false }; return a; }),
+    });
+
+    this.cSvc.getPresentations(product.id).subscribe({
+      next: r => {
+        const poPresId = this._linkedPoItem?.product_presentation_id;
+        if (poPresId && r.data.some(pr => pr.id === poPresId)) {
+          this.toggleItemPresentationMode(i, true);
+          ctrl.patchValue({ product_presentation_id: poPresId }, { emitEvent: false });
+        }
+        this.itemStates.update(arr => { const a = [...arr]; a[i] = { ...a[i], presentations: r.data }; return a; });
+      },
+      error: () => {},
+    });
+
+    this.cSvc.getProduct(product.id).subscribe({
+      next: r => this.itemStates.update(arr => { const a = [...arr]; a[i] = { ...a[i], productDetail: r.data, loadingProductDetail: false }; return a; }),
+      error: () => this.itemStates.update(arr => { const a = [...arr]; a[i] = { ...a[i], loadingProductDetail: false }; return a; }),
+    });
+  }
+
+  onItemLocationChange(i: number, locId: number | null): void {
+    this.itemStates.update(arr => { const a = [...arr]; a[i] = { ...a[i], locCapacity: null, loadingLocCap: !!locId }; return a; });
+    if (!locId) return;
+    this.wSvc.getLocationCapacity(locId).subscribe({
+      next: r => this.itemStates.update(arr => { const a = [...arr]; a[i] = { ...a[i], locCapacity: r.data, loadingLocCap: false }; return a; }),
+      error: () => this.itemStates.update(arr => { const a = [...arr]; a[i] = { ...a[i], loadingLocCap: false }; return a; }),
+    });
+  }
+
+  toggleItemPresentationMode(i: number, use: boolean): void {
+    this.itemStates.update(arr => { const a = [...arr]; a[i] = { ...a[i], usePresentationMode: use }; return a; });
+    const ctrl = this.asGroup(this.itemsArray.at(i));
+    if (!use) ctrl.patchValue({ product_presentation_id: null, quantity_in_presentation: null }, { emitEvent: false });
+    else ctrl.patchValue({ quantity_base: null }, { emitEvent: false });
+  }
+
+  itemPreviewBaseUnits(i: number): number | null {
+    const state = this.itemStates()[i];
+    if (!state?.usePresentationMode) return null;
+    const ctrl = this.asGroup(this.itemsArray.at(i));
+    const presId = ctrl.get('product_presentation_id')?.value;
+    const qty    = ctrl.get('quantity_in_presentation')?.value;
+    const pres   = state.presentations.find(p => p.id === presId);
+    if (!pres || !qty || qty < 1) return null;
+    return qty * pres.factor_to_base;
+  }
+
+  itemEffectiveBaseQty(i: number): number {
+    const state = this.itemStates()[i];
+    const preview = this.itemPreviewBaseUnits(i);
+    if (state?.usePresentationMode && preview !== null) return preview;
+    return Number(this.asGroup(this.itemsArray.at(i)).get('quantity_base')?.value) || 0;
+  }
+
+  itemSelectedPresentation(i: number): ProductPresentation | null {
+    const state = this.itemStates()[i];
+    const presId = this.asGroup(this.itemsArray.at(i)).get('product_presentation_id')?.value;
+    return state?.presentations.find(p => p.id === presId) ?? null;
+  }
+
+  itemHasActiveReg(i: number): boolean {
+    const pd = this.itemStates()[i]?.productDetail;
+    if (!pd?.variants?.length) return false;
+    return pd.variants.some(v => v.sanitary_registrations?.some(r => r.is_active && !r.is_expired));
+  }
+
+  itemProjStatus(i: number, cap: LocationCapacity | null, qty: number): 'ok' | 'warn' | 'danger' | 'nodata' | 'nodims' {
+    if (!cap) return 'nodata';
+    const prod = this.itemStates()[i]?.selectedProduct;
+    if (!prod) return 'nodata';
+    const hasVolLim = cap.capacity_volume.max_cm3 !== null;
+    const hasWgtLim = cap.capacity_weight.max_kg  !== null;
+    if (!hasVolLim && !hasWgtLim) return 'nodata';
+    if (!prod.volume_cm3 && !prod.weight_kg) return 'nodims';
+
+    const grades: ('ok' | 'warn' | 'danger')[] = [];
+    if (hasVolLim && prod.volume_cm3 != null && qty > 0) {
+      const need = qty * prod.volume_cm3, avail = cap.capacity_volume.available_cm3 ?? 0;
+      grades.push(need > avail ? 'danger' : need > avail * 0.8 ? 'warn' : 'ok');
+    }
+    if (hasWgtLim && prod.weight_kg != null && qty > 0) {
+      const need = qty * prod.weight_kg, avail = cap.capacity_weight.available_kg ?? 0;
+      grades.push(need > avail ? 'danger' : need > avail * 0.8 ? 'warn' : 'ok');
+    }
+    if (grades.length === 0) return 'ok';
+    if (grades.includes('danger')) return 'danger';
+    if (grades.includes('warn')) return 'warn';
+    return 'ok';
+  }
+
+  itemNeededVol(i: number, qty: number): number | null {
+    const v = this.itemStates()[i]?.selectedProduct?.volume_cm3;
+    return v != null && qty > 0 ? qty * v : null;
+  }
+
+  itemNeededWgt(i: number, qty: number): number | null {
+    const w = this.itemStates()[i]?.selectedProduct?.weight_kg;
+    return w != null && qty > 0 ? qty * w : null;
   }
 
   // ── Toggle distribución ──────────────────────────────────────
@@ -881,19 +1104,37 @@ export class MovementFormDialogComponent implements OnInit {
     const item = this._linkedPoItem;
     if (!po || !item?.id) { onDone(); return; }
 
-    const qtyReceived = this.usePresentationMode()
-      ? (Number(formValue.quantity_in_presentation) || 0)
-      : (this.useDistribution() ? this.entryDistTotal : (Number(formValue.quantity_base) || 0));
+    let qtyReceived: number;
+    let lotNumber      = '';
+    let expirationDate = '';
+    let locationId: number | undefined;
+
+    if (this.isEntry && this.itemsArray.length > 0) {
+      const firstCtrl  = this.asGroup(this.itemsArray.at(0));
+      const iv         = firstCtrl.value;
+      const firstState = this.itemStates()[0];
+      qtyReceived    = firstState?.usePresentationMode ? (Number(iv.quantity_in_presentation) || 0) : (Number(iv.quantity_base) || 0);
+      lotNumber      = iv.lot_number      || '';
+      expirationDate = iv.expiration_date || '';
+      locationId     = iv.location_id     || undefined;
+    } else {
+      qtyReceived    = this.usePresentationMode()
+        ? (Number(formValue.quantity_in_presentation) || 0)
+        : (this.useDistribution() ? this.entryDistTotal : (Number(formValue.quantity_base) || 0));
+      lotNumber      = formValue.lot_number      || '';
+      expirationDate = formValue.expiration_date || '';
+      locationId     = formValue.location_id     || undefined;
+    }
 
     this.purchasingSvc.receive(po.id, [{
       item_id:           item.id,
       quantity_received: qtyReceived,
-      lot_number:        formValue.lot_number || '',
-      expiration_date:   formValue.expiration_date || '',
-      location_id:       formValue.location_id || undefined,
+      lot_number:        lotNumber,
+      expiration_date:   expirationDate,
+      location_id:       locationId,
     }]).subscribe({
       next:  () => onDone(),
-      error: () => onDone(), // El inventario ya fue guardado → cerrar igual
+      error: () => onDone(),
     });
   }
 
@@ -947,48 +1188,38 @@ export class MovementFormDialogComponent implements OnInit {
 
     // ── ENTRADA ─────────────────────────────────────────────────
     if (this.isEntry) {
-      // Campos comunes del lote (por ítem)
-      const lotInfo: Record<string, unknown> = {
-        product_variant_id: v.product_variant_id,
-        lot_number:         v.lot_number         || undefined,
-        expiration_date:    v.expiration_date     || undefined,
-        manufacturing_date: v.manufacturing_date  || undefined,
-        notes:              v.notes               || undefined,
-      };
-
-      // Campos de cabecera del documento (top-level)
       const entryHeader: Record<string, unknown> = {
         warehouse_id:      v.warehouse_id,
-        movement_date:     v.movement_date || undefined,
-        invoice_number:    v.invoice_number   || undefined,
+        movement_date:     v.movement_date     || undefined,
+        invoice_number:    v.invoice_number    || undefined,
         entry_temperature: v.entry_temperature != null ? v.entry_temperature : undefined,
-        reason:            v.reason           || undefined,
+        reason:            v.reason            || undefined,
       };
-      if (basePayload['purchase_order_id'])      entryHeader['purchase_order_id']      = basePayload['purchase_order_id'];
-      if (basePayload['purchase_order_item_id']) entryHeader['purchase_order_item_id'] = basePayload['purchase_order_item_id'];
+      if (linkedPo)       entryHeader['purchase_order_id']      = linkedPo.id;
+      if (linkedItem?.id) entryHeader['purchase_order_item_id'] = linkedItem.id;
 
-      if (this.useDistribution()) {
-        const items = (this.entryRows.value as any[]).map((row: any) => ({
-          ...lotInfo,
-          location_id:  row.location_id,
-          quantity_base: Number(row.quantity_base),
-        }));
-        this.data.inventorySvc.entry({ ...entryHeader, items }).subscribe({
-          next: () => this._notifyPoReceive(v, () => this.ref.close(true)),
-          error: err => this._handleError(err),
-        });
-        return;
-      }
+      const items = this.itemsArray.controls.map((ctrl, i) => {
+        const g     = this.asGroup(ctrl);
+        const iv    = g.value;
+        const state = this.itemStates()[i];
+        const base: Record<string, unknown> = {
+          product_variant_id: iv.product_variant_id,
+          location_id:        iv.location_id       || undefined,
+          lot_number:         iv.lot_number         || undefined,
+          expiration_date:    iv.expiration_date    || undefined,
+          manufacturing_date: iv.manufacturing_date || undefined,
+          notes:              iv.notes              || undefined,
+        };
+        if (state?.usePresentationMode) {
+          base['product_presentation_id']  = iv.product_presentation_id;
+          base['quantity_in_presentation'] = Number(iv.quantity_in_presentation);
+        } else {
+          base['quantity_base'] = Number(iv.quantity_base);
+        }
+        return base;
+      });
 
-      const item: Record<string, unknown> = { ...lotInfo, location_id: v.location_id || undefined };
-      if (this.usePresentationMode() && v.product_presentation_id) {
-        item['product_presentation_id'] = v.product_presentation_id;
-        item['quantity_in_presentation'] = Number(v.quantity_in_presentation);
-      } else {
-        item['quantity_base'] = Number(v.quantity_base);
-      }
-
-      this.data.inventorySvc.entry({ ...entryHeader, items: [item] }).subscribe({
+      this.data.inventorySvc.entry({ ...entryHeader, items }).subscribe({
         next: () => this._notifyPoReceive(v, () => this.ref.close(true)),
         error: err => this._handleError(err),
       });
@@ -1032,7 +1263,7 @@ export class MovementFormDialogComponent implements OnInit {
 
     // ── AJUSTE ───────────────────────────────────────────────────
     if (this.isAdjustment) {
-      this.data.inventorySvc.adjustment({ ...basePayload, location_id: v.location_id || undefined, quantity: Number(v.quantity), reason: v.reason })
+      this.data.inventorySvc.adjustment({ ...basePayload, location_id: v.location_id || undefined, batch_id: v.batch_id || undefined, quantity: Number(v.quantity), reason: v.reason })
         .subscribe({
           next: res => this._afterMovements([res.data], res.data, 'adjustment'),
           error: err => this._handleError(err),
@@ -1088,7 +1319,7 @@ export class MovementFormDialogComponent implements OnInit {
     }
 
     // ── DEVOLUCIÓN ───────────────────────────────────────────────
-    this.data.inventorySvc.return_({ ...basePayload, location_id: v.location_id || undefined, quantity: Number(v.quantity) })
+    this.data.inventorySvc.return_({ ...basePayload, location_id: v.location_id || undefined, batch_id: v.batch_id || undefined, quantity: Number(v.quantity) })
       .subscribe({
         next: res => this._afterMovements([res.data], res.data, 'return'),
         error: err => this._handleError(err),
@@ -1174,7 +1405,16 @@ export class MovementFormDialogComponent implements OnInit {
 
   private _handleError(err: any): void {
     this.saving.set(false);
-    if (err.status === 422) this.errors.set(Object.values(err.error?.errors || {}).flat() as string[]);
+    if (err.status === 422) {
+      const raw = err.error?.errors || {};
+      const msgs: string[] = [];
+      Object.entries(raw).forEach(([key, val]) => {
+        const vals = (Array.isArray(val) ? val : [val]) as string[];
+        const label = key.replace(/^items\.(\d+)\.(.+)$/, (_, idx, field) => `Producto ${Number(idx) + 1} — ${field}`);
+        vals.forEach(m => msgs.push(label !== key ? `${label}: ${m}` : m as string));
+      });
+      this.errors.set(msgs.length ? msgs : ['Error de validación']);
+    }
     else if (err.status === 409 && err.error?.error_code === 'EXPIRED_STOCK')
       this.errors.set([err.error?.message || 'El producto solo tiene stock vencido en este almacén. Gestione el lote vencido mediante una devolución, un ajuste o una baja por vencimiento antes de continuar.']);
     else if (err.status === 409) this.errors.set([err.error?.message || 'Error de capacidad o negocio']);

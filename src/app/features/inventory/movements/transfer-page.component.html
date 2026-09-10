@@ -1,0 +1,303 @@
+<app-page-header title="Nuevo Traslado entre Almacenes" icon="swap_horiz">
+  <button mat-stroked-button type="button" (click)="goBack()">
+    <mat-icon>arrow_back</mat-icon>
+    Volver al inventario
+  </button>
+</app-page-header>
+
+<app-form-errors [errors]="errors()"></app-form-errors>
+
+<div class="transfer-page">
+
+  <!-- ══════════════════ SECCIÓN 1: CABECERA ══════════════════ -->
+  <section class="form-section header-section">
+    <div class="section-heading">
+      <span class="section-num">1</span>
+      <span>Datos del traslado</span>
+    </div>
+
+    <div class="two-col">
+      <!-- Almacén origen -->
+      <mat-form-field appearance="outline">
+        <mat-label>Almacén origen *</mat-label>
+        <mat-select [ngModel]="warehouseFromId()" (ngModelChange)="onWarehouseFromChange($event)">
+          @for (w of warehouses(); track w.id) {
+            <mat-option [value]="w.id"
+                        [disabled]="w.id === warehouseToId()">
+              {{ w.name }}
+            </mat-option>
+          }
+        </mat-select>
+        <mat-icon matSuffix>warehouse</mat-icon>
+      </mat-form-field>
+
+      <!-- Almacén destino -->
+      <mat-form-field appearance="outline">
+        <mat-label>Almacén destino *</mat-label>
+        <mat-select [ngModel]="warehouseToId()" (ngModelChange)="onWarehouseToChange($event)">
+          @for (w of warehouses(); track w.id) {
+            <mat-option [value]="w.id"
+                        [disabled]="w.id === warehouseFromId()">
+              {{ w.name }}
+            </mat-option>
+          }
+        </mat-select>
+        <mat-icon matSuffix>warehouse</mat-icon>
+      </mat-form-field>
+    </div>
+
+    @if (warehouseFromId() && warehouseToId() && warehouseFromId() === warehouseToId()) {
+      <div class="status-row status-row--error">
+        <mat-icon>warning</mat-icon>
+        El almacén origen y destino no pueden ser el mismo.
+      </div>
+    }
+
+    <div class="two-col">
+      <!-- Fecha del movimiento -->
+      <mat-form-field appearance="outline">
+        <mat-label>Fecha del movimiento</mat-label>
+        <input matInput type="date" [max]="today"
+               [ngModel]="movementDate()" (ngModelChange)="movementDate.set($event)" />
+        <mat-hint>Vacío = fecha actual</mat-hint>
+      </mat-form-field>
+
+      <!-- Motivo -->
+      <mat-form-field appearance="outline">
+        <mat-label>Motivo / Observación</mat-label>
+        <input matInput [ngModel]="reason()" (ngModelChange)="reason.set($event)"
+               placeholder="Ej. Redistribución de stock" />
+        <mat-icon matSuffix>notes</mat-icon>
+      </mat-form-field>
+    </div>
+  </section>
+
+  <!-- ══════════════════ COLUMNAS: FORMULARIO + LISTA ══════════ -->
+  <div class="transfer-layout">
+
+    <!-- ── Panel izquierdo: formulario progresivo ───────────── -->
+    <div class="transfer-form-panel">
+      <section class="form-section" [class.form-section--disabled]="!headersComplete">
+        <div class="section-heading">
+          <span class="section-num">2</span>
+          <span>Producto a trasladar</span>
+          @if (!headersComplete) {
+            <span class="inactive-hint">Selecciona ambos almacenes primero</span>
+          }
+        </div>
+
+        @if (headersComplete) {
+
+          <!-- Búsqueda de producto -->
+          <app-product-search #productScanner
+            label="Buscar producto (nombre, código o barras)"
+            [required]="false"
+            [selectedProduct]="draftProduct()"
+            (productSelected)="onDraftProductSelected($event)">
+          </app-product-search>
+
+          <!-- Variante — aparece tras seleccionar producto -->
+          @if (draftProduct()) {
+            <mat-form-field appearance="outline" class="full-field">
+              <mat-label>Marca / Variante *</mat-label>
+              @if (loadingVariants()) {
+                <mat-spinner matPrefix diameter="16" style="margin:0 6px 0 4px"></mat-spinner>
+              } @else {
+                <mat-icon matPrefix>science</mat-icon>
+              }
+              <mat-select [ngModel]="draftVariantId()" (ngModelChange)="onDraftVariantChange($event)">
+                @for (v of draftVariants(); track v.id) {
+                  <mat-option [value]="v.id">
+                    {{ v.lab_brand || 'Sin marca' }}
+                    @if (v.brand_sku) { <span style="color:#718096"> — {{ v.brand_sku }}</span> }
+                  </mat-option>
+                }
+                @if (!loadingVariants() && draftVariants().length === 0 && draftProduct()) {
+                  <mat-option disabled>Sin variantes activas</mat-option>
+                }
+              </mat-select>
+            </mat-form-field>
+          }
+
+          <!-- Cargando lotes -->
+          @if (loadingDraftFefo()) {
+            <div class="status-row status-row--loading">
+              <mat-spinner diameter="16"></mat-spinner>
+              Verificando stock en {{ warehouseFromName }}…
+            </div>
+          }
+
+          <!-- Error de stock -->
+          @if (!loadingDraftFefo() && draftFetchError()) {
+            <div class="status-row status-row--error">
+              <mat-icon>warning</mat-icon>
+              {{ draftFetchError() }}
+            </div>
+          }
+
+          <!-- Lotes FEFO con cantidad seleccionable por lote -->
+          @if (draftVariantId() && !loadingDraftFefo() && !draftFetchError() && draftFefo().length > 0) {
+            <div class="fefo-panel">
+              <div class="fefo-panel-label">
+                <mat-icon>sort</mat-icon>
+                Selecciona cantidad por lote (sugerencia FEFO)
+                <span class="fefo-total-badge">{{ draftAvailableQty() }} u. disponibles</span>
+              </div>
+              @for (b of draftFefo(); track b.lot_number; let first = $first) {
+                <div class="fefo-lot-row"
+                     [class.fefo-lot-row--first]="first"
+                     [class.fefo-lot-row--selected]="(draftLotQtys()[b.lot_number] || 0) > 0">
+                  <div class="lot-info">
+                    <span class="lot-cell lot-num"><mat-icon>tag</mat-icon>{{ b.lot_number }}</span>
+                    <span class="lot-cell lot-expiry"><mat-icon>event</mat-icon>{{ b.expiration_date }}</span>
+                    <span class="lot-cell lot-qty">{{ b.quantity_available }} disp.</span>
+                    @if (first) { <span class="fefo-badge">FEFO</span> }
+                  </div>
+                  <div class="lot-qty-input">
+                    <mat-form-field appearance="outline" class="lot-field">
+                      <mat-label>Cant.</mat-label>
+                      <input matInput type="number" min="0" [max]="b.quantity_available" step="any"
+                             [ngModel]="draftLotQtys()[b.lot_number] || 0"
+                             (ngModelChange)="setLotQty(b.lot_number, $event ? +$event : 0)" />
+                      <mat-hint>máx {{ b.quantity_available }}</mat-hint>
+                    </mat-form-field>
+                  </div>
+                </div>
+              }
+
+              <!-- Total seleccionado -->
+              <div class="fefo-total-row" [class.fefo-total-row--ready]="draftTotalQty() > 0">
+                <mat-icon>calculate</mat-icon>
+                Total a trasladar:
+                <strong>{{ draftTotalQty() }}</strong> u.
+                @if (draftTotalQty() > draftAvailableQty()) {
+                  <span class="total-over">— excede el stock disponible</span>
+                }
+              </div>
+            </div>
+          }
+
+          <!-- Ubicaciones -->
+          @if (draftVariantId() && !loadingDraftFefo() && !draftFetchError() && draftFefo().length > 0) {
+            <div class="two-col">
+              <!-- Ubicación origen (opcional) -->
+              @if (locationsFrom().length > 0) {
+                <mat-form-field appearance="outline">
+                  <mat-label>Ubicación origen</mat-label>
+                  @if (loadingLocFrom()) {
+                    <mat-spinner matPrefix diameter="16" style="margin:0 6px 0 4px"></mat-spinner>
+                  } @else {
+                    <mat-icon matPrefix>place</mat-icon>
+                  }
+                  <mat-select [ngModel]="draftLocFromId()" (ngModelChange)="draftLocFromId.set($event)">
+                    <mat-option [value]="null">Sin ubicación específica</mat-option>
+                    @for (l of locationsFrom(); track l.id) {
+                      <mat-option [value]="l.id">{{ l.name }} <span class="loc-code">({{ l.code }})</span></mat-option>
+                    }
+                  </mat-select>
+                </mat-form-field>
+              }
+
+              <!-- Ubicación destino (requerida si hay ubicaciones en destino) -->
+              @if (locationsTo().length > 0) {
+                <mat-form-field appearance="outline">
+                  <mat-label>Ubicación destino *</mat-label>
+                  @if (loadingLocTo()) {
+                    <mat-spinner matPrefix diameter="16" style="margin:0 6px 0 4px"></mat-spinner>
+                  } @else {
+                    <mat-icon matPrefix>pin_drop</mat-icon>
+                  }
+                  <mat-select [ngModel]="draftLocToId()" (ngModelChange)="draftLocToId.set($event)">
+                    @for (l of locationsTo(); track l.id) {
+                      <mat-option [value]="l.id">{{ l.name }} <span class="loc-code">({{ l.code }})</span></mat-option>
+                    }
+                  </mat-select>
+                </mat-form-field>
+              }
+            </div>
+
+            <div class="add-btn-row">
+              <button mat-raised-button color="accent" type="button"
+                      [disabled]="!canAdd()"
+                      (click)="addItem()">
+                <mat-icon>add_circle</mat-icon>
+                Agregar a la lista
+              </button>
+            </div>
+          }
+
+        }<!-- /headersComplete -->
+      </section>
+    </div><!-- /transfer-form-panel -->
+
+    <!-- ── Panel derecho: lista de ítems ────────────────────── -->
+    <div class="transfer-list-panel">
+      <div class="list-panel-header">
+        <mat-icon>swap_horiz</mat-icon>
+        <span>Productos a trasladar</span>
+        @if (items().length > 0) {
+          <span class="list-count-badge">{{ items().length }}</span>
+        }
+      </div>
+
+      @if (items().length === 0) {
+        <div class="list-empty">
+          <mat-icon>inventory_2</mat-icon>
+          <span>Agrega productos usando el formulario</span>
+        </div>
+      }
+
+      @for (item of items(); track $index; let i = $index) {
+        <div class="list-item-card">
+          <div class="list-item-header">
+            <span class="list-item-num">#{{ i + 1 }}</span>
+            <div class="list-item-name">
+              <strong>{{ item.product_name }}</strong>
+              <span class="list-item-variant">{{ item.variant_label }}</span>
+            </div>
+            <button mat-icon-button type="button" color="warn"
+                    (click)="removeItem(i)"
+                    matTooltip="Eliminar">
+              <mat-icon>delete_outline</mat-icon>
+            </button>
+          </div>
+          <div class="list-item-meta">
+            <span class="meta-chip meta-chip--qty">
+              <mat-icon>numbers</mat-icon>{{ item.qty_total }} u.
+            </span>
+            @for (b of item.fefo; track b.lot_number) {
+              <span class="meta-chip meta-chip--lot">
+                <mat-icon>tag</mat-icon>{{ b.lot_number }}
+                <span style="color:#4a5568;margin-left:2px">({{ item.lotQtys[b.lot_number] }})</span>
+              </span>
+            }
+            <span class="meta-chip meta-chip--from">
+              <mat-icon>logout</mat-icon>{{ item.loc_from_name }}
+            </span>
+            <span class="meta-chip meta-chip--to">
+              <mat-icon>login</mat-icon>{{ item.loc_to_name }}
+            </span>
+          </div>
+        </div>
+      }
+
+      <!-- Botón de registro -->
+      @if (items().length > 0) {
+        <div class="submit-row">
+          <button mat-raised-button color="primary" type="button"
+                  [disabled]="!canSubmit()"
+                  (click)="save()">
+            @if (saving()) {
+              <mat-spinner diameter="18" class="btn-spinner"></mat-spinner>
+              Registrando…
+            } @else {
+              <mat-icon>swap_horiz</mat-icon>
+              Registrar Traslado ({{ items().length }} producto{{ items().length !== 1 ? 's' : '' }})
+            }
+          </button>
+        </div>
+      }
+    </div><!-- /transfer-list-panel -->
+
+  </div><!-- /transfer-layout -->
+</div><!-- /transfer-page -->

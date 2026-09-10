@@ -42,7 +42,11 @@
 .proc-name { color: #2d3748; font-size: 0.85rem; }
 
 .patient-cell {
-  display: flex; flex-direction: column; gap: 0.15rem;
+  display: flex; flex-direction: column; gap: 0.1rem;
+}
+
+.copy-row {
+  display: flex; align-items: center; gap: 0.25rem;
 }
 
 .patient-name {
@@ -50,15 +54,40 @@
 }
 
 .patient-doc {
-  display: flex; align-items: center; gap: 0.3rem;
+  display: flex; align-items: center; gap: 0.25rem;
   font-weight: 500; color: #4a5568; font-size: 0.82rem;
 }
 
-.patient-icon { font-size: 0.9rem; height: 0.9rem; width: 0.9rem; color: #718096; }
+.patient-contact {
+  display: flex; align-items: center; gap: 0.25rem;
+  font-size: 0.78rem; color: #718096;
+}
 
-.patient-ext {
-  font-size: 0.75rem; color: #718096; font-family: monospace;
-  cursor: default;
+.patient-icon { font-size: 0.85rem; height: 0.85rem; width: 0.85rem; color: #a0aec0; }
+
+.copy-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 22px; height: 22px;
+  padding: 0;
+  background: none;
+  border: none;
+  cursor: pointer;
+  border-radius: 4px;
+  color: #a0aec0;
+  opacity: 0.5;
+  line-height: 1;
+  transition: opacity 0.15s, color 0.15s;
+
+  &:hover { opacity: 1; color: #553c9a; background: rgba(85,60,154,0.08); }
+
+  mat-icon {
+    font-size: 14px; height: 14px; width: 14px;
+    line-height: 14px;
+    display: block;
+  }
 }
 
 .seller-cell {
@@ -123,3 +152,16 @@
 // ── Badges (reutilizados del proyecto) ────────────────────────
 .badge--on   { background: #c6f6d5; color: #276749; }
 .badge--gray { background: #e2e8f0; color: #718096; }
+
+// ── Descuento / neto ──────────────────────────────────────────
+.discount-cell { color: #c05621; font-size: 0.85rem; font-weight: 600; }
+.net-total-cell { color: #276749; font-size: 0.92rem; }
+
+.badge {
+  display: inline-block;
+  font-size: 0.72rem; font-weight: 700;
+  padding: 0.15rem 0.55rem; border-radius: 9999px;
+
+  &--warn { background: rgba(255,152,0,.15); color: #e65100; }
+  &--ok   { background: rgba(76,175,80,.15); color: #2e7d32; }
+}

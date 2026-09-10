@@ -32,14 +32,14 @@
   </h3>
   <div class="quick-access-grid">
     <button
-      *sgaPermission="'movimientos.salida'"
-      class="quick-access-card"
-      (click)="openExitWizard()"
+      *sgaPermission="'ordenes_servicio.crear'"
+      class="quick-access-card quick-access-card--service-orders"
+      (click)="goToServiceOrders()"
     >
-      <mat-icon class="quick-access-card__icon">output</mat-icon>
+      <mat-icon class="quick-access-card__icon">receipt_long</mat-icon>
       <div class="quick-access-card__content">
-        <span class="quick-access-card__title">Cargar salida de inventario</span>
-        <span class="quick-access-card__desc">Registrar salida de productos del stock</span>
+        <span class="quick-access-card__title">Nueva Orden de Servicio</span>
+        <span class="quick-access-card__desc">Registrar procedimientos médicos y gestionar insumos del paciente</span>
       </div>
       <mat-icon class="quick-access-card__arrow">chevron_right</mat-icon>
     </button>

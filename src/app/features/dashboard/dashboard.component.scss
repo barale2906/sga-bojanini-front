@@ -212,6 +212,16 @@
     }
   }
 
+  &--service-orders {
+    &:hover {
+      border-color: #276749;
+
+      .quick-access-card__icon {
+        color: #276749;
+      }
+    }
+  }
+
   &--records {
     text-decoration: none;
     color: inherit;

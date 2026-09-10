@@ -1,0 +1,579 @@
+:host {
+  display: block;
+  padding-bottom: 3rem;
+}
+
+.form-container {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 0 1rem;
+}
+
+/* ── Sections ─────────────────────────────────────────────────── */
+.form-section {
+  background: var(--mat-card-background, #fff);
+  border: 1px solid var(--mat-divider-color, rgba(0,0,0,.12));
+  border-radius: 8px;
+  padding: 1.25rem 1.5rem;
+  margin-bottom: 1.5rem;
+}
+
+.section-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+
+  mat-icon { color: var(--mat-primary-color, #1976d2); }
+  h3 { margin: 0; font-size: 1rem; font-weight: 600; }
+
+  &--procedures { margin-top: 0.5rem; }
+}
+
+.proc-count-badge {
+  background: var(--mat-primary-color, #1976d2);
+  color: #fff;
+  border-radius: 50%;
+  width: 22px;
+  height: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+/* ── MedSys search ────────────────────────────────────────────── */
+.medsys-search-box { margin-bottom: 1rem; }
+
+.medsys-error {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  color: var(--mat-warn-color, #f44336);
+  font-size: 0.875rem;
+  margin-top: -0.75rem;
+  margin-bottom: 0.5rem;
+
+  mat-icon { font-size: 1rem; width: 1rem; height: 1rem; }
+}
+
+.medsys-list {
+  border: 1px solid var(--mat-divider-color, rgba(0,0,0,.12));
+  border-radius: 6px;
+  overflow: hidden;
+  margin-bottom: 1rem;
+}
+
+.medsys-list-item {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  width: 100%;
+  padding: 0.6rem 1rem;
+  border: none;
+  background: none;
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.15s;
+
+  &:hover { background: var(--mat-row-hover-color, rgba(0,0,0,.04)); }
+  &:not(:last-child) { border-bottom: 1px solid var(--mat-divider-color, rgba(0,0,0,.08)); }
+
+  mat-icon { color: var(--mat-secondary-text, rgba(0,0,0,.54)); }
+
+  &__info { display: flex; flex-direction: column; }
+  &__name { font-weight: 500; font-size: 0.9rem; }
+  &__doc  { font-size: 0.8rem; color: var(--mat-secondary-text, rgba(0,0,0,.54)); }
+}
+
+.patient-badge {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  background: rgba(var(--mat-primary-rgb, 25, 118, 210), 0.08);
+  border-radius: 6px;
+  margin-bottom: 1rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+
+  mat-icon { color: var(--mat-primary-color, #1976d2); font-size: 1.1rem; }
+}
+
+/* ── Citas MedSys ─────────────────────────────────────────────── */
+.appts-loading {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.82rem;
+  color: #718096;
+  margin: 0.5rem 0;
+}
+
+.appts-block {
+  margin: 0.5rem 0 1rem;
+}
+
+.appts-title {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: #4a5568;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-bottom: 0.5rem;
+
+  mat-icon { font-size: 1rem; width: 1rem; height: 1rem; color: #2b6cb0; }
+}
+
+.appts-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.appt-chip {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: #edf2f7;
+  border-radius: 20px;
+  padding: 0.25rem 0.75rem;
+  font-size: 0.8rem;
+  border: 1px solid #e2e8f0;
+
+  &--mapped {
+    background: #ebf8ff;
+    border-color: #bee3f8;
+  }
+}
+
+.appt-date   { color: #2d3748; font-weight: 600; }
+.appt-service { color: #4a5568; }
+.appt-status {
+  background: #e2e8f0;
+  border-radius: 10px;
+  padding: 1px 8px;
+  font-size: 0.75rem;
+  color: #718096;
+}
+
+/* ── Procedure search ─────────────────────────────────────────── */
+.proc-search-wrap { margin-bottom: 0.75rem; }
+
+.proc-results-list {
+  border: 1px solid var(--mat-divider-color, rgba(0,0,0,.12));
+  border-radius: 6px;
+  overflow: hidden;
+  margin-top: -0.5rem;
+  margin-bottom: 0.75rem;
+}
+
+.proc-result-item {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  width: 100%;
+  padding: 0.55rem 1rem;
+  border: none;
+  background: none;
+  cursor: pointer;
+  text-align: left;
+  font-size: 0.875rem;
+  transition: background 0.15s;
+
+  &:hover { background: var(--mat-row-hover-color, rgba(0,0,0,.04)); }
+  &:not(:last-child) { border-bottom: 1px solid var(--mat-divider-color, rgba(0,0,0,.07)); }
+}
+
+.proc-result-code {
+  font-size: 0.78rem;
+  background: var(--mat-row-hover-color, rgba(0,0,0,.06));
+  padding: 1px 5px;
+  border-radius: 3px;
+  flex-shrink: 0;
+}
+
+.proc-result-name { flex: 1; }
+
+.proc-result-price {
+  font-weight: 600;
+  color: var(--mat-primary-color, #1976d2);
+  flex-shrink: 0;
+}
+
+.proc-result-no-price {
+  font-size: 0.78rem;
+  color: var(--mat-secondary-text, rgba(0,0,0,.54));
+  flex-shrink: 0;
+}
+
+.proc-selected-badge {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.4rem 0.75rem;
+  background: rgba(var(--mat-primary-rgb, 25, 118, 210), 0.07);
+  border-radius: 6px;
+  margin-bottom: 0.75rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+
+  mat-icon { color: var(--mat-success-color, #4caf50); font-size: 1.1rem; flex-shrink: 0; }
+}
+
+.proc-no-price-warn {
+  font-size: 0.8rem;
+  font-weight: 400;
+  color: #c05621;
+  margin-left: 0.25rem;
+}
+
+/* ── Fields ───────────────────────────────────────────────────── */
+.full-width  { width: 100%; }
+
+.field-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 0.75rem;
+  margin-bottom: 0.25rem;
+
+  &--3 { grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); }
+}
+
+/* ── Procedure cards ──────────────────────────────────────────── */
+.procedure-card {
+  background: var(--mat-card-background, #fff);
+  border: 1px solid var(--mat-divider-color, rgba(0,0,0,.12));
+  border-left: 4px solid var(--mat-primary-color, #1976d2);
+  border-radius: 8px;
+  padding: 1rem 1.5rem 1.25rem;
+  margin-bottom: 1rem;
+}
+
+.procedure-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+
+.procedure-num {
+  font-weight: 600;
+  font-size: 0.95rem;
+  color: var(--mat-primary-color, #1976d2);
+}
+
+.total-display {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 0.5rem 0.75rem;
+  background: var(--mat-row-hover-color, rgba(0,0,0,.04));
+  border-radius: 6px;
+  min-height: 56px;
+
+  &__label { font-size: 0.75rem; color: var(--mat-secondary-text, rgba(0,0,0,.54)); }
+  &__value { font-size: 1.05rem; font-weight: 600; }
+}
+
+.code-tag {
+  font-size: 0.78rem;
+  background: var(--mat-row-hover-color, rgba(0,0,0,.04));
+  padding: 1px 5px;
+  border-radius: 3px;
+  margin-right: 0.3rem;
+}
+
+/* ── Toggle sections ──────────────────────────────────────────── */
+.toggle-section {
+  margin: 0.75rem 0 0.5rem;
+}
+
+/* ── Discount block ───────────────────────────────────────────── */
+.discount-block {
+  background: rgba(var(--mat-warn-rgb, 244, 67, 54), 0.04);
+  border: 1px dashed var(--mat-warn-color, #f44336);
+  border-radius: 6px;
+  padding: 1rem;
+  margin-bottom: 0.75rem;
+
+  mat-radio-group {
+    display: flex;
+    gap: 1.5rem;
+    margin-bottom: 1rem;
+  }
+}
+
+.discount-pct-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.field-narrow { max-width: 200px; }
+
+.discount-computed {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  padding-top: 0.75rem;
+  font-size: 0.9rem;
+}
+
+.discount-computed-row {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.discount-fixed-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+
+  mat-form-field { flex: 1; min-width: 160px; }
+}
+
+.discount-or-label {
+  font-weight: 600;
+  color: var(--mat-secondary-text, rgba(0,0,0,.54));
+  padding-top: 0.25rem;
+}
+
+.discount-total-check {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.8rem;
+  color: var(--mat-secondary-text, rgba(0,0,0,.54));
+  margin-top: 0.5rem;
+
+  mat-icon { font-size: 1rem; width: 1rem; height: 1rem; color: inherit; }
+
+  &--ok {
+    color: var(--mat-success-color, #4caf50);
+  }
+}
+
+.text-success { color: var(--mat-success-color, #4caf50); }
+
+/* ── Supplies block ───────────────────────────────────────────── */
+.supplies-block {
+  background: rgba(0, 0, 0, 0.02);
+  border: 1px dashed var(--mat-divider-color, rgba(0,0,0,.2));
+  border-radius: 6px;
+  padding: 1rem;
+  margin-bottom: 0.75rem;
+}
+
+.supply-item {
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  padding: 0.75rem;
+  margin-bottom: 0.75rem;
+  background: #fafafa;
+}
+
+.supply-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  margin-bottom: 0;
+}
+
+.supply-warehouse { min-width: 180px; flex: 1; }
+.supply-product   { flex: 2; min-width: 220px; }
+.supply-qty       { max-width: 110px; }
+
+/* Lotes */
+.batch-loading {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.82rem;
+  color: #718096;
+  margin-top: 0.35rem;
+}
+
+.batch-error {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  color: #c53030;
+  font-size: 0.82rem;
+  margin-top: 0.35rem;
+
+  mat-icon { font-size: 1rem; width: 1rem; height: 1rem; }
+}
+
+.batch-selector-row {
+  margin-top: 0.5rem;
+}
+
+.batch-field { width: 100%; }
+
+.batch-option {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+}
+
+.batch-fefo-star { color: #d4a017; font-size: 0.9rem; }
+.batch-qty  { color: #276749; font-size: 0.82rem; }
+.batch-exp  { color: #718096; font-size: 0.82rem; }
+
+.batch-qty-warn {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  color: #c05621;
+  font-size: 0.82rem;
+  margin-top: 0.35rem;
+  background: rgba(192, 86, 33, 0.07);
+  border-radius: 4px;
+  padding: 0.3rem 0.5rem;
+
+  mat-icon { font-size: 1rem; width: 1rem; height: 1rem; }
+}
+
+.add-supply-btn {
+  width: 100%;
+  margin-top: 0.25rem;
+}
+
+/* ── Clinical evolution ───────────────────────────────────────── */
+.evolution-block {
+  margin-top: 0.75rem;
+}
+
+.evolution-label {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  margin-bottom: 0.4rem;
+  color: var(--mat-secondary-text, rgba(0,0,0,.7));
+
+  mat-icon { font-size: 1.1rem; color: var(--mat-primary-color, #1976d2); }
+}
+
+.field-hint { font-size: 0.78rem; margin-top: 0.25rem; }
+.field-hint--warn { color: var(--mat-warn-color, #f44336); }
+
+/* ── Add procedure button ─────────────────────────────────────── */
+.add-proc-btn {
+  width: 100%;
+  margin-bottom: 1.5rem;
+}
+
+/* ── Form actions ─────────────────────────────────────────────── */
+.form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.75rem;
+  padding: 1rem 0 0;
+}
+
+/* ── Success state ────────────────────────────────────────────── */
+.success-container {
+  display: flex;
+  justify-content: center;
+  padding: 2rem 1rem;
+}
+
+.success-card {
+  background: var(--mat-card-background, #fff);
+  border: 1px solid var(--mat-divider-color, rgba(0,0,0,.12));
+  border-radius: 12px;
+  padding: 2rem 2.5rem;
+  text-align: center;
+  max-width: 520px;
+  width: 100%;
+}
+
+.success-icon {
+  font-size: 3rem;
+  width: 3rem;
+  height: 3rem;
+  color: var(--mat-success-color, #4caf50);
+  margin-bottom: 0.5rem;
+}
+
+.success-title {
+  font-size: 1.25rem;
+  font-weight: 600;
+  margin: 0 0 0.5rem;
+}
+
+.success-order-number {
+  font-size: 1.5rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  color: var(--mat-primary-color, #1976d2);
+  margin-bottom: 1rem;
+  font-family: monospace;
+}
+
+.discount-pending-notice {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1rem;
+  background: rgba(255, 152, 0, 0.1);
+  border: 1px solid rgba(255, 152, 0, 0.4);
+  border-radius: 6px;
+  font-size: 0.875rem;
+  margin-bottom: 1rem;
+
+  mat-icon { color: #ff9800; font-size: 1.1rem; flex-shrink: 0; }
+}
+
+.success-summary {
+  border: 1px solid var(--mat-divider-color, rgba(0,0,0,.12));
+  border-radius: 8px;
+  overflow: hidden;
+  margin-bottom: 1.5rem;
+}
+
+.summary-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 0.6rem 1rem;
+  font-size: 0.9rem;
+
+  &:not(:last-child) { border-bottom: 1px solid var(--mat-divider-color, rgba(0,0,0,.08)); }
+  &--total .summary-value { font-weight: 700; font-size: 1rem; }
+  &--discount .summary-value { color: var(--mat-warn-color, #f44336); }
+  &--net .summary-value { color: var(--mat-success-color, #4caf50); font-weight: 700; }
+}
+
+.summary-label { color: var(--mat-secondary-text, rgba(0,0,0,.54)); }
+
+.success-actions { display: flex; justify-content: center; gap: 1rem; }
+
+/* ── Responsive ───────────────────────────────────────────────── */
+@media (max-width: 600px) {
+  .procedure-card { padding: 0.75rem 1rem; }
+  .form-section   { padding: 1rem; }
+  .success-card   { padding: 1.25rem 1rem; }
+  .success-title  { font-size: 1.1rem; }
+
+  .supply-row { flex-direction: column; }
+  .supply-warehouse,
+  .supply-product { width: 100%; min-width: unset; }
+  .supply-qty     { max-width: unset; width: 100%; }
+
+  .discount-fixed-row { flex-direction: column; }
+  .discount-or-label  { display: none; }
+
+  .form-actions { flex-direction: column; }
+}

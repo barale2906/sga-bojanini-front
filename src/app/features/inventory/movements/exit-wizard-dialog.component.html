@@ -116,6 +116,20 @@
             </div>
           </div>
 
+          <!-- Ubicación preferida (opcional) -->
+          @if (locations().length > 0) {
+            <mat-form-field appearance="outline" class="loc-field">
+              <mat-label>Ubicación preferida</mat-label>
+              <mat-select [value]="item.location_id" (selectionChange)="setCartItemLocation(i, $event.value)">
+                <mat-option [value]="null">Cualquier ubicación</mat-option>
+                @for (l of locations(); track l.id) {
+                  <mat-option [value]="l.id">{{ l.name }} <span class="loc-code">({{ l.code }})</span></mat-option>
+                }
+              </mat-select>
+              <mat-icon matSuffix>place</mat-icon>
+            </mat-form-field>
+          }
+
           <!-- Stock / FEFO info -->
           @if (item.loadingStock || item.loadingFefo) {
             <div class="row-loading">
@@ -263,6 +277,7 @@
             <mat-option [value]="cc.id">
               {{ cc.name }}
               <span class="cc-type"> — {{ cc.type_label }}</span>
+              @if (cc.is_external) { <span class="cc-type cc-external-badge"> · Externo</span> }
             </mat-option>
           }
         </mat-select>
@@ -270,6 +285,45 @@
           <mat-hint>{{ selectedCostCenter!.description }}</mat-hint>
         }
       </mat-form-field>
+
+      <!-- Paciente y servicio (solo para centros de costo externos) -->
+      @if (isExternalCC) {
+        <div class="external-cc-section">
+          <div class="section-title section-title--sub">
+            <mat-icon>person_pin</mat-icon>
+            <span>Datos del Paciente</span>
+          </div>
+
+          <mat-form-field appearance="outline" class="full-width">
+            <mat-label>Servicio médico</mat-label>
+            @if (loadingServices()) {
+              <mat-spinner matPrefix diameter="16" style="margin:0 6px 0 4px"></mat-spinner>
+            } @else {
+              <mat-icon matPrefix>medical_services</mat-icon>
+            }
+            <mat-select formControlName="service_id">
+              <mat-option [value]="null">— Sin servicio —</mat-option>
+              @for (s of medicalServices(); track s.id) {
+                <mat-option [value]="s.id">{{ s.name }} <span class="cc-type">({{ s.code }})</span></mat-option>
+              }
+            </mat-select>
+          </mat-form-field>
+
+          <div class="two-col-form">
+            <mat-form-field appearance="outline">
+              <mat-label>Documento paciente</mat-label>
+              <input matInput formControlName="patient_document" placeholder="Ej. 10234567" maxlength="50" />
+              <mat-icon matSuffix>badge</mat-icon>
+            </mat-form-field>
+
+            <mat-form-field appearance="outline">
+              <mat-label>ID paciente externo (HIS)</mat-label>
+              <input matInput formControlName="patient_external_id" placeholder="Ej. HIS-00123" maxlength="100" />
+              <mat-icon matSuffix>link</mat-icon>
+            </mat-form-field>
+          </div>
+        </div>
+      }
 
       <mat-form-field appearance="outline" class="full-width">
         <mat-label>Fecha del movimiento</mat-label>
@@ -282,13 +336,6 @@
         <input matInput formControlName="reason" placeholder="Despacho de medicamentos..." />
       </mat-form-field>
 
-      <!-- ── Bloque de paciente externo (componente reutilizable) ── -->
-      @if (isExternalCenter) {
-        <div class="patient-block">
-          <app-patient-sale-form mode="exit" #patientFormRef></app-patient-sale-form>
-        </div>
-      } <!-- /isExternalCenter -->
-
     </form>
 
   } <!-- /paso 2 -->
@@ -300,9 +347,6 @@
       <mat-icon>check_circle</mat-icon>
       <div>
         <div class="confirm-success-title">Salida registrada exitosamente</div>
-        @if (summary.withRecords) {
-          <div class="confirm-success-sub">Los registros de procedimientos del paciente también fueron guardados.</div>
-        }
       </div>
     </div>
 

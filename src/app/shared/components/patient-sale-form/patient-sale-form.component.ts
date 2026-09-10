@@ -1,4 +1,4 @@
-import { Component, Input, inject, signal, computed, OnInit } from '@angular/core';
+import { Component, Input, inject, signal, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import {
   AbstractControl, FormArray, FormBuilder, FormGroup,
@@ -17,8 +17,8 @@ import { DateAdapter, MAT_DATE_FORMATS } from '@angular/material/core';
 import { Subject, of } from 'rxjs';
 import { catchError, debounceTime, distinctUntilChanged, finalize, switchMap } from 'rxjs/operators';
 import {
-  MedicalServicesService, MedicalServiceNode, ProcedurePrice, ClinicalTemplate,
-  MedsysPatient, MedsysAppointment,
+  MedicalServicesService, ClinicalTemplate,
+  MedsysPatient, MedsysAppointment, ProcedureSearchResult,
 } from '../../../features/inventory/medical-services.service';
 import { EsDateAdapter, ES_DATE_FORMATS } from '../../adapters/es-date.adapter';
 import { RichTextEditorComponent } from '../rich-text-editor/rich-text-editor.component';
@@ -71,7 +71,6 @@ export class PatientSaleFormComponent implements OnInit {
     patient_first_name:  ['', Validators.required],
     patient_last_name:   ['', Validators.required],
     service_date:        [new Date() as Date | null, Validators.required],
-    filter_service_id:   [null as number | null],
     seller:              ['', Validators.required],
     referrer:            ['', Validators.required],
   });
@@ -79,15 +78,14 @@ export class PatientSaleFormComponent implements OnInit {
   procedureRows = this.fb.array<FormGroup>([]);
 
   // ── Signals ────────────────────────────────────────────────────
-  servicesTree          = signal<MedicalServiceNode[]>([]);
-  loadingTree           = signal(false);
-  rowPrices             = signal<(ProcedurePrice | null)[]>([]);
-  rowPricesLoading      = signal<boolean[]>([]);
   rowTemplates          = signal<(ClinicalTemplate | null)[]>([]);
   rowTemplatesLoading   = signal<boolean[]>([]);
   sellerSuggestions     = signal<string[]>([]);
   referrerSuggestions   = signal<string[]>([]);
-  selectedServiceId     = signal<number | null>(null);
+
+  // Per-procedure search state
+  procSearch = signal<{ query: string; results: ProcedureSearchResult[]; loading: boolean; selected: ProcedureSearchResult | null }[]>([]);
+  private _procSearchTimers = new Map<number, ReturnType<typeof setTimeout>>();
 
   // ── MedSys patient search ─────────────────────────────────────
   medsysSearchQuery     = signal('');
@@ -96,20 +94,12 @@ export class PatientSaleFormComponent implements OnInit {
   medsysPatientList     = signal<MedsysPatient[]>([]);
   medsysSelectedPatient = signal<MedsysPatient | null>(null);
   medsysAppointments    = signal<MedsysAppointment[]>([]);
-  medsysApptLoading     = signal(false);
   medsysSelectedAppt    = signal<MedsysAppointment | null>(null);
 
   private _appointmentCode = signal<string | null>(null);
   private _medsysSearch$   = new Subject<string>();
   private _sellerSearch$   = new Subject<string>();
   private _referrerSearch$ = new Subject<string>();
-
-  // ── Computed ───────────────────────────────────────────────────
-  selectedProcedures = computed((): MedicalServiceNode[] => {
-    const id = this.selectedServiceId();
-    if (!id) return [];
-    return this.servicesTree().find(s => s.id === id)?.children ?? [];
-  });
 
   // ── API pública (para uso desde el padre vía @ViewChild) ───────
   get isValid(): boolean {
@@ -156,10 +146,8 @@ export class PatientSaleFormComponent implements OnInit {
 
   // ── Lifecycle ──────────────────────────────────────────────────
   ngOnInit(): void {
-    this._loadServicesTree();
-
     this._medsysSearch$.pipe(
-      debounceTime(400), distinctUntilChanged(),
+      debounceTime(300), distinctUntilChanged(),
       switchMap(term => {
         if (term.trim().length < 3) {
           this.medsysPatientList.set([]);
@@ -169,35 +157,22 @@ export class PatientSaleFormComponent implements OnInit {
         this.medsysSearchLoading.set(true);
         this.medsysSearchError.set(null);
         return this.medSvc.searchMedsysPatients(term).pipe(
-          finalize(() => this.medsysSearchLoading.set(false)),
           catchError(err => {
             const msg = err.status === 404
               ? (err.error?.message ?? 'Paciente no encontrado en MedSys')
               : err.status === 403
                 ? 'Sin permiso para consultar MedSys'
                 : 'Error al consultar MedSys';
+            this.medsysSearchLoading.set(false);
             this.medsysSearchError.set(msg);
             return of(null);
           }),
         );
       }),
     ).subscribe(res => {
+      this.medsysSearchLoading.set(false);
       if (!res) return;
-      const d = res.data;
-      if (d.patient) {
-        this._fillPatientFromMedsys(d.patient);
-        this.medsysAppointments.set(d.appointments ?? []);
-        this.medsysPatientList.set([]);
-      } else if (d.patients) {
-        this.medsysPatientList.set(d.patients);
-      }
-    });
-
-    this.patientForm.get('filter_service_id')!.valueChanges.subscribe(serviceId => {
-      this.procedureRows.clear();
-      this.rowPrices.set([]);
-      this.rowPricesLoading.set([]);
-      this.selectedServiceId.set(serviceId);
+      this.medsysPatientList.set(res.data.patients ?? []);
     });
 
     this._sellerSearch$.pipe(
@@ -237,25 +212,16 @@ export class PatientSaleFormComponent implements OnInit {
   selectMedsysPatient(patient: MedsysPatient): void {
     this._fillPatientFromMedsys(patient);
     this.medsysPatientList.set([]);
-    this.medsysApptLoading.set(true);
-    const today = new Date().toISOString().split('T')[0];
-    this.medSvc.getMedsysAppointments(patient.codigo, today)
-      .pipe(finalize(() => this.medsysApptLoading.set(false)))
-      .subscribe({
-        next:  r => this.medsysAppointments.set(r.data),
-        error: () => this.medsysAppointments.set([]),
-      });
+    // Las últimas 3 citas vienen en la respuesta; invertimos para mostrar de más antigua a más reciente.
+    const recent = (patient.recent_appointments ?? []).slice().reverse();
+    this.medsysAppointments.set(recent);
   }
 
   selectMedsysAppointment(appt: MedsysAppointment): void {
     this.medsysSelectedAppt.set(appt);
     this._appointmentCode.set(appt.codcontrol);
-    // Auto-fill date from appointment (avoid UTC offset issues with noon time)
     this.patientForm.get('service_date')!.setValue(new Date(appt.fecha + 'T12:00:00'));
-    if (appt.is_mapped && appt.medical_service_id) {
-      this.patientForm.get('filter_service_id')!.setValue(appt.medical_service_id);
-      if (this.procedureRows.length === 0) this.addProcedureRow();
-    }
+    if (this.procedureRows.length === 0) this.addProcedureRow();
   }
 
   private readonly _ACTIVE_APPT_STATES = ['Cita Agendada', 'Cita Confirmada', 'En Consultorio'];
@@ -302,35 +268,77 @@ export class PatientSaleFormComponent implements OnInit {
   onSellerInput(value: string): void   { this._sellerSearch$.next(value); }
   onReferrerInput(value: string): void { this._referrerSearch$.next(value); }
 
+  // ── Procedure search ────────────────────────────────────────────
+  onProcSearchInput(idx: number, value: string): void {
+    this.procSearch.update(arr => {
+      const copy = [...arr];
+      copy[idx] = { query: value, results: [], loading: false, selected: null };
+      return copy;
+    });
+    (this.procedureRows.at(idx) as FormGroup)
+      .patchValue({ procedure_id: null, unit_price: null }, { emitEvent: false });
+
+    clearTimeout(this._procSearchTimers.get(idx));
+    if (value.trim().length < 2) return;
+
+    this._procSearchTimers.set(idx, setTimeout(() => {
+      this.procSearch.update(arr => {
+        const copy = [...arr]; copy[idx] = { ...copy[idx], loading: true }; return copy;
+      });
+      this.medSvc.searchProcedures(value.trim()).subscribe({
+        next: r => this.procSearch.update(arr => {
+          const copy = [...arr]; copy[idx] = { ...copy[idx], loading: false, results: r.data }; return copy;
+        }),
+        error: () => this.procSearch.update(arr => {
+          const copy = [...arr]; copy[idx] = { ...copy[idx], loading: false, results: [] }; return copy;
+        }),
+      });
+    }, 350));
+  }
+
+  selectProcedureResult(idx: number, result: ProcedureSearchResult): void {
+    this.procSearch.update(arr => {
+      const copy = [...arr];
+      copy[idx] = { query: `${result.code} — ${result.name}`, results: [], loading: false, selected: result };
+      return copy;
+    });
+    const row = this.procedureRows.at(idx) as FormGroup;
+    row.get('procedure_id')?.setValue(result.id, { emitEvent: false });
+    row.get('unit_price')?.setValue(result.current_price?.unit_price ?? null, { emitEvent: false });
+    if (this.mode === 'exit') this._loadProcedureTemplate(idx, result.id);
+  }
+
+  clearProcedure(idx: number): void {
+    this.procSearch.update(arr => {
+      const copy = [...arr];
+      copy[idx] = { query: '', results: [], loading: false, selected: null };
+      return copy;
+    });
+    (this.procedureRows.at(idx) as FormGroup)
+      .patchValue({ procedure_id: null, unit_price: null }, { emitEvent: false });
+    this.rowTemplates.update(arr => { const a = [...arr]; a[idx] = null; return a; });
+  }
+
   // ── Procedure rows ─────────────────────────────────────────────
   addProcedureRow(): void {
-    const idx = this.procedureRows.length;
     const row = this.fb.group({
       procedure_id: [null as number | null, Validators.required],
       quantity:     [1,                     [Validators.required, Validators.min(1)]],
       unit_price:   [null as number | null, [Validators.required, Validators.min(0)]],
       notes:        [''],
     });
-    row.get('procedure_id')!.valueChanges.subscribe(procId => {
-      if (procId) {
-        this._loadProcedurePrice(idx, Number(procId));
-        if (this.mode === 'exit') this._loadProcedureTemplate(idx, Number(procId));
-      }
-    });
     this.procedureRows.push(row);
-    this.rowPrices.update(arr => [...arr, null]);
-    this.rowPricesLoading.update(arr => [...arr, false]);
     this.rowTemplates.update(arr => [...arr, null]);
     this.rowTemplatesLoading.update(arr => [...arr, false]);
+    this.procSearch.update(arr => [...arr, { query: '', results: [], loading: false, selected: null }]);
   }
 
   removeProcedureRow(i: number): void {
     if (this.procedureRows.length <= 1) return;
     this.procedureRows.removeAt(i);
-    this.rowPrices.update(arr => arr.filter((_, idx) => idx !== i));
-    this.rowPricesLoading.update(arr => arr.filter((_, idx) => idx !== i));
     this.rowTemplates.update(arr => arr.filter((_, idx) => idx !== i));
     this.rowTemplatesLoading.update(arr => arr.filter((_, idx) => idx !== i));
+    this.procSearch.update(arr => arr.filter((_, idx) => idx !== i));
   }
 
   rowProcedureTotal(i: number): number {
@@ -339,27 +347,6 @@ export class PatientSaleFormComponent implements OnInit {
   }
 
   // ── Privados ───────────────────────────────────────────────────
-  private _loadServicesTree(): void {
-    this.loadingTree.set(true);
-    this.medSvc.getTree(true)
-      .pipe(finalize(() => this.loadingTree.set(false)))
-      .subscribe({ next: r => this.servicesTree.set(r.data), error: () => {} });
-  }
-
-  private _loadProcedurePrice(rowIdx: number, procedureId: number): void {
-    this.rowPricesLoading.update(arr => { const a = [...arr]; a[rowIdx] = true; return a; });
-    this.medSvc.getProcedurePrices(procedureId, { is_active: true })
-      .pipe(finalize(() => this.rowPricesLoading.update(arr => { const a = [...arr]; a[rowIdx] = false; return a; })))
-      .subscribe({
-        next: r => {
-          const valid = r.data.find(p => p.is_currently_valid) ?? r.data[0] ?? null;
-          this.rowPrices.update(arr => { const a = [...arr]; a[rowIdx] = valid; return a; });
-          if (valid) (this.procedureRows.at(rowIdx) as FormGroup)?.get('unit_price')?.setValue(valid.unit_price, { emitEvent: false });
-        },
-        error: () => this.rowPrices.update(arr => { const a = [...arr]; a[rowIdx] = null; return a; }),
-      });
-  }
-
   private _loadProcedureTemplate(rowIdx: number, procedureId: number): void {
     this.rowTemplatesLoading.update(arr => { const a = [...arr]; a[rowIdx] = true; return a; });
     this.medSvc.getTemplateForService(procedureId)

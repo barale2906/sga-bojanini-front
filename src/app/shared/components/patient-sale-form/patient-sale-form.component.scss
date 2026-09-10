@@ -353,14 +353,71 @@
   border-radius: 9999px;
 }
 
+/* Búsqueda de procedimiento */
+.proc-search-wrap { margin-bottom: 0.5rem; }
+
+.proc-results-list {
+  border: 1px solid var(--mat-divider-color, rgba(0,0,0,.12));
+  border-radius: 6px;
+  overflow: hidden;
+  margin-top: -0.5rem;
+  margin-bottom: 0.75rem;
+}
+
+.proc-result-item {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  width: 100%;
+  padding: 0.5rem 0.75rem;
+  border: none;
+  background: none;
+  cursor: pointer;
+  text-align: left;
+  font-size: 0.85rem;
+  transition: background 0.15s;
+
+  &:hover { background: var(--mat-row-hover-color, rgba(0,0,0,.04)); }
+  &:not(:last-child) { border-bottom: 1px solid var(--mat-divider-color, rgba(0,0,0,.07)); }
+}
+
+.proc-result-code {
+  font-size: 0.76rem;
+  background: var(--mat-row-hover-color, rgba(0,0,0,.06));
+  padding: 1px 5px;
+  border-radius: 3px;
+  flex-shrink: 0;
+}
+
+.proc-result-name { flex: 1; }
+
+.proc-result-price { font-weight: 600; color: #553c9a; flex-shrink: 0; }
+.proc-result-no-price { font-size: 0.76rem; color: var(--mat-secondary-text, rgba(0,0,0,.5)); flex-shrink: 0; }
+
+.proc-selected-badge {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  padding: 0.35rem 0.65rem;
+  background: rgba(85, 60, 154, 0.07);
+  border-radius: 6px;
+  margin-bottom: 0.6rem;
+  font-size: 0.85rem;
+  font-weight: 500;
+
+  mat-icon { color: #276749; font-size: 1.05rem; flex-shrink: 0; }
+}
+
+.proc-no-price-warn { font-size: 0.78rem; font-weight: 400; color: #c05621; }
+
 .procedure-row-fields {
   display: grid;
   grid-template-columns: 110px 1fr;
   gap: 0.25rem 0.5rem;
 
-  .field-procedure { grid-column: span 2; }
-  .field-qty-sm    {}
-  .field-price     {}
+  .field-qty-sm {}
+  .field-price  {}
 }
 
 .procedure-row-total {
@@ -371,7 +428,8 @@
   strong { color: #553c9a; font-size: 0.92rem; }
 }
 
-.price-hint--ok { color: #276749 !important; }
+.price-hint--ok   { color: #276749 !important; }
+.price-hint--warn { color: #c05621 !important; }
 
 .add-row-btn {
   width: 100%;

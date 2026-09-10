@@ -73,9 +73,18 @@ export interface PatientProcedureRecord {
   patient_document: string;
   patient_first_name?: string;
   patient_last_name?: string;
+  patient_email?: string | null;
+  patient_address?: string | null;
+  patient_phone?: string | null;
   quantity: number;
   unit_price: number;
   total: number;
+  discount_type?: 'percentage' | 'fixed' | null;
+  discount_value?: number | null;
+  discount_amount?: number | null;
+  net_total?: number | null;
+  discount_status?: 'pending' | 'approved' | null;
+  order_number?: string | null;
   service_date: string;
   notes: string | null;
   seller?: string | null;
@@ -151,6 +160,12 @@ export interface MedsysPatient {
   tipodoc: string;
   documento: string;
   nombre: string;
+  email?: string;
+  direccion?: string;
+  direccion2?: string;
+  telcelular?: string;
+  telefono?: string;
+  recent_appointments?: MedsysAppointment[];
 }
 
 export interface MedsysAppointment {
@@ -160,15 +175,28 @@ export interface MedsysAppointment {
   codtipocontrol: string;
   servicio: string;
   estado: string;
-  medical_service_id: number | null;
-  medical_service_name: string | null;
-  is_mapped: boolean;
+  medical_service_id?: number | null;
+  medical_service_name?: string | null;
+  is_mapped?: boolean;
 }
 
 export interface MedsysPatientSearchResult {
   patient?: MedsysPatient;
   appointments?: MedsysAppointment[];
   patients?: MedsysPatient[];
+}
+
+export interface ProcedureSearchResult {
+  id: number;
+  code: string;
+  name: string;
+  parent_id: number | null;
+  current_price: {
+    id: number;
+    unit_price: number;
+    effective_from: string;
+    effective_to: string | null;
+  } | null;
 }
 
 @Injectable({ providedIn: 'root' })
@@ -316,6 +344,11 @@ export class MedicalServicesService {
   }
 
   // ── MedSys integration ──────────────────────────────────────
+
+  searchProcedures(q: string): Observable<ApiResponse<ProcedureSearchResult[]>> {
+    const params = new HttpParams().set('q', q);
+    return this.http.get<ApiResponse<ProcedureSearchResult[]>>(`${this.api}/medical-services/search`, { params });
+  }
 
   searchMedsysPatients(search: string): Observable<ApiResponse<MedsysPatientSearchResult>> {
     const params = new HttpParams().set('search', search);

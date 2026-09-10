@@ -31,6 +31,8 @@ const ICON_MAP: Record<string, string> = {
   'bell': 'notifications',
   'plug': 'power',
   'heart-pulse': 'monitor_heart',
+  'receipt-text': 'receipt_long',
+  'receipt':      'receipt',
   'bar-chart-2': 'bar_chart',
   'shield-check': 'verified_user',
   'settings': 'settings',

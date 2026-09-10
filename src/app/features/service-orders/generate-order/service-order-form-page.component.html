@@ -1,0 +1,528 @@
+<app-page-header
+  title="Nueva Orden de Servicio"
+  subtitle="Registre procedimientos médicos para el paciente"
+  icon="receipt_long"
+>
+  <a mat-stroked-button routerLink="/service-orders/generar">
+    <mat-icon>add</mat-icon>
+    Nueva Orden
+  </a>
+</app-page-header>
+
+<!-- ═══════════════════════ ESTADO ÉXITO ═══════════════════════════ -->
+@if (orderCreated(); as order) {
+  <div class="success-container">
+    <div class="success-card">
+      <mat-icon class="success-icon">check_circle</mat-icon>
+      <h2 class="success-title">¡Orden Generada Exitosamente!</h2>
+      <div class="success-order-number">{{ order.order_number }}</div>
+
+      @if (order.order_status === 'discount_pending') {
+        <div class="discount-pending-notice">
+          <mat-icon>pending_actions</mat-icon>
+          <span>Esta orden tiene descuentos pendientes de aprobación. Se notificó al personal autorizado.</span>
+        </div>
+      }
+
+      <div class="success-summary">
+        <div class="summary-row">
+          <span class="summary-label">Paciente</span>
+          <span class="summary-value">{{ order.patient_first_name }} {{ order.patient_last_name }}</span>
+        </div>
+        <div class="summary-row">
+          <span class="summary-label">Documento</span>
+          <span class="summary-value">{{ order.patient_document }}</span>
+        </div>
+        <div class="summary-row">
+          <span class="summary-label">Fecha</span>
+          <span class="summary-value">{{ order.service_date | date:'dd/MM/yyyy':'UTC' }}</span>
+        </div>
+        <div class="summary-row">
+          <span class="summary-label">Procedimientos</span>
+          <span class="summary-value">{{ order.procedures.length }}</span>
+        </div>
+        <div class="summary-row summary-row--total">
+          <span class="summary-label">Total</span>
+          <span class="summary-value">{{ formatCurrency(order.total_amount) }}</span>
+        </div>
+        @if (order.total_discount > 0) {
+          <div class="summary-row summary-row--discount">
+            <span class="summary-label">Descuento</span>
+            <span class="summary-value">— {{ formatCurrency(order.total_discount) }}</span>
+          </div>
+          <div class="summary-row summary-row--net">
+            <span class="summary-label">Valor a Pagar</span>
+            <span class="summary-value">{{ formatCurrency(order.net_total) }}</span>
+          </div>
+        }
+      </div>
+
+      <div class="success-actions">
+        <button mat-raised-button color="primary" (click)="newOrder()">
+          <mat-icon>add</mat-icon>
+          Nueva Orden
+        </button>
+      </div>
+    </div>
+  </div>
+}
+
+<!-- ═══════════════════════ FORMULARIO ════════════════════════════ -->
+@if (!orderCreated()) {
+  <div class="form-container">
+    <app-form-errors [errors]="errors()"></app-form-errors>
+
+    <!-- ─── SECCIÓN: PACIENTE ──────────────────────────────────── -->
+    <div class="form-section">
+      <div class="section-header">
+        <mat-icon>person_search</mat-icon>
+        <h3>Datos del Paciente</h3>
+      </div>
+
+      <!-- Buscador MedSys -->
+      <div class="medsys-search-box">
+        <mat-form-field appearance="outline" class="full-width">
+          <mat-label>Buscar paciente en MedSys (documento o nombre)</mat-label>
+          <input matInput
+                 [value]="medsysQuery()"
+                 (input)="onMedsysInput($any($event.target).value)"
+                 placeholder="Ej: 1234567890 o Juan Pérez" />
+          <mat-icon matPrefix>search</mat-icon>
+          @if (medsysLoading()) {
+            <mat-spinner matSuffix diameter="18"></mat-spinner>
+          }
+          @if (medsysSelected()) {
+            <button matSuffix mat-icon-button (click)="clearPatient()" matTooltip="Limpiar paciente">
+              <mat-icon>close</mat-icon>
+            </button>
+          }
+        </mat-form-field>
+
+        @if (medsysError()) {
+          <div class="medsys-error">
+            <mat-icon>error_outline</mat-icon>
+            <span>{{ medsysError() }}</span>
+          </div>
+        }
+
+        @if (medsysPatientList().length > 0) {
+          <div class="medsys-list">
+            @for (patient of medsysPatientList(); track patient.codigo) {
+              <button class="medsys-list-item" type="button" (click)="selectMedsysPatient(patient)">
+                <mat-icon>person</mat-icon>
+                <div class="medsys-list-item__info">
+                  <span class="medsys-list-item__name">{{ patient.nombre }}</span>
+                  <span class="medsys-list-item__doc">{{ patient.tipodoc }} {{ patient.documento }}</span>
+                </div>
+              </button>
+            }
+          </div>
+        }
+
+        @if (medsysSelected()) {
+          <div class="patient-badge">
+            <mat-icon>verified_user</mat-icon>
+            <span>{{ medsysSelected()!.nombre }} · {{ medsysSelected()!.tipodoc }} {{ medsysSelected()!.documento }}</span>
+          </div>
+
+          <!-- Últimas 3 citas del paciente (más antigua → más reciente) -->
+          @if (medsysAppointments().length > 0) {
+            <div class="appts-block">
+              <div class="appts-title">
+                <mat-icon>event_note</mat-icon>
+                <span>Últimas 3 citas en MedSys</span>
+              </div>
+              <div class="appts-list">
+                @for (appt of medsysAppointments(); track appt.codcontrol) {
+                  <div class="appt-chip">
+                    <span class="appt-date">{{ appt.fecha }} {{ appt.hora | slice:0:5 }}</span>
+                    <span class="appt-service">{{ appt.medical_service_name ?? appt.servicio }}</span>
+                    <span class="appt-status">{{ appt.estado }}</span>
+                  </div>
+                }
+              </div>
+            </div>
+          }
+        }
+      </div>
+
+      <!-- Datos del paciente (pre-cargados) -->
+      <form [formGroup]="patientGroup">
+        <div class="field-grid">
+          <mat-form-field appearance="outline">
+            <mat-label>Documento *</mat-label>
+            <input matInput formControlName="patient_document" />
+          </mat-form-field>
+
+          <mat-form-field appearance="outline">
+            <mat-label>Código MedSys *</mat-label>
+            <input matInput formControlName="patient_external_id" readonly />
+            <mat-icon matSuffix>qr_code</mat-icon>
+          </mat-form-field>
+
+          <mat-form-field appearance="outline">
+            <mat-label>Nombres *</mat-label>
+            <input matInput formControlName="patient_first_name" />
+          </mat-form-field>
+
+          <mat-form-field appearance="outline">
+            <mat-label>Apellidos *</mat-label>
+            <input matInput formControlName="patient_last_name" />
+          </mat-form-field>
+
+          <mat-form-field appearance="outline">
+            <mat-label>Email</mat-label>
+            <input matInput formControlName="patient_email" type="email" />
+          </mat-form-field>
+
+          <mat-form-field appearance="outline">
+            <mat-label>Teléfono</mat-label>
+            <input matInput formControlName="patient_phone" />
+          </mat-form-field>
+        </div>
+
+        <mat-form-field appearance="outline" class="full-width">
+          <mat-label>Dirección</mat-label>
+          <input matInput formControlName="patient_address" />
+        </mat-form-field>
+
+        <div class="field-grid">
+          <mat-form-field appearance="outline">
+            <mat-label>Fecha de Servicio *</mat-label>
+            <input matInput type="date" formControlName="service_date" [max]="today" />
+          </mat-form-field>
+
+          <!-- Vendedor/Cajero -->
+          <mat-form-field appearance="outline">
+            <mat-label>Vendedor / Cajero</mat-label>
+            <input matInput formControlName="seller"
+                   [matAutocomplete]="sellerAuto"
+                   (input)="onSellerInput($any($event.target).value)" />
+            <mat-autocomplete #sellerAuto="matAutocomplete">
+              @for (s of sellerSuggestions(); track s) {
+                <mat-option [value]="s">{{ s }}</mat-option>
+              }
+            </mat-autocomplete>
+          </mat-form-field>
+
+          <!-- Médico referente -->
+          <mat-form-field appearance="outline">
+            <mat-label>Médico / Referente</mat-label>
+            <input matInput formControlName="referrer"
+                   [matAutocomplete]="referrerAuto"
+                   (input)="onReferrerInput($any($event.target).value)" />
+            <mat-autocomplete #referrerAuto="matAutocomplete">
+              @for (r of referrerSuggestions(); track r) {
+                <mat-option [value]="r">{{ r }}</mat-option>
+              }
+            </mat-autocomplete>
+          </mat-form-field>
+        </div>
+
+        <mat-form-field appearance="outline" class="full-width">
+          <mat-label>Observaciones generales</mat-label>
+          <textarea matInput formControlName="notes" rows="2"
+                    placeholder="Notas adicionales de la orden..."></textarea>
+        </mat-form-field>
+      </form>
+    </div>
+
+    <!-- ─── SECCIÓN: PROCEDIMIENTOS ─────────────────────────────── -->
+    <div class="section-header section-header--procedures">
+      <mat-icon>medical_services</mat-icon>
+      <h3>Procedimientos</h3>
+      <span class="proc-count-badge">{{ proceduresArray.length }}</span>
+    </div>
+
+    @for (proc of proceduresArray.controls; track $index; let i = $index) {
+      <div class="procedure-card">
+        <div class="procedure-card-header">
+          <span class="procedure-num">Procedimiento {{ i + 1 }}</span>
+          @if (proceduresArray.length > 1) {
+            <button mat-icon-button color="warn" (click)="removeProcedure(i)"
+                    matTooltip="Eliminar procedimiento">
+              <mat-icon>delete_outline</mat-icon>
+            </button>
+          }
+        </div>
+
+        <form [formGroup]="asGroup(proc)">
+
+          <!-- Búsqueda de procedimiento -->
+          <div class="proc-search-wrap">
+            <mat-form-field appearance="outline" class="full-width">
+              <mat-label>Buscar procedimiento (código o nombre) *</mat-label>
+              <mat-icon matPrefix>search</mat-icon>
+              <input matInput
+                     [value]="procSearch()[i]?.query ?? ''"
+                     (input)="onProcSearchInput(i, $any($event.target).value)"
+                     placeholder="Ej: CUR-001 o Curaciones simples" />
+              <mat-hint>Mínimo 2 caracteres</mat-hint>
+              @if (procSearch()[i]?.loading) {
+                <mat-spinner matSuffix diameter="16"></mat-spinner>
+              }
+              @if (procSearch()[i]?.selected) {
+                <button matSuffix mat-icon-button type="button"
+                        (click)="clearProcedure(i)" matTooltip="Limpiar procedimiento">
+                  <mat-icon>close</mat-icon>
+                </button>
+              }
+            </mat-form-field>
+
+            @if (procSearch()[i]?.results?.length) {
+              <div class="proc-results-list">
+                @for (res of procSearch()[i].results; track res.id) {
+                  <button type="button" class="proc-result-item" (click)="selectProcedureResult(i, res)">
+                    <code class="proc-result-code">{{ res.code }}</code>
+                    <span class="proc-result-name">{{ res.name }}</span>
+                    @if (res.current_price) {
+                      <span class="proc-result-price">{{ formatCurrency(res.current_price.unit_price) }}</span>
+                    } @else {
+                      <span class="proc-result-no-price">Sin tarifa</span>
+                    }
+                  </button>
+                }
+              </div>
+            }
+
+            @if (procSearch()[i]?.selected) {
+              <div class="proc-selected-badge">
+                <mat-icon>check_circle</mat-icon>
+                <span>{{ procSearch()[i].selected!.code }} — {{ procSearch()[i].selected!.name }}</span>
+                @if (!procSearch()[i].selected!.current_price) {
+                  <span class="proc-no-price-warn">Sin tarifa activa — ingrese el precio manualmente</span>
+                }
+              </div>
+            }
+          </div>
+
+          <!-- Precio y Cantidad -->
+          <div class="field-grid field-grid--3">
+            <mat-form-field appearance="outline">
+              <mat-label>Precio Unitario *</mat-label>
+              <input matInput type="number" formControlName="unit_price" min="0" step="any"
+                     (change)="onUnitPriceOrQtyChange(i)" />
+              <span matPrefix>$&nbsp;</span>
+            </mat-form-field>
+
+            <mat-form-field appearance="outline">
+              <mat-label>Cantidad *</mat-label>
+              <input matInput type="number" formControlName="quantity" min="0.001" step="any"
+                     (change)="onUnitPriceOrQtyChange(i)" />
+            </mat-form-field>
+
+            <div class="total-display">
+              <span class="total-display__label">Total</span>
+              <span class="total-display__value">{{ formatCurrency(procedureTotal(i)) }}</span>
+            </div>
+          </div>
+
+          <!-- ── Descuento ─────────────────────────────────────── -->
+          <div class="toggle-section">
+            <mat-slide-toggle formControlName="has_discount" color="primary">
+              Aplicar descuento
+            </mat-slide-toggle>
+          </div>
+
+          @if (asGroup(proc).get('has_discount')?.value) {
+            <div class="discount-block">
+              <mat-radio-group formControlName="discount_type" (change)="onDiscountTypeChange(i)">
+                <mat-radio-button value="percentage">Por porcentaje</mat-radio-button>
+                <mat-radio-button value="fixed">Por valor</mat-radio-button>
+              </mat-radio-group>
+
+              @if (asGroup(proc).get('discount_type')?.value === 'percentage') {
+                <div class="discount-pct-row">
+                  <mat-form-field appearance="outline" class="field-narrow">
+                    <mat-label>Porcentaje de descuento *</mat-label>
+                    <input matInput type="number" formControlName="discount_percent" min="0.01" max="99.99" step="0.01" />
+                    <span matSuffix>%</span>
+                  </mat-form-field>
+                  <div class="discount-computed">
+                    <div class="discount-computed-row">
+                      <span>Descuento:</span>
+                      <strong>— {{ formatCurrency(discountAmount(i)) }}</strong>
+                    </div>
+                    <div class="discount-computed-row">
+                      <span>Valor a pagar:</span>
+                      <strong class="text-success">{{ formatCurrency(discountNet(i)) }}</strong>
+                    </div>
+                  </div>
+                </div>
+              }
+
+              @if (asGroup(proc).get('discount_type')?.value === 'fixed') {
+                <div class="discount-fixed-row">
+                  <mat-form-field appearance="outline">
+                    <mat-label>Valor del descuento *</mat-label>
+                    <input matInput type="number" formControlName="discount_amount" min="0" step="any"
+                           (input)="onDiscountAmountInput(i)" />
+                    <span matPrefix>$&nbsp;</span>
+                  </mat-form-field>
+                  <div class="discount-or-label">ó</div>
+                  <mat-form-field appearance="outline">
+                    <mat-label>Valor a pagar *</mat-label>
+                    <input matInput type="number" formControlName="discount_net" min="0.01" step="any"
+                           (input)="onDiscountNetInput(i)" />
+                    <span matPrefix>$&nbsp;</span>
+                  </mat-form-field>
+                </div>
+                <div class="discount-total-check"
+                     [class.discount-total-check--ok]="procedureTotal(i) > 0 &&
+                       +((asGroup(proc).get('discount_amount')?.value || 0) +
+                         (asGroup(proc).get('discount_net')?.value || 0)).toFixed(2) === +procedureTotal(i).toFixed(2)">
+                  <mat-icon>{{ procedureTotal(i) > 0 &&
+                    +((asGroup(proc).get('discount_amount')?.value || 0) +
+                      (asGroup(proc).get('discount_net')?.value || 0)).toFixed(2) === +procedureTotal(i).toFixed(2)
+                    ? 'check_circle' : 'info' }}</mat-icon>
+                  <span>La suma debe ser igual al total: {{ formatCurrency(procedureTotal(i)) }}</span>
+                </div>
+              }
+            </div>
+          }
+
+          <!-- ── Insumos ────────────────────────────────────────── -->
+          <div class="toggle-section">
+            <mat-slide-toggle formControlName="has_supplies" color="primary">
+              Descontar insumos de inventario
+            </mat-slide-toggle>
+          </div>
+
+          @if (asGroup(proc).get('has_supplies')?.value) {
+            <div class="supplies-block">
+              @for (supply of getSupplies(i).controls; track $index; let si = $index) {
+                <div class="supply-item">
+                  <!-- Fila principal: almacén + producto + cantidad + quitar -->
+                  <div class="supply-row">
+                    <mat-form-field appearance="outline" class="supply-warehouse">
+                      <mat-label>Almacén *</mat-label>
+                      <mat-select [formControl]="$any(asGroup(supply).get('warehouse_id'))"
+                                  (selectionChange)="onSupplyWarehouseChange(i, si)">
+                        @if (loadingWarehouses()) {
+                          <mat-option disabled>Cargando...</mat-option>
+                        }
+                        @for (w of warehouses(); track w.id) {
+                          <mat-option [value]="w.id">{{ w.name }}</mat-option>
+                        }
+                      </mat-select>
+                    </mat-form-field>
+
+                    <div class="supply-product">
+                      <app-product-search
+                        label="Insumo / Producto *"
+                        [required]="true"
+                        [selectedProduct]="getSupplyProduct(i, si)"
+                        (productSelected)="onSupplyProductSelected(i, si, $event)">
+                      </app-product-search>
+                    </div>
+
+                    <mat-form-field appearance="outline" class="supply-qty">
+                      <mat-label>Cantidad *</mat-label>
+                      <input matInput type="number"
+                             [formControl]="$any(asGroup(supply).get('quantity'))"
+                             min="0.001" step="any" />
+                      @if (getSelectedBatch(i, si); as batch) {
+                        <mat-hint>Disponible: {{ batch.quantity_available }}</mat-hint>
+                      }
+                    </mat-form-field>
+
+                    <button mat-icon-button color="warn" (click)="removeSupply(i, si)"
+                            matTooltip="Quitar insumo">
+                      <mat-icon>remove_circle_outline</mat-icon>
+                    </button>
+                  </div>
+
+                  <!-- Lotes disponibles -->
+                  @if (getSupplyBatchState(i, si); as bState) {
+                    @if (bState.loading) {
+                      <div class="batch-loading">
+                        <mat-spinner diameter="14"></mat-spinner>
+                        <span>Verificando stock disponible...</span>
+                      </div>
+                    }
+                    @if (!bState.loading && bState.error) {
+                      <div class="batch-error">
+                        <mat-icon>block</mat-icon>
+                        <span>{{ bState.error }}</span>
+                      </div>
+                    }
+                    @if (!bState.loading && !bState.error && bState.batches.length > 0) {
+                      <div class="batch-selector-row">
+                        <mat-form-field appearance="outline" class="batch-field">
+                          <mat-label>Seleccionar lote *</mat-label>
+                          <mat-select [formControl]="$any(asGroup(supply).get('batch_id'))">
+                            @for (batch of bState.batches; track batch.id; let first = $first) {
+                              <mat-option [value]="batch.id">
+                                <span class="batch-option">
+                                  @if (first) { <span class="batch-fefo-star">★</span> }
+                                  <strong>Lote {{ batch.lot_number }}</strong>
+                                  <span class="batch-qty">· {{ batch.quantity_available }} uds</span>
+                                  @if (batch.expiration_date) {
+                                    <span class="batch-exp">· Vence: {{ batch.expiration_date | date:'dd/MM/yy':'UTC' }}</span>
+                                  }
+                                </span>
+                              </mat-option>
+                            }
+                          </mat-select>
+                          <mat-hint>Ordenados por FEFO — primer vencimiento primero</mat-hint>
+                        </mat-form-field>
+
+                        @if (supplyQtyExceeds(i, si)) {
+                          <div class="batch-qty-warn">
+                            <mat-icon>warning</mat-icon>
+                            <span>La cantidad supera el stock disponible del lote
+                              ({{ getSelectedBatch(i, si)?.quantity_available }} uds)</span>
+                          </div>
+                        }
+                      </div>
+                    }
+                  }
+                </div>
+              }
+              <button mat-stroked-button type="button" (click)="addSupply(i)" class="add-supply-btn">
+                <mat-icon>add</mat-icon>
+                Agregar insumo
+              </button>
+            </div>
+          }
+
+          <!-- ── Evolución Clínica ─────────────────────────────── -->
+          <div class="evolution-block">
+            <div class="evolution-label">
+              <mat-icon>description</mat-icon>
+              <span>Evolución Clínica *</span>
+            </div>
+            <app-rich-text-editor
+              formControlName="notes"
+              label="Evolución clínica"
+              placeholder="Describa la evolución clínica del paciente..."
+              [required]="true">
+            </app-rich-text-editor>
+            @if (!_htmlHasText(asGroup(proc).get('notes')?.value)) {
+              <div class="field-hint field-hint--warn">Campo obligatorio</div>
+            }
+          </div>
+
+        </form>
+      </div>
+    }
+
+    <button mat-stroked-button type="button" class="add-proc-btn" (click)="addProcedure()">
+      <mat-icon>add</mat-icon>
+      Agregar Procedimiento
+    </button>
+
+    <!-- ─── BOTÓN GUARDAR ───────────────────────────────────────── -->
+    <div class="form-actions">
+      <button mat-button routerLink="/dashboard">Cancelar</button>
+      <button mat-raised-button color="primary"
+              [disabled]="!isFormValid || saving()"
+              (click)="save()">
+        @if (saving()) { <mat-spinner diameter="18"></mat-spinner> }
+        <mat-icon>receipt_long</mat-icon>
+        Generar Orden
+      </button>
+    </div>
+
+  </div>
+}

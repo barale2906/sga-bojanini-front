@@ -90,18 +90,20 @@
       </div>
     }
 
-    <!-- ── Producto (genérico) ── -->
-    <div class="span2">
-      <app-product-search
-        label="Producto"
-        [required]="true"
-        [selectedProduct]="_selectedProductFull()"
-        (productSelected)="onProductSelected($event)">
-      </app-product-search>
-    </div>
+    <!-- ── Producto (genérico) — solo para tipos distintos de entrada ── -->
+    @if (!isEntry) {
+      <div class="span2">
+        <app-product-search
+          label="Producto"
+          [required]="true"
+          [selectedProduct]="_selectedProductFull()"
+          (productSelected)="onProductSelected($event)">
+        </app-product-search>
+      </div>
+    }
 
-    <!-- ── Variante (requerida para todos los tipos excepto salida) ── -->
-    @if (!isExit && form.get('product_id')?.value) {
+    <!-- ── Variante (requerida para todos los tipos excepto salida/entrada) ── -->
+    @if (!isEntry && !isExit && form.get('product_id')?.value) {
       @if (loadingVariants()) {
         <div class="span2 cap-loading">
           <mat-spinner diameter="14"></mat-spinner>
@@ -125,69 +127,6 @@
       }
     }
 
-    <!-- ── Panel de clasificación + INVIMA (solo entrada) ── -->
-    @if (isEntry) {
-      @if (loadingProductDetail()) {
-        <div class="span2 cap-loading">
-          <mat-spinner diameter="14"></mat-spinner>
-          <span>Cargando información del producto...</span>
-        </div>
-      }
-      @if (!loadingProductDetail() && productDetail(); as pd) {
-        @if (pd.classification) {
-          <div class="span2 class-panel">
-            <div class="class-header">
-              <mat-icon>{{ classIcon(pd.classification) }}</mat-icon>
-              <span class="class-badge class-badge--{{ pd.classification.code.toLowerCase() }}">
-                {{ pd.classification.code }} — {{ pd.classification.name }}
-              </span>
-            </div>
-            <div class="class-fields-row">
-              @if (pd.classification.has_concentration && pd.concentration) {
-                <span class="class-field"><strong>Concentración:</strong> {{ pd.concentration }}</span>
-              }
-              @if (pd.classification.has_pharma_fields && pd.pharmaceutical_form) {
-                <span class="class-field"><strong>Forma farm.:</strong> {{ pd.pharmaceutical_form }}</span>
-              }
-            </div>
-          </div>
-        }
-
-        @if (pd.classification?.has_sanitary_registration) {
-          <div class="span2 invima-panel" [class.invima-panel--ok]="hasActiveReg" [class.invima-panel--warn]="!hasActiveReg">
-            <div class="invima-header">
-              <mat-icon>verified_user</mat-icon>
-              <span>Registros Sanitarios (INVIMA)</span>
-              @if (hasActiveReg) {
-                <span class="invima-badge invima-badge--ok">✓ Activo vigente</span>
-              } @else {
-                <span class="invima-badge invima-badge--warn">⚠ Sin registro activo</span>
-              }
-            </div>
-            @let selVariant = variants().find(v => v.id === form.get('product_variant_id')?.value);
-            @if (selVariant?.sanitary_registrations?.length) {
-              @for (reg of selVariant!.sanitary_registrations!; track reg.id) {
-                <div class="invima-reg" [class.invima-reg--expired]="reg.is_expired">
-                  <mat-icon class="invima-reg-icon">{{ reg.is_expired ? 'warning' : 'verified' }}</mat-icon>
-                  <span class="invima-reg-num">{{ reg.registration_number }}</span>
-                  <span class="invima-reg-exp">Vence: {{ reg.expiry_date | date:'dd/MM/yyyy' }}</span>
-                  @if (reg.is_expired) {
-                    <span class="invima-tag invima-tag--expired">Vencido</span>
-                  } @else if (!reg.is_active) {
-                    <span class="invima-tag invima-tag--inactive">Inactivo</span>
-                  } @else {
-                    <span class="invima-tag invima-tag--ok">Activo</span>
-                  }
-                </div>
-              }
-            } @else {
-              <div class="invima-empty">Sin registros sanitarios para la variante seleccionada.</div>
-            }
-          </div>
-        }
-      }
-    }
-
     <!-- ── Almacén ── -->
     <mat-form-field appearance="outline" class="span2">
       <mat-label>Almacén *</mat-label>
@@ -207,295 +146,266 @@
       </mat-form-field>
     }
 
-    <!-- ══════════════════════ ENTRADA ══════════════════════════ -->
+    <!-- ══════════════════════ ENTRADA BULK ═══════════════════════ -->
     @if (isEntry) {
 
-      <!-- Datos del lote -->
-      <mat-form-field appearance="outline">
-        <mat-label>N° de Lote</mat-label>
-        <input matInput formControlName="lot_number" placeholder="LOT-2026-001" />
-      </mat-form-field>
-      <mat-form-field appearance="outline">
-        <mat-label>Fecha de Vencimiento</mat-label>
-        <input matInput type="date" formControlName="expiration_date" />
-      </mat-form-field>
-      <mat-form-field appearance="outline">
-        <mat-label>Fecha de Fabricación</mat-label>
-        <input matInput type="date" formControlName="manufacturing_date" />
-      </mat-form-field>
+      <!-- Cabecera del documento -->
       <mat-form-field appearance="outline">
         <mat-label>N° de Factura</mat-label>
-        <input matInput formControlName="invoice_number" maxlength="100" placeholder="FAC-2025-00892" />
+        <input matInput formControlName="invoice_number" maxlength="100" placeholder="FAC-2026-00892" />
         <mat-hint>Número de factura del proveedor (opcional)</mat-hint>
       </mat-form-field>
       <mat-form-field appearance="outline">
         <mat-label>Temperatura de entrada (°C)</mat-label>
         <input matInput type="number" formControlName="entry_temperature" step="0.1" placeholder="4.5" />
-        <mat-hint>Temperatura registrada al recibir el producto (opcional)</mat-hint>
+        <mat-hint>Temperatura al recibir (opcional)</mat-hint>
+      </mat-form-field>
+      <mat-form-field appearance="outline" class="span2">
+        <mat-label>Observación general</mat-label>
+        <textarea matInput formControlName="reason" rows="2" placeholder="Ej: Recepción bodega norte"></textarea>
       </mat-form-field>
 
-      <!-- Toggle distribución (solo si hay almacén) -->
-      @if (form.get('warehouse_id')?.value) {
-        <div class="span2 dist-toggle-row">
-          <button mat-stroked-button type="button"
-                  [class.active]="!useDistribution()"
-                  (click)="useDistribution() && toggleDistribution()">
-            <mat-icon>place</mat-icon> Una ubicación
-          </button>
-          <button mat-stroked-button type="button"
-                  [class.active]="useDistribution()"
-                  (click)="!useDistribution() && toggleDistribution()">
-            <mat-icon>call_split</mat-icon> Distribuir en varias
-          </button>
-        </div>
-      }
-
-      <!-- ── Modo ÚNICA ubicación ── -->
-      @if (!useDistribution()) {
-
-        <!-- Zona (filtro de ubicaciones) -->
-        @if (zones().length > 0) {
-          <mat-form-field appearance="outline" class="span2">
-            <mat-label>Zona</mat-label>
-            <mat-select formControlName="zone_id">
-              <mat-option [value]="null">Todas las zonas</mat-option>
-              @for (z of zones(); track z.id) {
-                <mat-option [value]="z.id">
-                  <mat-icon style="font-size:1rem;vertical-align:middle;margin-right:4px">{{ zoneTypeIcon(z.type) }}</mat-icon>
-                  {{ z.name }}
-                  <span style="color:#718096;font-size:0.82em"> — {{ z.type }}</span>
-                </mat-option>
-              }
-            </mat-select>
-            <mat-hint>Filtra las ubicaciones disponibles</mat-hint>
-          </mat-form-field>
-        }
-
-        <mat-form-field appearance="outline" class="span2">
-          <mat-label>Ubicación</mat-label>
-          <mat-select formControlName="location_id">
-            <mat-option [value]="null">Sin ubicación específica</mat-option>
-            @for (l of locations(); track l.id) {
-              <mat-option [value]="l.id">{{ l.name }}</mat-option>
-            }
-          </mat-select>
-        </mat-form-field>
-
-        <!-- Panel de capacidad de la ubicación seleccionada -->
-        @if (loadingSingleCap()) {
-          <div class="span2 cap-loading">
-            <mat-spinner diameter="14"></mat-spinner>
-            <span>Verificando capacidad...</span>
+      <!-- Lista de productos -->
+      <div class="span2 items-section">
+        <div class="items-section-header">
+          <div class="items-section-title">
+            <mat-icon>inventory</mat-icon>
+            Productos a ingresar
+            <span class="items-count-badge">{{ itemsArray.length }}</span>
           </div>
-        }
-        @if (!loadingSingleCap() && singleLocCapacity(); as cap) {
-          <div class="span2 cap-panel" [class]="'cap-panel--' + projStatus(cap, effectiveBaseQty)">
-            <div class="cap-panel-header">
-              <mat-icon class="cap-icon">
-                {{ projStatus(cap, effectiveBaseQty) === 'danger' ? 'error' :
-                   projStatus(cap, effectiveBaseQty) === 'warn'   ? 'warning' :
-                   projStatus(cap, effectiveBaseQty) === 'ok'     ? 'check_circle' : 'info' }}
-              </mat-icon>
-              <strong>{{ cap.name }}</strong> — capacidad disponible
-              <span class="cap-status-pill cap-pill--{{ projStatus(cap, effectiveBaseQty) }}">
-                @switch (projStatus(cap, effectiveBaseQty)) {
-                  @case ('ok')     { ✓ Sin problemas }
-                  @case ('warn')   { ⚠ Espacio ajustado }
-                  @case ('danger') { ✗ Excede capacidad }
-                  @case ('nodims') { — Sin dimensiones de producto }
-                  @case ('nodata') { — Sin capacidad configurada }
-                }
-              </span>
-            </div>
-
-            <!-- Volumen -->
-            @if (cap.capacity_volume.max_cm3 !== null) {
-              <div class="cap-row">
-                <span class="cap-row-label">📦 Volumen</span>
-                <div class="mini-bar">
-                  <div class="mini-bar__fill mini-bar__fill--{{ projStatus(cap, effectiveBaseQty) }}"
-                       [style.width.%]="cap.capacity_volume.usage_pct ?? 0"></div>
-                </div>
-                <span class="cap-row-pct">{{ fmtPct(cap.capacity_volume.usage_pct) }}</span>
-                <span class="cap-row-detail">libre: {{ _fmtVol(cap.capacity_volume.available_cm3) }}</span>
-                @if (neededVol(effectiveBaseQty); as nv) {
-                  <span class="cap-row-needed">→ usará {{ _fmtVol(nv) }}</span>
-                }
-              </div>
-            } @else {
-              <div class="cap-row">
-                <span class="cap-row-label">📦 Volumen</span>
-                <span class="cap-row-detail">Usando {{ _fmtVol(cap.capacity_volume.used_cm3) }} · sin límite</span>
-              </div>
-            }
-
-            <!-- Peso -->
-            @if (cap.capacity_weight.max_kg !== null) {
-              <div class="cap-row">
-                <span class="cap-row-label">⚖ Peso</span>
-                <div class="mini-bar">
-                  <div class="mini-bar__fill mini-bar__fill--{{ projStatus(cap, effectiveBaseQty) }}"
-                       [style.width.%]="cap.capacity_weight.usage_pct ?? 0"></div>
-                </div>
-                <span class="cap-row-pct">{{ fmtPct(cap.capacity_weight.usage_pct) }}</span>
-                <span class="cap-row-detail">libre: {{ _fmtKg(cap.capacity_weight.available_kg) }}</span>
-                @if (neededWgt(effectiveBaseQty); as nw) {
-                  <span class="cap-row-needed">→ usará {{ _fmtKg(nw) }}</span>
-                }
-              </div>
-            } @else {
-              <div class="cap-row">
-                <span class="cap-row-label">⚖ Peso</span>
-                <span class="cap-row-detail">Usando {{ _fmtKg(cap.capacity_weight.used_kg) }} · sin límite</span>
-              </div>
-            }
-          </div>
-        }
-
-        <!-- ── Modo de ingreso (base vs presentación) ── -->
-        <div class="span2 mode-toggle">
-          <label>Modo de ingreso:</label>
-          <button mat-stroked-button type="button" [class.active]="!usePresentationMode()" (click)="usePresentationMode.set(false)">
-            Unidad base directa
-          </button>
-          <button mat-stroked-button type="button" [class.active]="usePresentationMode()" (click)="usePresentationMode.set(true)"
-                  [disabled]="presentations().length === 0"
-                  [matTooltip]="presentations().length === 0 ? 'Este producto no tiene presentaciones configuradas.' : 'Ingresar por empaque'">
-            Por empaque / presentación
+          <button mat-raised-button color="primary" type="button" (click)="addItem()">
+            <mat-icon>add</mat-icon> Agregar producto
           </button>
         </div>
 
-        @if (usePresentationMode() && presentations().length === 0 && form.get('product_id')?.value) {
-          <div class="span2 no-pres-warn">
-            <mat-icon>info</mat-icon>
-            Este producto no tiene presentaciones de empaque configuradas.
-            Dirígete al <strong>Catálogo → Detalle del producto → Presentaciones de empaque</strong>.
-          </div>
-        }
-
-        @if (!usePresentationMode()) {
-          <mat-form-field appearance="outline" class="span2">
-            <mat-label>Cantidad en {{ selectedProduct?.base_unit?.abbreviation || 'unidad base' }} *</mat-label>
-            <input matInput type="number" formControlName="quantity_base" min="0.001" step="any" />
-            <mat-hint>Número de {{ selectedProduct?.base_unit?.name || 'unidades base' }}</mat-hint>
-          </mat-form-field>
-        }
-
-        @if (usePresentationMode()) {
-          <mat-form-field appearance="outline">
-            <mat-label>Presentación / empaque *</mat-label>
-            <mat-select formControlName="product_presentation_id">
-              @for (pr of presentations(); track pr.id) {
-                <mat-option [value]="pr.id">
-                  {{ pr.name }}
-                  <span style="color:#718096;font-size:0.85em"> — 1 und = {{ pr.factor_to_base }} {{ selectedProduct?.base_unit?.abbreviation || 'base' }}</span>
-                </mat-option>
-              }
-            </mat-select>
-            @if (selectedPresentation) {
-              <mat-hint>1 {{ selectedPresentation.name }} = <strong>{{ selectedPresentation.factor_to_base }}</strong> {{ selectedProduct?.base_unit?.abbreviation || 'uds.' }}</mat-hint>
-            }
-          </mat-form-field>
-
-          <mat-form-field appearance="outline">
-            <mat-label>Cantidad de empaques *</mat-label>
-            <input matInput type="number" formControlName="quantity_in_presentation" min="0.001" step="any" />
-            @if (selectedPresentation) {
-              <mat-hint>{{ selectedPresentation.name }}{{ (form.get('quantity_in_presentation')?.value || 0) > 1 ? 's' : '' }}</mat-hint>
-            }
-          </mat-form-field>
-
-          @if (previewBaseUnits !== null) {
-            <div class="span2 conversion-preview">
-              <mat-icon>calculate</mat-icon>
-              <span>
-                <strong>{{ form.get('quantity_in_presentation')?.value }}</strong>
-                {{ selectedPresentation?.name }}
-                =
-                <strong class="base-qty">{{ previewBaseUnits }}</strong>
-                {{ selectedProduct?.base_unit?.abbreviation || 'unidades base' }} ingresarán al inventario
+        @for (ctrl of itemsArray.controls; track $index; let i = $index) {
+          <div class="item-card">
+            <div class="item-card-header">
+              <span class="item-num">
+                <mat-icon>arrow_right</mat-icon>
+                Producto {{ i + 1 }}
               </span>
+              <button mat-icon-button color="warn" type="button"
+                      (click)="removeItem(i)"
+                      [disabled]="itemsArray.length <= 1"
+                      matTooltip="Quitar producto">
+                <mat-icon>delete_outline</mat-icon>
+              </button>
             </div>
-          }
-        }
 
-      } <!-- /!useDistribution() -->
+            <div [formGroup]="asGroup(ctrl)" class="item-fields">
 
-      <!-- ── Modo MÚLTIPLES ubicaciones ── -->
-      @if (useDistribution()) {
+              <!-- Buscador de producto -->
+              <div class="span2">
+                <app-product-search
+                  label="Producto"
+                  [required]="true"
+                  [selectedProduct]="itemStates()[i]?.selectedProduct ?? null"
+                  (productSelected)="onItemProductSelected(i, $event)">
+                </app-product-search>
+              </div>
 
-        <div class="span2 dist-section" [formGroup]="distributionForm">
-          <div class="dist-section-header">
-            <div class="dist-section-title">
-              <mat-icon>call_split</mat-icon>
-              Distribución en ubicaciones
-            </div>
-            <button mat-stroked-button type="button" (click)="addEntryRow()">
-              <mat-icon>add</mat-icon> Agregar ubicación
-            </button>
-          </div>
+              <!-- Variante -->
+              @if (asGroup(ctrl).get('product_id')?.value) {
+                @if (itemStates()[i]?.loadingVariants) {
+                  <div class="span2 cap-loading">
+                    <mat-spinner diameter="14"></mat-spinner>
+                    <span>Cargando variantes...</span>
+                  </div>
+                } @else {
+                  <mat-form-field appearance="outline" class="span2">
+                    <mat-label>Marca / Variante *</mat-label>
+                    <mat-select formControlName="product_variant_id">
+                      @for (v of (itemStates()[i]?.variants ?? []); track v.id) {
+                        <mat-option [value]="v.id">
+                          {{ v.lab_brand || 'Sin marca' }}
+                          @if (v.brand_sku) { — {{ v.brand_sku }} }
+                        </mat-option>
+                      }
+                    </mat-select>
+                    @if (!(itemStates()[i]?.variants?.length)) {
+                      <mat-hint>Sin variantes activas. Cree una desde el catálogo.</mat-hint>
+                    }
+                  </mat-form-field>
+                }
 
-          <div formArrayName="entryRows" class="dist-rows-wrap">
-            @for (ctrl of entryRows.controls; track $index; let i = $index) {
-              <div class="dist-row" [formGroupName]="$index">
-                <!-- Ubicación -->
-                <mat-form-field appearance="outline" class="dist-loc-field">
-                  <mat-label>Ubicación {{ i + 1 }}</mat-label>
+                <!-- INVIMA compacto -->
+                @if (!itemStates()[i]?.loadingProductDetail) {
+                  @let pd = itemStates()[i]?.productDetail;
+                  @if (pd?.classification?.has_sanitary_registration) {
+                    <div class="span2 invima-compact"
+                         [class.invima-compact--ok]="itemHasActiveReg(i)"
+                         [class.invima-compact--warn]="!itemHasActiveReg(i)">
+                      <mat-icon>{{ itemHasActiveReg(i) ? 'verified_user' : 'warning' }}</mat-icon>
+                      <span>INVIMA: {{ itemHasActiveReg(i) ? 'Registro activo vigente' : 'Sin registro activo' }}</span>
+                    </div>
+                  }
+                }
+              }
+
+              <!-- N° Lote + Vencimiento -->
+              <mat-form-field appearance="outline">
+                <mat-label>N° de Lote *</mat-label>
+                <input matInput formControlName="lot_number" placeholder="LOT-2026-001" />
+              </mat-form-field>
+              <mat-form-field appearance="outline">
+                <mat-label>Fecha de Vencimiento *</mat-label>
+                <input matInput type="date" formControlName="expiration_date" />
+              </mat-form-field>
+              <mat-form-field appearance="outline" class="span2">
+                <mat-label>Fecha de Fabricación</mat-label>
+                <input matInput type="date" formControlName="manufacturing_date" />
+              </mat-form-field>
+
+              <!-- Ubicación dentro del almacén -->
+              @if (form.get('warehouse_id')?.value) {
+                <mat-form-field appearance="outline" class="span2">
+                  <mat-label>Ubicación *</mat-label>
                   <mat-select formControlName="location_id"
-                              (selectionChange)="onEntryRowLocChange(i, $event.value)">
+                              (selectionChange)="onItemLocationChange(i, $event.value)">
+                    <mat-option [value]="null">Sin ubicación específica</mat-option>
                     @for (l of locations(); track l.id) {
                       <mat-option [value]="l.id">{{ l.name }}</mat-option>
                     }
                   </mat-select>
                 </mat-form-field>
 
-                <!-- Cantidad (uds base) -->
-                <mat-form-field appearance="outline" class="dist-qty-field">
-                  <mat-label>Cant. ({{ selectedProduct?.base_unit?.abbreviation || 'uds' }})</mat-label>
-                  <input matInput type="number" formControlName="quantity_base" min="0.001" step="any" />
-                </mat-form-field>
-
-                <!-- Badge de capacidad -->
-                <div class="dist-cap-badge dist-cap-badge--{{ projStatus(entryRowCaps()[i], asGroup(ctrl).get('quantity_base')?.value ?? 0) }}">
-                  @if (entryRowCaps()[i] === null && asGroup(ctrl).get('location_id')?.value) {
-                    <mat-spinner diameter="12"></mat-spinner>
-                  } @else if (entryRowCaps()[i]) {
-                    @switch (projStatus(entryRowCaps()[i], asGroup(ctrl).get('quantity_base')?.value ?? 0)) {
-                      @case ('ok')     { <mat-icon class="badge-icon">check_circle</mat-icon> ok }
-                      @case ('warn')   { <mat-icon class="badge-icon">warning</mat-icon> ajustado }
-                      @case ('danger') { <mat-icon class="badge-icon">error</mat-icon> excede }
-                      @case ('nodims') { <mat-icon class="badge-icon">info</mat-icon> sin dims }
-                      @case ('nodata') { <mat-icon class="badge-icon">info</mat-icon> sin límite }
+                <!-- Panel de capacidad -->
+                @if (itemStates()[i]?.loadingLocCap) {
+                  <div class="span2 cap-loading">
+                    <mat-spinner diameter="14"></mat-spinner>
+                    <span>Verificando capacidad...</span>
+                  </div>
+                }
+                @if (!itemStates()[i]?.loadingLocCap && itemStates()[i]?.locCapacity; as cap) {
+                  <div class="span2 cap-panel" [class]="'cap-panel--' + itemProjStatus(i, cap, itemEffectiveBaseQty(i))">
+                    <div class="cap-panel-header">
+                      <mat-icon class="cap-icon">
+                        {{ itemProjStatus(i, cap, itemEffectiveBaseQty(i)) === 'danger' ? 'error' :
+                           itemProjStatus(i, cap, itemEffectiveBaseQty(i)) === 'warn'   ? 'warning' :
+                           itemProjStatus(i, cap, itemEffectiveBaseQty(i)) === 'ok'     ? 'check_circle' : 'info' }}
+                      </mat-icon>
+                      <strong>{{ cap.name }}</strong>
+                      <span class="cap-status-pill cap-pill--{{ itemProjStatus(i, cap, itemEffectiveBaseQty(i)) }}">
+                        @switch (itemProjStatus(i, cap, itemEffectiveBaseQty(i))) {
+                          @case ('ok')     { ✓ Sin problemas }
+                          @case ('warn')   { ⚠ Espacio ajustado }
+                          @case ('danger') { ✗ Excede capacidad }
+                          @case ('nodims') { — Sin dimensiones de producto }
+                          @case ('nodata') { — Sin capacidad configurada }
+                        }
+                      </span>
+                    </div>
+                    @if (cap.capacity_volume.max_cm3 !== null) {
+                      <div class="cap-row">
+                        <span class="cap-row-label">📦 Volumen</span>
+                        <div class="mini-bar">
+                          <div class="mini-bar__fill mini-bar__fill--{{ itemProjStatus(i, cap, itemEffectiveBaseQty(i)) }}"
+                               [style.width.%]="cap.capacity_volume.usage_pct ?? 0"></div>
+                        </div>
+                        <span class="cap-row-pct">{{ fmtPct(cap.capacity_volume.usage_pct) }}</span>
+                        <span class="cap-row-detail">libre: {{ _fmtVol(cap.capacity_volume.available_cm3) }}</span>
+                        @if (itemNeededVol(i, itemEffectiveBaseQty(i)); as nv) {
+                          <span class="cap-row-needed">→ usará {{ _fmtVol(nv) }}</span>
+                        }
+                      </div>
+                    } @else {
+                      <div class="cap-row">
+                        <span class="cap-row-label">📦 Volumen</span>
+                        <span class="cap-row-detail">Usando {{ _fmtVol(cap.capacity_volume.used_cm3) }} · sin límite</span>
+                      </div>
                     }
-                  } @else { — }
-                </div>
+                    @if (cap.capacity_weight.max_kg !== null) {
+                      <div class="cap-row">
+                        <span class="cap-row-label">⚖ Peso</span>
+                        <div class="mini-bar">
+                          <div class="mini-bar__fill mini-bar__fill--{{ itemProjStatus(i, cap, itemEffectiveBaseQty(i)) }}"
+                               [style.width.%]="cap.capacity_weight.usage_pct ?? 0"></div>
+                        </div>
+                        <span class="cap-row-pct">{{ fmtPct(cap.capacity_weight.usage_pct) }}</span>
+                        <span class="cap-row-detail">libre: {{ _fmtKg(cap.capacity_weight.available_kg) }}</span>
+                        @if (itemNeededWgt(i, itemEffectiveBaseQty(i)); as nw) {
+                          <span class="cap-row-needed">→ usará {{ _fmtKg(nw) }}</span>
+                        }
+                      </div>
+                    } @else {
+                      <div class="cap-row">
+                        <span class="cap-row-label">⚖ Peso</span>
+                        <span class="cap-row-detail">Usando {{ _fmtKg(cap.capacity_weight.used_kg) }} · sin límite</span>
+                      </div>
+                    }
+                  </div>
+                }
+              }
 
-                <!-- Eliminar fila -->
-                <button mat-icon-button color="warn" type="button"
-                        (click)="removeEntryRow(i)"
-                        [disabled]="entryRows.length <= 1"
-                        matTooltip="Quitar fila">
-                  <mat-icon>remove_circle_outline</mat-icon>
+              <!-- Modo de ingreso: unidad base vs presentación -->
+              <div class="span2 mode-toggle">
+                <label>Modo de ingreso:</label>
+                <button mat-stroked-button type="button"
+                        [class.active]="!itemStates()[i]?.usePresentationMode"
+                        (click)="toggleItemPresentationMode(i, false)">
+                  Unidad base directa
+                </button>
+                <button mat-stroked-button type="button"
+                        [class.active]="itemStates()[i]?.usePresentationMode"
+                        (click)="toggleItemPresentationMode(i, true)"
+                        [disabled]="!(itemStates()[i]?.presentations?.length)"
+                        [matTooltip]="!(itemStates()[i]?.presentations?.length) ? 'Sin presentaciones configuradas.' : 'Ingresar por empaque'">
+                  Por empaque / presentación
                 </button>
               </div>
-            }
-          </div>
 
-          <!-- Total -->
-          <div class="dist-total" [class.dist-total--ok]="entryDistTotal > 0">
-            Total asignado: <strong>{{ entryDistTotal }}</strong>
-            {{ selectedProduct?.base_unit?.abbreviation || 'uds base' }}
-            en {{ entryRows.length }} ubicación{{ entryRows.length !== 1 ? 'es' : '' }}
-          </div>
-        </div>
+              @if (!itemStates()[i]?.usePresentationMode) {
+                <mat-form-field appearance="outline" class="span2">
+                  <mat-label>Cantidad en {{ itemStates()[i]?.selectedProduct?.base_unit?.abbreviation || 'unidad base' }} *</mat-label>
+                  <input matInput type="number" formControlName="quantity_base" min="0.001" step="any" />
+                </mat-form-field>
+              }
 
-      } <!-- /useDistribution() entry -->
+              @if (itemStates()[i]?.usePresentationMode) {
+                <mat-form-field appearance="outline">
+                  <mat-label>Presentación / empaque *</mat-label>
+                  <mat-select formControlName="product_presentation_id">
+                    @for (pr of (itemStates()[i]?.presentations ?? []); track pr.id) {
+                      <mat-option [value]="pr.id">
+                        {{ pr.name }}
+                        <span style="color:#718096;font-size:0.85em"> — 1 und = {{ pr.factor_to_base }} {{ itemStates()[i]?.selectedProduct?.base_unit?.abbreviation || 'base' }}</span>
+                      </mat-option>
+                    }
+                  </mat-select>
+                  @if (itemSelectedPresentation(i)) {
+                    <mat-hint>1 {{ itemSelectedPresentation(i)!.name }} = <strong>{{ itemSelectedPresentation(i)!.factor_to_base }}</strong> {{ itemStates()[i]?.selectedProduct?.base_unit?.abbreviation || 'uds.' }}</mat-hint>
+                  }
+                </mat-form-field>
+                <mat-form-field appearance="outline">
+                  <mat-label>Cantidad de empaques *</mat-label>
+                  <input matInput type="number" formControlName="quantity_in_presentation" min="0.001" step="any" />
+                </mat-form-field>
+                @if (itemPreviewBaseUnits(i); as preview) {
+                  <div class="span2 conversion-preview">
+                    <mat-icon>calculate</mat-icon>
+                    <span>
+                      <strong>{{ asGroup(ctrl).get('quantity_in_presentation')?.value }}</strong>
+                      {{ itemSelectedPresentation(i)?.name }}
+                      = <strong class="base-qty">{{ preview }}</strong>
+                      {{ itemStates()[i]?.selectedProduct?.base_unit?.abbreviation || 'unidades base' }} ingresarán al inventario
+                    </span>
+                  </div>
+                }
+              }
 
-      <!-- Notas -->
-      <mat-form-field appearance="outline" class="span2">
-        <mat-label>Notas</mat-label>
-        <textarea matInput formControlName="notes" rows="2"></textarea>
-      </mat-form-field>
+              <!-- Notas del ítem -->
+              <mat-form-field appearance="outline" class="span2">
+                <mat-label>Notas del ítem</mat-label>
+                <textarea matInput formControlName="notes" rows="1"
+                          placeholder="Observación específica de este producto"></textarea>
+              </mat-form-field>
+
+            </div><!-- /item-fields -->
+          </div><!-- /item-card -->
+        }
+
+      </div><!-- /items-section -->
 
     } <!-- /isEntry -->
 
@@ -731,6 +641,30 @@
         <mat-hint>El backend ajusta el lote correspondiente a esta ubicación</mat-hint>
       </mat-form-field>
 
+      <!-- Lote específico (opcional) -->
+      @if (loadingAdjReturnBatches()) {
+        <div class="span2 fefo-loading">
+          <mat-spinner diameter="14"></mat-spinner>
+          <span>Cargando lotes disponibles...</span>
+        </div>
+      }
+      @if (!loadingAdjReturnBatches() && adjReturnBatches().length > 0) {
+        <mat-form-field appearance="outline" class="span2">
+          <mat-label>Lote específico (opcional)</mat-label>
+          <mat-select formControlName="batch_id">
+            <mat-option [value]="null">Sin especificar — FEFO automático</mat-option>
+            @for (b of adjReturnBatches(); track b.id) {
+              <mat-option [value]="b.id">
+                {{ b.lot_number }}
+                @if (b.expiration_date) { · vence {{ b.expiration_date }} }
+                · {{ b.quantity_available }} disp.
+              </mat-option>
+            }
+          </mat-select>
+          <mat-hint>Si no se elige, el backend selecciona el lote por FEFO</mat-hint>
+        </mat-form-field>
+      }
+
       <!-- Indicador de signo -->
       <div class="span2 adj-hint">
         <mat-icon>info</mat-icon>
@@ -925,6 +859,32 @@
                 <mat-hint>ID del paciente en el HIS/EMR</mat-hint>
               </mat-form-field>
             </div>
+          }
+        }
+
+        <!-- Lote específico (solo Devolución — opcional) -->
+        @if (isReturn) {
+          @if (loadingAdjReturnBatches()) {
+            <div class="span2 fefo-loading">
+              <mat-spinner diameter="14"></mat-spinner>
+              <span>Cargando lotes disponibles...</span>
+            </div>
+          }
+          @if (!loadingAdjReturnBatches() && adjReturnBatches().length > 0) {
+            <mat-form-field appearance="outline" class="span2">
+              <mat-label>Lote específico (opcional)</mat-label>
+              <mat-select formControlName="batch_id">
+                <mat-option [value]="null">Sin especificar — FEFO automático</mat-option>
+                @for (b of adjReturnBatches(); track b.id) {
+                  <mat-option [value]="b.id">
+                    {{ b.lot_number }}
+                    @if (b.expiration_date) { · vence {{ b.expiration_date }} }
+                    · {{ b.quantity_available }} disp.
+                  </mat-option>
+                }
+              </mat-select>
+              <mat-hint>Si no se elige, el backend selecciona el lote por FEFO</mat-hint>
+            </mat-form-field>
           }
         }
 

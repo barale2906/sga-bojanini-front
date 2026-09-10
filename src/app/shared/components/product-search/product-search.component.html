@@ -5,7 +5,7 @@
     {{ showClear() ? 'inventory_2' : 'search' }}
   </mat-icon>
 
-  <input matInput
+  <input matInput #searchInput
          [formControl]="searchCtrl"
          [matAutocomplete]="productAuto"
          placeholder="Nombre, código o SKU..."

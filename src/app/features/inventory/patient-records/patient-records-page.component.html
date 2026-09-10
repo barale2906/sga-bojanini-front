@@ -128,18 +128,72 @@
           <th mat-header-cell *matHeaderCellDef>Paciente</th>
           <td mat-cell *matCellDef="let r">
             <div class="patient-cell">
+
               @if (r.patient_first_name || r.patient_last_name) {
-                <span class="patient-name">{{ r.patient_first_name }} {{ r.patient_last_name }}</span>
-              }
-              <span class="patient-doc">
-                <mat-icon class="patient-icon">badge</mat-icon>
-                {{ r.patient_document }}
-              </span>
-              @if (r.patient_external_id) {
-                <span class="patient-ext" [matTooltip]="'ID Clínico: ' + r.patient_external_id">
-                  {{ r.patient_external_id }}
+                <span class="copy-row">
+                  <span class="patient-name">{{ r.patient_first_name }} {{ r.patient_last_name }}</span>
+                  <button type="button" class="copy-btn"
+                          matTooltip="Copiar nombre"
+                          (click)="copy((r.patient_first_name || '') + ' ' + (r.patient_last_name || ''))">
+                    <mat-icon>content_copy</mat-icon>
+                  </button>
                 </span>
               }
+
+              <span class="copy-row">
+                <span class="patient-doc">
+                  <mat-icon class="patient-icon">badge</mat-icon>
+                  {{ r.patient_document }}
+                </span>
+                <button type="button" class="copy-btn"
+                        matTooltip="Copiar cédula"
+                        (click)="copy(r.patient_document)">
+                  <mat-icon>content_copy</mat-icon>
+                </button>
+              </span>
+
+              @if (r.patient_address) {
+                <span class="copy-row">
+                  <span class="patient-contact">
+                    <mat-icon class="patient-icon">home</mat-icon>
+                    {{ r.patient_address }}
+                  </span>
+                  <button type="button" class="copy-btn"
+                          matTooltip="Copiar dirección"
+                          (click)="copy(r.patient_address)">
+                    <mat-icon>content_copy</mat-icon>
+                  </button>
+                </span>
+              }
+
+              @if (r.patient_email) {
+                <span class="copy-row">
+                  <span class="patient-contact">
+                    <mat-icon class="patient-icon">email</mat-icon>
+                    {{ r.patient_email }}
+                  </span>
+                  <button type="button" class="copy-btn"
+                          matTooltip="Copiar correo"
+                          (click)="copy(r.patient_email)">
+                    <mat-icon>content_copy</mat-icon>
+                  </button>
+                </span>
+              }
+
+              @if (r.patient_phone) {
+                <span class="copy-row">
+                  <span class="patient-contact">
+                    <mat-icon class="patient-icon">phone</mat-icon>
+                    {{ r.patient_phone }}
+                  </span>
+                  <button type="button" class="copy-btn"
+                          matTooltip="Copiar teléfono"
+                          (click)="copy(r.patient_phone)">
+                    <mat-icon>content_copy</mat-icon>
+                  </button>
+                </span>
+              }
+
             </div>
           </td>
         </ng-container>
@@ -150,15 +204,29 @@
           <td mat-cell *matCellDef="let r">
             <div class="seller-cell">
               @if (r.seller) {
-                <span class="seller-row">
-                  <mat-icon class="seller-icon">sell</mat-icon>
-                  {{ r.seller }}
+                <span class="copy-row">
+                  <span class="seller-row">
+                    <mat-icon class="seller-icon">sell</mat-icon>
+                    {{ r.seller }}
+                  </span>
+                  <button type="button" class="copy-btn"
+                          matTooltip="Copiar vendedor"
+                          (click)="copy(r.seller)">
+                    <mat-icon>content_copy</mat-icon>
+                  </button>
                 </span>
               }
               @if (r.referrer) {
-                <span class="seller-row">
-                  <mat-icon class="seller-icon">medical_information</mat-icon>
-                  {{ r.referrer }}
+                <span class="copy-row">
+                  <span class="seller-row">
+                    <mat-icon class="seller-icon">medical_information</mat-icon>
+                    {{ r.referrer }}
+                  </span>
+                  <button type="button" class="copy-btn"
+                          matTooltip="Copiar remitente"
+                          (click)="copy(r.referrer)">
+                    <mat-icon>content_copy</mat-icon>
+                  </button>
                 </span>
               }
               @if (!r.seller && !r.referrer) {
@@ -189,6 +257,50 @@
           <th mat-header-cell *matHeaderCellDef>Total</th>
           <td mat-cell *matCellDef="let r">
             <strong class="total-cell">{{ r.total | currency:'COP':'symbol':'1.0-0' }}</strong>
+          </td>
+        </ng-container>
+
+        <!-- Descuento -->
+        <ng-container matColumnDef="discount">
+          <th mat-header-cell *matHeaderCellDef>Descuento</th>
+          <td mat-cell *matCellDef="let r">
+            @if (r.discount_type && r.discount_amount) {
+              <span class="discount-cell">
+                @if (r.discount_type === 'percentage') {
+                  {{ r.discount_value }}%
+                } @else {
+                  {{ r.discount_amount | currency:'COP':'symbol':'1.0-0' }}
+                }
+              </span>
+            } @else {
+              <span class="col-dash">—</span>
+            }
+          </td>
+        </ng-container>
+
+        <!-- Neto a pagar -->
+        <ng-container matColumnDef="net_total">
+          <th mat-header-cell *matHeaderCellDef>Neto</th>
+          <td mat-cell *matCellDef="let r">
+            @if (r.net_total != null) {
+              <strong class="net-total-cell">{{ r.net_total | currency:'COP':'symbol':'1.0-0' }}</strong>
+            } @else {
+              <span class="col-dash">—</span>
+            }
+          </td>
+        </ng-container>
+
+        <!-- Estado descuento -->
+        <ng-container matColumnDef="discount_status">
+          <th mat-header-cell *matHeaderCellDef>Est. Descuento</th>
+          <td mat-cell *matCellDef="let r">
+            @if (r.discount_status === 'pending') {
+              <span class="badge badge--warn">Pendiente</span>
+            } @else if (r.discount_status === 'approved') {
+              <span class="badge badge--ok">Aprobado</span>
+            } @else {
+              <span class="col-dash">—</span>
+            }
           </td>
         </ng-container>
 
