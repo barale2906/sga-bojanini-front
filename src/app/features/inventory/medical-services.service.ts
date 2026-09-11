@@ -85,12 +85,24 @@ export interface PatientProcedureRecord {
   net_total?: number | null;
   discount_status?: 'pending' | 'approved' | null;
   order_number?: string | null;
+  billing_status?: 'billed' | 'cancelled' | null;
+  billed_by_user_id?: number | null;
+  billed_at?: string | null;
   service_date: string;
   notes: string | null;
   seller?: string | null;
   referrer?: string | null;
   is_active: boolean;
   created_at?: string;
+}
+
+export interface ServiceOrderBillingResult {
+  order_number: string;
+  billing_status: 'billed' | 'cancelled' | null;
+  order_status: string;
+  total_amount: number;
+  total_discount: number;
+  net_total: number;
 }
 
 export interface PatientProcedureRecordPayload {
@@ -257,6 +269,7 @@ export class MedicalServicesService {
     seller?: string;
     referrer?: string;
     is_active?: boolean;
+    billing_status?: 'billed' | 'cancelled' | 'null' | null;
     per_page?: number;
     page?: number;
   } = {}): Observable<PaginatedResponse<PatientProcedureRecord>> {
@@ -269,6 +282,8 @@ export class MedicalServicesService {
     if (filter.seller)              params = params.set('seller',              filter.seller);
     if (filter.referrer)            params = params.set('referrer',            filter.referrer);
     if (filter.is_active !== undefined) params = params.set('is_active', String(filter.is_active));
+    if (filter.billing_status !== undefined && filter.billing_status !== null)
+      params = params.set('billing_status', filter.billing_status);
     if (filter.per_page)            params = params.set('per_page',            String(filter.per_page));
     if (filter.page)                params = params.set('page',                String(filter.page));
     return this.http.get<PaginatedResponse<PatientProcedureRecord>>(`${this.api}/patient-procedure-records`, { params });
@@ -288,6 +303,14 @@ export class MedicalServicesService {
 
   deletePatientProcedureRecord(id: number): Observable<ApiResponse<void>> {
     return this.http.delete<ApiResponse<void>>(`${this.api}/patient-procedure-records/${id}`);
+  }
+
+  billServiceOrder(orderNumber: string): Observable<ApiResponse<ServiceOrderBillingResult>> {
+    return this.http.post<ApiResponse<ServiceOrderBillingResult>>(`${this.api}/service-orders/${encodeURIComponent(orderNumber)}/bill`, {});
+  }
+
+  cancelServiceOrder(orderNumber: string): Observable<ApiResponse<ServiceOrderBillingResult>> {
+    return this.http.post<ApiResponse<ServiceOrderBillingResult>>(`${this.api}/service-orders/${encodeURIComponent(orderNumber)}/cancel`, {});
   }
 
   // ── Plantillas de evolución clínica ─────────────────────────

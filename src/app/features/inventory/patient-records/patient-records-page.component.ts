@@ -13,6 +13,7 @@ import { MatSelectModule } from '@angular/material/select';
 import { MatChipsModule } from '@angular/material/chips';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { MatDatepickerModule } from '@angular/material/datepicker';
+import { MatTabsModule } from '@angular/material/tabs';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { MatDialog } from '@angular/material/dialog';
 import { DateAdapter, MAT_DATE_FORMATS } from '@angular/material/core';
@@ -29,6 +30,8 @@ import { PermissionDirective } from '../../../shared/directives/permission.direc
 import { ConfirmDialogComponent } from '../../../shared/components/confirm-dialog/confirm-dialog.component';
 import { EsDateAdapter, ES_DATE_FORMATS } from '../../../shared/adapters/es-date.adapter';
 
+type BillingTab = 'pending' | 'billed' | 'cancelled' | 'all';
+
 @Component({
   selector: 'app-patient-records-page',
   standalone: true,
@@ -40,7 +43,7 @@ import { EsDateAdapter, ES_DATE_FORMATS } from '../../../shared/adapters/es-date
     CommonModule, ReactiveFormsModule,
     MatTableModule, MatPaginatorModule, MatButtonModule, MatIconModule,
     MatFormFieldModule, MatInputModule, MatSelectModule,
-    MatChipsModule, MatTooltipModule, MatDatepickerModule,
+    MatChipsModule, MatTooltipModule, MatDatepickerModule, MatTabsModule,
     PageHeaderComponent, LoadingSpinnerComponent, PermissionDirective,
   ],
   templateUrl: './patient-records-page.component.html',
@@ -58,8 +61,17 @@ export class PatientRecordsPageComponent implements OnInit {
   meta        = signal<PaginationMeta>({ current_page: 1, last_page: 1, per_page: 25, total: 0 });
   loading     = signal(false);
   procedures  = signal<MedicalServiceNode[]>([]);
+  activeTab   = signal<BillingTab>('pending');
+  actionLoading = signal<string | null>(null);
 
-  cols = ['actions', 'procedure', 'patient', 'seller_referrer', 'quantity', 'unit_price', 'total', 'discount', 'net_total', 'discount_status', 'service_date'];
+  readonly tabs: { value: BillingTab; label: string; icon: string }[] = [
+    { value: 'pending',   label: 'Pendientes',  icon: 'pending_actions' },
+    { value: 'billed',    label: 'Facturadas',  icon: 'check_circle' },
+    { value: 'cancelled', label: 'Anuladas',    icon: 'cancel' },
+    { value: 'all',       label: 'Todas',       icon: 'list' },
+  ];
+
+  cols = ['actions', 'service_date', 'discount_status', 'procedure', 'patient', 'seller_referrer', 'quantity', 'unit_price', 'total', 'discount', 'net_total'];
 
   filters = this.fb.group({
     patient_document:    [''],
@@ -81,6 +93,19 @@ export class PatientRecordsPageComponent implements OnInit {
     this.filters.valueChanges.pipe(debounceTime(300)).subscribe(() => this.loadRecords(1));
   }
 
+  setTab(tab: BillingTab): void {
+    this.activeTab.set(tab);
+    this.loadRecords(1);
+  }
+
+  private _billingStatusParam(): 'billed' | 'cancelled' | 'null' | undefined {
+    const tab = this.activeTab();
+    if (tab === 'pending')   return 'null';
+    if (tab === 'billed')    return 'billed';
+    if (tab === 'cancelled') return 'cancelled';
+    return undefined;
+  }
+
   loadRecords(page = 1): void {
     const { patient_document, patient_external_id, medical_service_id, seller, referrer, service_date_from, service_date_to } = this.filters.value;
     this.loading.set(true);
@@ -92,6 +117,7 @@ export class PatientRecordsPageComponent implements OnInit {
       referrer:            referrer            || undefined,
       service_date_from:   service_date_from   ? this._toApiDate(service_date_from) : undefined,
       service_date_to:     service_date_to     ? this._toApiDate(service_date_to)   : undefined,
+      billing_status:      this._billingStatusParam(),
       page,
       per_page: this.meta().per_page,
     }).subscribe({
@@ -144,6 +170,50 @@ export class PatientRecordsPageComponent implements OnInit {
         },
         error: err => {
           this.snack.open(err.error?.message || 'No se pudo eliminar el registro', 'OK', { duration: 4000 });
+        },
+      });
+    });
+  }
+
+  billOrder(record: PatientProcedureRecord): void {
+    if (!record.order_number) return;
+    this.actionLoading.set(record.order_number);
+    this.svc.billServiceOrder(record.order_number).subscribe({
+      next: () => {
+        this.actionLoading.set(null);
+        this.snack.open('Orden marcada como facturada', 'OK', { duration: 3000 });
+        this.loadRecords();
+      },
+      error: err => {
+        this.actionLoading.set(null);
+        this.snack.open(err?.error?.message || 'No se pudo facturar la orden', 'OK', { duration: 4000 });
+      },
+    });
+  }
+
+  cancelOrder(record: PatientProcedureRecord): void {
+    if (!record.order_number) return;
+    const orderNum = record.order_number;
+    this.dialog.open(ConfirmDialogComponent, {
+      data: {
+        title: 'Anular orden de servicio',
+        message: `¿Anular la orden ${orderNum}? Esta acción no es reversible.`,
+        confirmColor: 'warn',
+        confirmText: 'Anular',
+      },
+      width: '460px',
+    }).afterClosed().subscribe(ok => {
+      if (!ok) return;
+      this.actionLoading.set(orderNum);
+      this.svc.cancelServiceOrder(orderNum).subscribe({
+        next: () => {
+          this.actionLoading.set(null);
+          this.snack.open('Orden anulada', 'OK', { duration: 3000 });
+          this.loadRecords();
+        },
+        error: err => {
+          this.actionLoading.set(null);
+          this.snack.open(err?.error?.message || 'No se pudo anular la orden', 'OK', { duration: 4000 });
         },
       });
     });

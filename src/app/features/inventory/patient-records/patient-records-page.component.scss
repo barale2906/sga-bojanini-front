@@ -1,3 +1,27 @@
+// ── Billing tabs ──────────────────────────────────────────────
+.billing-tabs {
+  display: flex; gap: 0.5rem; flex-wrap: wrap;
+  margin-bottom: 1rem;
+}
+
+.billing-tab {
+  display: inline-flex; align-items: center; gap: 0.35rem;
+  padding: 0.4rem 1rem; border-radius: 9999px;
+  font-size: 0.82rem; font-weight: 600;
+  border: 1.5px solid #e2e8f0;
+  background: white; color: #718096; cursor: pointer;
+  transition: all 0.15s;
+
+  mat-icon { font-size: 1rem; height: 1rem; width: 1rem; }
+
+  &:hover { background: #f7fafc; border-color: #cbd5e0; }
+
+  &--pending   { background: #f7fafc;   border-color: #a0aec0; color: #4a5568; }
+  &--billed    { background: #c6f6d5;   border-color: #38a169; color: #276749; }
+  &--cancelled { background: #fed7d7;   border-color: #e53e3e; color: #9b2c2c; }
+  &--all       { background: #e9d8fd;   border-color: #805ad5; color: #553c9a; }
+}
+
 // ── Filters card ─────────────────────────────────────────────
 .filters-card {
   background: white; border: 1px solid #e2e8f0; border-radius: 12px;
@@ -115,7 +139,7 @@
 .total-cell { color: #276749; font-size: 0.92rem; }
 
 .actions-cell {
-  display: flex; align-items: center; gap: 0.25rem; justify-content: flex-end;
+  display: flex; align-items: center; gap: 0.25rem;
 }
 
 .status-badge {
@@ -162,6 +186,9 @@
   font-size: 0.72rem; font-weight: 700;
   padding: 0.15rem 0.55rem; border-radius: 9999px;
 
-  &--warn { background: rgba(255,152,0,.15); color: #e65100; }
-  &--ok   { background: rgba(76,175,80,.15); color: #2e7d32; }
+  &--warn      { background: rgba(255,152,0,.15); color: #e65100; }
+  &--ok        { background: rgba(76,175,80,.15);  color: #2e7d32; }
+  &--pending   { background: #edf2f7; color: #718096; }
+  &--billed    { background: #c6f6d5; color: #276749; }
+  &--cancelled { background: #fed7d7; color: #9b2c2c; }
 }

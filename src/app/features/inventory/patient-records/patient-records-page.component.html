@@ -8,6 +8,22 @@
   </button>
 </app-page-header>
 
+<!-- ── Tabs de estado ─────────────────────────────────────── -->
+<div class="billing-tabs">
+  @for (tab of tabs; track tab.value) {
+    <button class="billing-tab"
+            [class.billing-tab--active]="activeTab() === tab.value"
+            [class.billing-tab--pending]="tab.value === 'pending' && activeTab() === tab.value"
+            [class.billing-tab--billed]="tab.value === 'billed' && activeTab() === tab.value"
+            [class.billing-tab--cancelled]="tab.value === 'cancelled' && activeTab() === tab.value"
+            [class.billing-tab--all]="tab.value === 'all' && activeTab() === tab.value"
+            (click)="setTab(tab.value)">
+      <mat-icon>{{ tab.icon }}</mat-icon>
+      {{ tab.label }}
+    </button>
+  }
+</div>
+
 <!-- ── Filtros ───────────────────────────────────────────── -->
 <div class="filters-card" [formGroup]="filters">
 
@@ -317,17 +333,36 @@
           <th mat-header-cell *matHeaderCellDef class="act"></th>
           <td mat-cell *matCellDef="let r" class="act">
             <div class="actions-cell">
-              <span [class.badge--on]="r.is_active" [class.badge--gray]="!r.is_active"
-                    class="badge status-badge">
-                {{ r.is_active ? 'Activo' : 'Inactivo' }}
-              </span>
-              <span *sgaPermission="'registros_procedimientos.eliminar'">
-                <button mat-icon-button color="warn"
-                        matTooltip="Eliminar registro"
-                        (click)="delete(r)">
-                  <mat-icon>delete_outline</mat-icon>
+
+              <!-- Badge billing status -->
+              @if (r.billing_status === 'billed') {
+                <span class="badge badge--billed">Facturada</span>
+              } @else if (r.billing_status === 'cancelled') {
+                <span class="badge badge--cancelled">Anulada</span>
+              } @else {
+                <span class="badge badge--pending">Pendiente</span>
+              }
+
+              <!-- Botón Facturar (solo para pendientes) -->
+              @if (!r.billing_status) {
+                <button mat-icon-button color="primary"
+                        matTooltip="Marcar como facturada"
+                        [disabled]="actionLoading() === r.order_number"
+                        (click)="billOrder(r)">
+                  <mat-icon>check_circle_outline</mat-icon>
                 </button>
-              </span>
+              }
+
+              <!-- Botón Anular (para pendientes y facturadas) -->
+              @if (r.billing_status !== 'cancelled') {
+                <button mat-icon-button color="warn"
+                        matTooltip="Anular orden"
+                        [disabled]="actionLoading() === r.order_number"
+                        (click)="cancelOrder(r)">
+                  <mat-icon>cancel</mat-icon>
+                </button>
+              }
+
             </div>
           </td>
         </ng-container>
