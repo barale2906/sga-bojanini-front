@@ -1,5 +1,14 @@
 .detail-content { max-height: 82vh; overflow-y: auto; padding: 1rem 1.5rem; }
 
+mat-divider { --mdc-divider-color: #cbd5e0; }
+
+/* Encabezados de tabla — neutralizar color del tema */
+.items-table ::ng-deep .mat-mdc-header-cell,
+.payments-table ::ng-deep .mat-mdc-header-cell {
+  background: #4a5568;
+  color: #fff;
+}
+
 /* Tabs */
 .og-title { display: flex; align-items: center; gap: 0.4rem; flex-wrap: wrap; }
 .og-tabs { margin-top: 0; }

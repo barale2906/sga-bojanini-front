@@ -22,7 +22,7 @@ export class ExpenseOrderPdfService {
         <div style="font-size:11px; color:#718096; margin-top:2px;">Sistema de Gestión Administrativa</div>
       </td>
       <td style="text-align:right; vertical-align:top;">
-        <div style="display:inline-block; background:#9F7AEA; color:#fff; padding:6px 16px; border-radius:6px;">
+        <div style="display:inline-block; background:#718096; color:#fff; padding:6px 16px; border-radius:6px;">
           <div style="font-size:9px; font-weight:700; letter-spacing:1.5px; text-transform:uppercase;">Orden de Gasto</div>
           <div style="font-size:18px; font-weight:800; font-family:monospace;">${o.code}</div>
         </div>
@@ -30,7 +30,7 @@ export class ExpenseOrderPdfService {
     </tr>
   </table>
 
-  <hr style="border:none; border-top:2px solid #9F7AEA; margin-bottom:20px;" />
+  <hr style="border:none; border-top:2px solid #cbd5e0; margin-bottom:20px;" />
 
   <!-- Info de la orden -->
   <table style="width:100%; border-collapse:collapse; margin-bottom:20px; font-size:11px;">
@@ -55,7 +55,7 @@ export class ExpenseOrderPdfService {
 
   <!-- Tabla de ítems -->
   <div style="margin-bottom:20px;">
-    <div style="background:#553C9A; color:#fff; padding:6px 10px; border-radius:6px 6px 0 0; font-size:11px; font-weight:700; letter-spacing:0.5px; text-transform:uppercase;">
+    <div style="background:#4a5568; color:#fff; padding:6px 10px; border-radius:6px 6px 0 0; font-size:11px; font-weight:700; letter-spacing:0.5px; text-transform:uppercase;">
       Detalle de Ítems
     </div>
     <table style="width:100%; border-collapse:collapse; font-size:10.5px;">
@@ -87,8 +87,8 @@ export class ExpenseOrderPdfService {
           ${this.totalRow('Subtotal', this.formatCurrency(Number(o.subtotal)))}
           ${this.taxByRateRows(o.items ?? [])}
           <tr>
-            <td style="padding:6px 10px; font-weight:700; font-size:13px; background:#553C9A; color:#fff; border-radius:0 0 0 6px;">TOTAL</td>
-            <td style="padding:6px 10px; font-weight:700; font-size:13px; background:#553C9A; color:#fff; text-align:right; border-radius:0 0 6px 0;">${this.formatCurrency(Number(o.total_amount))}</td>
+            <td style="padding:6px 10px; font-weight:700; font-size:13px; background:#4a5568; color:#fff; border-radius:0 0 0 6px;">TOTAL</td>
+            <td style="padding:6px 10px; font-weight:700; font-size:13px; background:#4a5568; color:#fff; text-align:right; border-radius:0 0 6px 0;">${this.formatCurrency(Number(o.total_amount))}</td>
           </tr>
         </table>
       </td>
