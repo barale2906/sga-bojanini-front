@@ -7,7 +7,7 @@ import { ApiResponse } from '../../core/models/api-response.model';
 import { User } from '../../core/models/user.model';
 
 export interface Sensor {
-  id: number; zone_id: number; code: string; name: string;
+  id: number; zone_id: number; name: string;
   type: 'temperature' | 'humidity' | 'pressure'; unit: string; is_active: boolean;
   zone?: { id: number; name: string };
 }

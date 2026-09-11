@@ -1,13 +1,13 @@
 import { Injectable, inject } from '@angular/core';
 import { HttpClient, HttpParams } from '@angular/common/http';
-import { Observable } from 'rxjs';
+import { Observable, forkJoin } from 'rxjs';
+import { map } from 'rxjs/operators';
 import { environment } from '../../../environments/environment';
 import { ApiResponse } from '../../core/models/api-response.model';
 
 export interface Warehouse {
   id: number;
   name: string;
-  code: string;
   address: string | null;
   description: string | null;
   is_active: boolean;
@@ -17,7 +17,6 @@ export interface Zone {
   id: number;
   warehouse_id: number;
   name: string;
-  code: string;
   type: 'ambient' | 'cold' | 'frozen' | 'controlled';
   temp_min: number | null;
   temp_max: number | null;
@@ -31,11 +30,44 @@ export interface Location {
   id: number;
   zone_id: number;
   name: string;
-  code: string;
   volume_cm3: number | null;
   max_weight_kg: number | null;
   description: string | null;
   is_active: boolean;
+}
+
+// ── Estructura unificada (zonas + ubicaciones anidadas) ───────
+
+export interface ZoneDetail extends Zone {
+  locations: Location[];
+}
+
+export interface WarehouseDetail extends Warehouse {
+  zones: ZoneDetail[];
+}
+
+export interface WarehouseFormPayload {
+  name: string;
+  address?: string | null;
+  description?: string | null;
+  is_active?: boolean;
+  zones: {
+    id?: number;
+    name: string;
+    type: 'ambient' | 'cold' | 'frozen' | 'controlled';
+    temp_min?: number | null;
+    temp_max?: number | null;
+    humidity_min?: number | null;
+    humidity_max?: number | null;
+    description?: string | null;
+    locations: {
+      id?: number;
+      name: string;
+      volume_cm3?: number | null;
+      max_weight_kg?: number | null;
+      description?: string | null;
+    }[];
+  }[];
 }
 
 // ── Capacidad física ──────────────────────────────────────────
@@ -160,6 +192,32 @@ export class WarehouseService {
 
   deleteLocation(id: number): Observable<ApiResponse<null>> {
     return this.http.delete<ApiResponse<null>>(`${this.api}/locations/${id}`);
+  }
+
+  // ── Carga unificada de almacén con zonas y ubicaciones ───────
+
+  getWarehouseDetail(id: number): Observable<WarehouseDetail> {
+    return forkJoin({
+      wh: this.getWarehouse(id),
+      zones: this.getWarehouseZones(id),
+      locations: this.getWarehouseLocations(id),
+    }).pipe(
+      map(({ wh, zones, locations }) => ({
+        ...(wh.data!),
+        zones: (zones.data ?? []).map(z => ({
+          ...z,
+          locations: (locations.data ?? []).filter(l => l.zone_id === z.id),
+        })),
+      }))
+    );
+  }
+
+  createWarehouseWithZones(payload: WarehouseFormPayload): Observable<ApiResponse<WarehouseDetail>> {
+    return this.http.post<ApiResponse<WarehouseDetail>>(`${this.api}/warehouses`, payload);
+  }
+
+  updateWarehouseWithZones(id: number, payload: WarehouseFormPayload): Observable<ApiResponse<WarehouseDetail>> {
+    return this.http.put<ApiResponse<WarehouseDetail>>(`${this.api}/warehouses/${id}`, payload);
   }
 
   // ── Capacidad física ──────────────────────────────────────────

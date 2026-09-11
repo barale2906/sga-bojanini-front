@@ -1,0 +1,354 @@
+<!-- ── Breadcrumb / navegación ───────────────────────────────── -->
+<div class="dfw-breadcrumb">
+  <button mat-icon-button (click)="back.emit()" matTooltip="Volver a la lista">
+    <mat-icon>arrow_back</mat-icon>
+  </button>
+  <span class="dfw-breadcrumb__trail">
+    <span class="dfw-breadcrumb__parent" (click)="back.emit()">Almacenes</span>
+    <mat-icon class="dfw-breadcrumb__sep">chevron_right</mat-icon>
+    <span class="dfw-breadcrumb__current">
+      {{ warehouse()?.name || (loading() ? '…' : 'Nuevo Almacén') }}
+    </span>
+  </span>
+</div>
+
+<app-loading-spinner [loading]="loading()" [inline]="true"></app-loading-spinner>
+
+@if (!loading()) {
+  <form [formGroup]="form" class="dfw-form" (ngSubmit)="save()">
+
+    <!-- ── Errores globales ────────────────────────────────────── -->
+    <app-form-errors [errors]="errors()"></app-form-errors>
+
+    <!-- ── Fila superior: datos + capacidad ──────────────────── -->
+    <div class="dfw-top-grid">
+
+      <!-- Datos del almacén -->
+      <section class="dfw-section dfw-section--data">
+        <h3 class="dfw-section__title">
+          <mat-icon>warehouse</mat-icon> Datos del Almacén
+        </h3>
+
+        <mat-form-field appearance="outline" class="dfw-field dfw-field--full">
+          <mat-label>Nombre *</mat-label>
+          <input matInput formControlName="name" />
+          @if (form.get('name')?.hasError('required') && form.get('name')?.touched) {
+            <mat-error>Requerido</mat-error>
+          }
+        </mat-form-field>
+
+        <mat-form-field appearance="outline" class="dfw-field dfw-field--full">
+          <mat-label>Dirección</mat-label>
+          <input matInput formControlName="address" />
+        </mat-form-field>
+
+        <mat-form-field appearance="outline" class="dfw-field dfw-field--full">
+          <mat-label>Descripción</mat-label>
+          <textarea matInput formControlName="description" rows="2"></textarea>
+        </mat-form-field>
+
+        <mat-slide-toggle formControlName="is_active" color="primary">
+          {{ form.get('is_active')?.value ? 'Activo' : 'Inactivo' }}
+        </mat-slide-toggle>
+      </section>
+
+      <!-- Capacidad (solo almacén existente) -->
+      @if (warehouse()) {
+        <section class="dfw-section dfw-section--cap">
+          <h3 class="dfw-section__title">
+            <mat-icon>analytics</mat-icon> Capacidad
+          </h3>
+
+          <app-loading-spinner [loading]="loadingCapacity()" [inline]="true"></app-loading-spinner>
+
+          @if (!loadingCapacity() && !warehouseCapacity()) {
+            <div class="cap-empty">
+              <mat-icon>info_outline</mat-icon>
+              <p>Sin datos de capacidad configurados.</p>
+            </div>
+          }
+
+          @if (warehouseCapacity(); as cap) {
+            <div class="cap-kpis">
+              <!-- Volumen -->
+              <div class="cap-kpi-card">
+                <div class="cap-kpi-label">
+                  <mat-icon class="cap-kpi-icon">straighten</mat-icon> Volumen
+                </div>
+                <div class="cap-bar-wrap">
+                  <div class="cap-bar">
+                    <div class="cap-bar__fill {{ capClass(cap.capacity_volume.usage_pct) }}"
+                         [style.width.%]="cap.capacity_volume.usage_pct ?? 0"></div>
+                  </div>
+                  <span class="cap-pct">{{ fmtPct(cap.capacity_volume.usage_pct) }}</span>
+                </div>
+                <div class="cap-kpi-detail">{{ volBadge(cap.capacity_volume) }}</div>
+              </div>
+              <!-- Peso -->
+              <div class="cap-kpi-card">
+                <div class="cap-kpi-label">
+                  <mat-icon class="cap-kpi-icon">scale</mat-icon> Peso
+                </div>
+                <div class="cap-bar-wrap">
+                  <div class="cap-bar">
+                    <div class="cap-bar__fill {{ capClass(cap.capacity_weight.usage_pct) }}"
+                         [style.width.%]="cap.capacity_weight.usage_pct ?? 0"></div>
+                  </div>
+                  <span class="cap-pct">{{ fmtPct(cap.capacity_weight.usage_pct) }}</span>
+                </div>
+                <div class="cap-kpi-detail">{{ wgtBadge(cap.capacity_weight) }}</div>
+              </div>
+            </div>
+
+            <!-- Detalle por zona -->
+            <mat-accordion class="cap-accordion" multi>
+              @for (zone of cap.zones; track zone.id) {
+                <mat-expansion-panel class="cap-zone-panel">
+                  <mat-expansion-panel-header>
+                    <mat-panel-title>
+                      <code class="code-tag" style="margin-right:0.5rem">{{ zone.code }}</code>
+                      {{ zone.name }}
+                    </mat-panel-title>
+                    <mat-panel-description>
+                      <span class="cap-zone-summary">
+                        <span class="cap-zone-pill {{ capClass(zone.capacity_volume.usage_pct) }}">Vol: {{ fmtPct(zone.capacity_volume.usage_pct) }}</span>
+                        <span class="cap-zone-pill {{ capClass(zone.capacity_weight.usage_pct) }}">Peso: {{ fmtPct(zone.capacity_weight.usage_pct) }}</span>
+                      </span>
+                    </mat-panel-description>
+                  </mat-expansion-panel-header>
+                  @if (zone.locations.length > 0) {
+                    <div class="loc-grid">
+                      @for (loc of zone.locations; track loc.id) {
+                        <div class="loc-cell {{ capClass(loc.capacity_volume.usage_pct) }}"
+                             [matTooltip]="loc.name + ' · Vol: ' + fmtPct(loc.capacity_volume.usage_pct) + ' · Peso: ' + fmtPct(loc.capacity_weight.usage_pct)">
+                          <span class="loc-cell-code">{{ loc.code }}</span>
+                          <span class="loc-cell-pct">{{ fmtPct(loc.capacity_volume.usage_pct) }}</span>
+                        </div>
+                      }
+                    </div>
+                  } @else {
+                    <p class="cap-no-zones">Sin ubicaciones en esta zona.</p>
+                  }
+                </mat-expansion-panel>
+              }
+            </mat-accordion>
+          }
+        </section>
+      }
+    </div><!-- /dfw-top-grid -->
+
+    <!-- ── Sección: Zonas ─────────────────────────────────────── -->
+    <section class="dfw-section">
+      <div class="dfw-section__header">
+        <h3 class="dfw-section__title">
+          <mat-icon>grid_view</mat-icon>
+          Zonas
+          @if (zonesArray.length > 0) {
+            <span class="dfw-count-badge">{{ zonesArray.length }}</span>
+          }
+        </h3>
+        <button *sgaPermission="'almacenes.editar'" type="button" mat-stroked-button color="primary"
+                class="dfw-add-btn" (click)="addZone()">
+          <mat-icon>add</mat-icon> Agregar zona
+        </button>
+      </div>
+
+      @if (zonesArray.length === 0) {
+        <div class="dfw-empty-zones">
+          <mat-icon>grid_off</mat-icon>
+          <p>Sin zonas configuradas.</p>
+          <button *sgaPermission="'almacenes.editar'" type="button" mat-stroked-button color="primary"
+                  (click)="addZone()">
+            <mat-icon>add</mat-icon> Agregar primera zona
+          </button>
+        </div>
+      }
+
+      <!-- Cuadrícula de tarjetas de zona -->
+      <div formArrayName="zones" class="dfw-zones-grid">
+        @for (zone of zonesArray.controls; let zi = $index; track zi) {
+
+          <div class="dfw-zone-card"
+               [class.dfw-zone-card--open]="openZoneIndex() === zi"
+               [formGroupName]="zi">
+
+            <!-- Cabecera siempre visible: al hacer clic abre/cierra -->
+            <div class="dfw-zone-card__head" (click)="toggleZone(zi)">
+              <div class="dfw-zone-card__head-left">
+                <mat-icon class="dfw-zone-type-icon zone-icon--{{ zone.get('type')?.value }}">
+                  {{ zoneTypeIcons[zone.get('type')?.value] || 'thermostat' }}
+                </mat-icon>
+                <div class="dfw-zone-card__titles">
+                  <span class="dfw-zone-card__name">{{ zone.get('name')?.value || 'Nueva zona' }}</span>
+                </div>
+              </div>
+              <div class="dfw-zone-card__head-right">
+                <span class="type-badge type-badge--{{ zone.get('type')?.value }}">
+                  {{ getZoneTypeLabel(zone.get('type')?.value) }}
+                </span>
+                <span class="dfw-loc-count">
+                  <mat-icon>place</mat-icon>{{ getLocationsArray(zi).length }}
+                </span>
+                <mat-icon class="dfw-zone-chevron">
+                  {{ openZoneIndex() === zi ? 'expand_less' : 'expand_more' }}
+                </mat-icon>
+              </div>
+            </div>
+
+            <!-- Cuerpo expandible -->
+            @if (openZoneIndex() === zi) {
+              <div class="dfw-zone-card__body">
+
+                <!-- Campos de la zona -->
+                <div class="dfw-row">
+                  <mat-form-field appearance="outline" class="dfw-field dfw-field--grow">
+                    <mat-label>Nombre *</mat-label>
+                    <input matInput formControlName="name" />
+                    @if (zone.get('name')?.hasError('required') && zone.get('name')?.touched) {
+                      <mat-error>Requerido</mat-error>
+                    }
+                  </mat-form-field>
+                  <mat-form-field appearance="outline" class="dfw-field dfw-field--md">
+                    <mat-label>Tipo *</mat-label>
+                    <mat-select formControlName="type">
+                      @for (t of zoneTypes; track t.value) {
+                        <mat-option [value]="t.value">{{ t.label }}</mat-option>
+                      }
+                    </mat-select>
+                  </mat-form-field>
+                </div>
+
+                <div class="dfw-row">
+                  <mat-form-field appearance="outline" class="dfw-field">
+                    <mat-label>Temp. mín (°C)</mat-label>
+                    <input matInput type="number" formControlName="temp_min" />
+                  </mat-form-field>
+                  <mat-form-field appearance="outline" class="dfw-field">
+                    <mat-label>Temp. máx (°C)</mat-label>
+                    <input matInput type="number" formControlName="temp_max" />
+                  </mat-form-field>
+                  <mat-form-field appearance="outline" class="dfw-field">
+                    <mat-label>Humedad mín (%)</mat-label>
+                    <input matInput type="number" min="0" max="100" formControlName="humidity_min" />
+                  </mat-form-field>
+                  <mat-form-field appearance="outline" class="dfw-field">
+                    <mat-label>Humedad máx (%)</mat-label>
+                    <input matInput type="number" min="0" max="100" formControlName="humidity_max" />
+                  </mat-form-field>
+                </div>
+
+                <mat-form-field appearance="outline" class="dfw-field dfw-field--full">
+                  <mat-label>Descripción de la zona</mat-label>
+                  <textarea matInput formControlName="description" rows="2"></textarea>
+                </mat-form-field>
+
+                <!-- ── Ubicaciones ──────────────────────────────── -->
+                <div class="dfw-locs-section">
+                  <div class="dfw-locs-header">
+                    <span class="dfw-locs-title">
+                      <mat-icon>place</mat-icon> Ubicaciones
+                    </span>
+                    <button *sgaPermission="'almacenes.editar'" type="button" mat-stroked-button
+                            class="dfw-add-btn dfw-add-btn--sm" (click)="addLocation(zi)">
+                      <mat-icon>add</mat-icon> Agregar ubicación
+                    </button>
+                  </div>
+
+                  @if (getLocationsArray(zi).length === 0) {
+                    <p class="dfw-locs-empty">Sin ubicaciones. Agrega la primera.</p>
+                  }
+
+                  <div formArrayName="locations" class="dfw-locs-list">
+                    @for (loc of getLocationsArray(zi).controls; let li = $index; track li) {
+                      <div class="dfw-loc-row" [formGroupName]="li">
+                        <!-- Nombre -->
+                        <mat-form-field appearance="outline" class="dfw-field dfw-field--grow">
+                          <mat-label>Nombre *</mat-label>
+                          <input matInput formControlName="name" placeholder="Estante A1" />
+                          @if (loc.get('name')?.hasError('required') && loc.get('name')?.touched) {
+                            <mat-error>Requerido</mat-error>
+                          }
+                        </mat-form-field>
+
+                        <!-- Calculador de volumen -->
+                        <div class="loc-vol-box">
+                          <div class="loc-vol-header">
+                            <mat-icon class="loc-vol-icon">grid_on</mat-icon>
+                            <span>Volumen por unidad (cm³)</span>
+                          </div>
+                          <div class="loc-vol-dims">
+                            <label>Alto
+                              <input type="number" min="0" formControlName="dim_h"
+                                     placeholder="—" (input)="calcVolume(zi, li)" /> cm
+                            </label>
+                            <label>Ancho
+                              <input type="number" min="0" formControlName="dim_w"
+                                     placeholder="—" (input)="calcVolume(zi, li)" /> cm
+                            </label>
+                            <label>Largo
+                              <input type="number" min="0" formControlName="dim_l"
+                                     placeholder="—" (input)="calcVolume(zi, li)" /> cm
+                            </label>
+                          </div>
+                          <div class="loc-vol-result">
+                            <span>=</span>
+                            <input type="number" min="0" formControlName="volume_cm3"
+                                   placeholder="—" />
+                            <span>cm³</span>
+                          </div>
+                          <p class="loc-vol-hint">Opcional · deja vacío si no aplica</p>
+                        </div>
+
+                        <!-- Peso máx -->
+                        <mat-form-field appearance="outline" class="dfw-field dfw-field--md">
+                          <mat-label>Peso máx. (kg)</mat-label>
+                          <input matInput type="number" min="0" formControlName="max_weight_kg" />
+                        </mat-form-field>
+
+                        <!-- Descripción -->
+                        <mat-form-field appearance="outline" class="dfw-field dfw-field--grow">
+                          <mat-label>Descripción</mat-label>
+                          <input matInput formControlName="description" />
+                        </mat-form-field>
+
+                        <button *sgaPermission="'almacenes.editar'" type="button" mat-icon-button color="warn"
+                                matTooltip="Eliminar ubicación" (click)="removeLocation(zi, li)">
+                          <mat-icon>delete</mat-icon>
+                        </button>
+                      </div>
+                    }
+                  </div>
+                </div><!-- /ubicaciones -->
+
+                <!-- Acción de zona -->
+                <div class="dfw-zone-card__footer">
+                  <button *sgaPermission="'almacenes.editar'" type="button" mat-button color="warn"
+                          (click)="removeZone(zi)">
+                    <mat-icon>delete</mat-icon> Eliminar zona
+                  </button>
+                </div>
+
+              </div><!-- /body -->
+            }
+
+          </div><!-- /dfw-zone-card -->
+        }
+      </div><!-- /dfw-zones-grid -->
+    </section>
+
+    <!-- ── Acciones del formulario ────────────────────────────── -->
+    <div class="dfw-actions">
+      <button type="button" mat-button (click)="back.emit()">
+        <mat-icon>arrow_back</mat-icon> Volver
+      </button>
+      <button *sgaPermission="(warehouse() ? 'almacenes.editar' : 'almacenes.crear')"
+              type="submit" mat-raised-button color="primary"
+              [disabled]="form.invalid || saving()">
+        @if (saving()) { <mat-spinner diameter="18" class="btn-spinner"></mat-spinner> }
+        <mat-icon>save</mat-icon>
+        {{ warehouse() ? 'Guardar cambios' : 'Crear almacén' }}
+      </button>
+    </div>
+
+  </form>
+}

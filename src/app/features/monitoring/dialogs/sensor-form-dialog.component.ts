@@ -23,10 +23,15 @@ import { FormErrorsComponent } from '../../../shared/components/form-errors/form
       <form [formGroup]="form" class="df">
         <mat-form-field appearance="outline" class="w"><mat-label>Zona *</mat-label>
           <mat-select formControlName="zone_id">
-            @for (z of data.zones; track z.id) { <mat-option [value]="z.id">{{ z.name }} — {{ warehouseName(z.warehouse_id) }}</mat-option> }
+            @for (wh of zonesGrouped(); track wh.warehouseId) {
+              <mat-optgroup [label]="wh.warehouseName">
+                @for (z of wh.zones; track z.id) {
+                  <mat-option [value]="z.id">{{ z.name }}</mat-option>
+                }
+              </mat-optgroup>
+            }
           </mat-select>
         </mat-form-field>
-        <mat-form-field appearance="outline" class="w"><mat-label>Código *</mat-label><input matInput formControlName="code" placeholder="TEMP-ZR01-01" /></mat-form-field>
         <mat-form-field appearance="outline" class="w"><mat-label>Nombre *</mat-label><input matInput formControlName="name" /></mat-form-field>
         <mat-form-field appearance="outline" class="w"><mat-label>Tipo *</mat-label>
           <mat-select formControlName="type">
@@ -53,9 +58,21 @@ export class SensorFormDialogComponent implements OnInit {
   private ref = inject(MatDialogRef<SensorFormDialogComponent>);
   private svc = inject(MonitoringService); private fb = inject(FormBuilder);
   saving = signal(false); errors = signal<string[]>([]);
-  form = this.fb.group({ zone_id: [null as number | null, Validators.required], code: ['', Validators.required], name: ['', Validators.required], type: ['temperature', Validators.required], unit: ['°C'], is_active: [true] });
+  form = this.fb.group({ zone_id: [null as number | null, Validators.required], name: ['', Validators.required], type: ['temperature', Validators.required], unit: ['°C'], is_active: [true] });
   ngOnInit(): void { if (this.data.sensor) this.form.patchValue(this.data.sensor as any); }
-  warehouseName(warehouseId: number): string { return this.data.warehouses.find(w => w.id === warehouseId)?.name ?? ''; }
+
+  zonesGrouped(): { warehouseId: number; warehouseName: string; zones: Zone[] }[] {
+    const map = new Map<number, { warehouseId: number; warehouseName: string; zones: Zone[] }>();
+    for (const z of this.data.zones) {
+      if (!map.has(z.warehouse_id)) {
+        const wName = this.data.warehouses.find(w => w.id === z.warehouse_id)?.name ?? `Almacén ${z.warehouse_id}`;
+        map.set(z.warehouse_id, { warehouseId: z.warehouse_id, warehouseName: wName, zones: [] });
+      }
+      map.get(z.warehouse_id)!.zones.push(z);
+    }
+    return [...map.values()].sort((a, b) => a.warehouseName.localeCompare(b.warehouseName));
+  }
+
   save(): void {
     if (this.form.invalid || this.saving()) return; this.saving.set(true);
     const req$ = this.data.sensor ? this.svc.updateSensor(this.data.sensor.id, this.form.value as any) : this.svc.createSensor(this.form.value as any);

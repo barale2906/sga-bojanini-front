@@ -1,0 +1,367 @@
+// ── Breadcrumb ───────────────────────────────────────────────
+.dfw-breadcrumb {
+  display: flex; align-items: center; gap: 0.5rem;
+  padding: 0.75rem 0 1.25rem;
+
+  &__trail { display: flex; align-items: center; gap: 0.1rem; }
+  &__parent {
+    color: #3182ce; cursor: pointer; font-size: 0.9rem;
+    &:hover { text-decoration: underline; }
+  }
+  &__sep { font-size: 1.1rem; color: #a0aec0; }
+  &__current { font-size: 0.95rem; font-weight: 600; color: #2d3748; }
+}
+
+// ── Formulario principal ─────────────────────────────────────
+.dfw-form { display: flex; flex-direction: column; gap: 1.5rem; }
+
+// ── Fila superior: datos + capacidad ─────────────────────────
+.dfw-top-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1rem;
+
+  @media (min-width: 900px) {
+    grid-template-columns: 1fr 380px;
+  }
+}
+
+// ── Secciones ────────────────────────────────────────────────
+.dfw-section {
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 1.5rem;
+
+  &--cap {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+
+  &__title {
+    display: flex; align-items: center; gap: 0.5rem;
+    font-size: 0.95rem; font-weight: 700; color: #2d3748;
+    text-transform: uppercase; letter-spacing: 0.04em;
+    margin: 0 0 1.25rem;
+    mat-icon { color: #718096; font-size: 1.1rem; height: 1.1rem; width: 1.1rem; }
+  }
+
+  &__header {
+    display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap;
+    gap: 0.5rem; margin-bottom: 1.25rem;
+    .dfw-section__title { margin: 0; }
+  }
+}
+
+// ── Filas y campos ───────────────────────────────────────────
+.dfw-row {
+  display: flex; gap: 0.75rem; flex-wrap: wrap; align-items: flex-start;
+  margin-bottom: 0;
+}
+
+.dfw-field {
+  &--full  { width: 100%; }
+  &--grow  { flex: 1; min-width: 180px; }
+  &--md    { width: 150px; }
+  &--sm    { width: 130px; }
+}
+
+// ── Conteo de zonas ──────────────────────────────────────────
+.dfw-count-badge {
+  display: inline-flex; align-items: center; justify-content: center;
+  background: #3182ce; color: #fff;
+  font-size: 0.72rem; font-weight: 700;
+  width: 20px; height: 20px; border-radius: 50%;
+  margin-left: 0.25rem;
+}
+
+// ── Botón agregar ────────────────────────────────────────────
+.dfw-add-btn {
+  white-space: nowrap;
+  mat-icon { font-size: 1rem; height: 1rem; width: 1rem; }
+  &--sm { transform: scale(0.9); }
+}
+
+// ── Estado vacío de zonas ────────────────────────────────────
+.dfw-empty-zones {
+  text-align: center; color: #a0aec0; padding: 2.5rem 1rem;
+  border: 2px dashed #e2e8f0; border-radius: 10px;
+  mat-icon { font-size: 2.5rem; width: 2.5rem; height: 2.5rem; margin-bottom: 0.5rem; display: block; }
+  p { margin: 0 0 1rem; font-size: 0.9rem; }
+}
+
+// ── Cuadrícula de tarjetas de zona ───────────────────────────
+.dfw-zones-grid {
+  display: grid;
+  grid-template-columns: 1fr;             // móvil / tablet
+  gap: 0.75rem;
+  align-items: start;
+
+  @media (min-width: 768px) {
+    grid-template-columns: repeat(2, 1fr); // pantalla mediana
+  }
+  @media (min-width: 1400px) {
+    grid-template-columns: repeat(4, 1fr); // pantalla grande
+  }
+}
+
+// ── Tarjeta de zona ──────────────────────────────────────────
+.dfw-zone-card {
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  overflow: hidden;
+  background: #fff;
+  transition: box-shadow 0.15s ease;
+
+  &--open {
+    border-color: #3182ce;
+    box-shadow: 0 0 0 2px rgba(49,130,206,0.15);
+    // cuando está abierta ocupa toda la fila en md (2 cols)
+    @media (min-width: 768px) and (max-width: 1399px) {
+      grid-column: span 2;
+    }
+    // en pantalla grande ocupa 2 de 4 cols
+    @media (min-width: 1400px) {
+      grid-column: span 2;
+    }
+  }
+}
+
+.dfw-zone-card__head {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 0.85rem 1rem; cursor: pointer; gap: 0.5rem;
+  background: #f7fafc;
+  border-bottom: 1px solid transparent;
+  transition: background 0.1s;
+
+  .dfw-zone-card--open & {
+    background: #ebf4ff;
+    border-bottom-color: #bee3f8;
+  }
+
+  &:hover { background: #edf2f7; }
+  .dfw-zone-card--open &:hover { background: #dbeafe; }
+}
+
+.dfw-zone-card__head-left {
+  display: flex; align-items: center; gap: 0.6rem; min-width: 0;
+}
+
+.dfw-zone-card__titles {
+  display: flex; flex-direction: column; gap: 0.15rem; min-width: 0;
+}
+
+.dfw-zone-card__name {
+  font-weight: 600; color: #2d3748; font-size: 0.88rem;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+
+.dfw-zone-card__head-right {
+  display: flex; align-items: center; gap: 0.5rem; flex-shrink: 0;
+}
+
+.dfw-zone-chevron {
+  color: #718096; font-size: 1.2rem; width: 1.2rem; height: 1.2rem;
+  transition: transform 0.2s;
+  .dfw-zone-card--open & { color: #3182ce; }
+}
+
+// ── Cuerpo de zona expandido ─────────────────────────────────
+.dfw-zone-card__body {
+  padding: 1rem;
+  display: flex; flex-direction: column; gap: 0.75rem;
+}
+
+.dfw-zone-card__footer {
+  display: flex; justify-content: flex-end;
+  padding-top: 0.5rem;
+  border-top: 1px solid #edf2f7;
+}
+
+// ── Iconos de tipo de zona ───────────────────────────────────
+.dfw-zone-type-icon {
+  font-size: 1.25rem; width: 1.25rem; height: 1.25rem; flex-shrink: 0;
+  &.zone-icon--cold      { color: #3182ce; }
+  &.zone-icon--frozen    { color: #0bc5ea; }
+  &.zone-icon--ambient   { color: #48bb78; }
+  &.zone-icon--controlled{ color: #dd6b20; }
+}
+
+.dfw-loc-count {
+  display: flex; align-items: center; gap: 0.15rem;
+  font-size: 0.78rem; color: #718096; font-weight: 600;
+  mat-icon { font-size: 0.85rem; width: 0.85rem; height: 0.85rem; }
+}
+
+// ── Badges ───────────────────────────────────────────────────
+.code-tag {
+  background: #edf2f7; color: #4a5568;
+  padding: 0.1rem 0.4rem; border-radius: 4px;
+  font-size: 0.75rem; font-family: monospace;
+}
+
+.type-badge {
+  display: inline-flex; padding: 0.1rem 0.5rem; border-radius: 9999px;
+  font-size: 0.7rem; font-weight: 600; white-space: nowrap;
+  &--ambient    { background: #e2e8f0; color: #4a5568; }
+  &--cold       { background: #bee3f8; color: #2b6cb0; }
+  &--frozen     { background: #b2f5ea; color: #234e52; }
+  &--controlled { background: #fefcbf; color: #744210; }
+}
+
+// ── Ubicaciones dentro de zona ───────────────────────────────
+.dfw-locs-section {
+  margin-top: 0.25rem;
+  padding-top: 1rem;
+  border-top: 1px solid #edf2f7;
+}
+
+.dfw-locs-header {
+  display: flex; align-items: center; justify-content: space-between; gap: 0.5rem;
+  margin-bottom: 0.75rem;
+}
+
+.dfw-locs-title {
+  display: flex; align-items: center; gap: 0.35rem;
+  font-size: 0.8rem; font-weight: 700; color: #4a5568;
+  text-transform: uppercase; letter-spacing: 0.04em;
+  mat-icon { font-size: 1rem; width: 1rem; height: 1rem; color: #718096; }
+}
+
+.dfw-locs-empty {
+  color: #a0aec0; font-size: 0.85rem; margin: 0.25rem 0 0.5rem;
+}
+
+.dfw-locs-list { display: flex; flex-direction: column; gap: 0.5rem; }
+
+.dfw-loc-row {
+  display: flex; gap: 0.5rem; align-items: flex-start; flex-wrap: wrap;
+  background: #f7fafc;
+  border: 1px solid #edf2f7;
+  border-radius: 8px;
+  padding: 0.75rem;
+}
+
+// ── Calculador de volumen en ubicaciones ─────────────────────
+.loc-vol-box {
+  background: #f0f4f8;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 0.6rem 0.75rem 0.4rem;
+  display: flex; flex-direction: column; gap: 0.35rem;
+  min-width: 200px;
+}
+
+.loc-vol-header {
+  display: flex; align-items: center; gap: 0.3rem;
+  font-size: 0.7rem; font-weight: 700; color: #4a5568;
+  text-transform: uppercase; letter-spacing: 0.04em;
+}
+
+.loc-vol-icon { font-size: 0.9rem; height: 0.9rem; width: 0.9rem; color: #718096; }
+
+.loc-vol-dims {
+  display: flex; flex-direction: column; gap: 0.2rem;
+
+  label {
+    display: flex; align-items: center; gap: 0.35rem;
+    font-size: 0.78rem; color: #4a5568;
+
+    input {
+      width: 64px; border: 1px solid #cbd5e0; border-radius: 4px;
+      padding: 0.15rem 0.3rem; font-size: 0.8rem; text-align: right;
+      background: #fff;
+      &:focus { outline: none; border-color: #3182ce; }
+    }
+  }
+}
+
+.loc-vol-result {
+  display: flex; align-items: center; gap: 0.35rem;
+  font-size: 0.82rem; font-weight: 700; color: #2d3748;
+  border-top: 1px dashed #cbd5e0; padding-top: 0.3rem;
+
+  input {
+    width: 80px; border: 1px solid #cbd5e0; border-radius: 4px;
+    padding: 0.15rem 0.3rem; font-size: 0.8rem; text-align: right;
+    background: #fff; font-weight: 700;
+    &:focus { outline: none; border-color: #3182ce; }
+  }
+}
+
+.loc-vol-hint { font-size: 0.68rem; color: #a0aec0; margin: 0; }
+
+// ── Acciones del formulario ──────────────────────────────────
+.dfw-actions {
+  display: flex; justify-content: flex-end; align-items: center;
+  gap: 0.75rem; padding: 0.5rem 0 1rem;
+}
+
+.btn-spinner { display: inline-block; margin-right: 0.4rem; }
+
+// ── Capacidad: sin datos ─────────────────────────────────────
+.cap-empty {
+  display: flex; flex-direction: column; align-items: center;
+  color: #a0aec0; padding: 1.5rem 1rem; text-align: center;
+  mat-icon { font-size: 2rem; width: 2rem; height: 2rem; margin-bottom: 0.5rem; }
+  p { margin: 0; font-size: 0.85rem; }
+}
+
+// ── KPIs de capacidad ────────────────────────────────────────
+.cap-kpis {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem;
+  @media (max-width: 500px) { grid-template-columns: 1fr; }
+}
+
+.cap-kpi-card {
+  background: #f7fafc; border: 1px solid #e2e8f0; border-radius: 10px;
+  padding: 0.75rem 1rem; display: flex; flex-direction: column; gap: 0.4rem;
+}
+
+.cap-kpi-label {
+  display: flex; align-items: center; gap: 0.4rem;
+  font-size: 0.74rem; font-weight: 700; color: #4a5568; text-transform: uppercase;
+}
+
+.cap-kpi-icon { font-size: 1rem; height: 1rem; width: 1rem; }
+.cap-kpi-detail { font-size: 0.74rem; color: #718096; }
+.cap-bar-wrap { display: flex; align-items: center; gap: 0.6rem; }
+.cap-bar {
+  flex: 1; height: 8px; background: #edf2f7; border-radius: 9999px; overflow: hidden;
+}
+.cap-bar__fill {
+  height: 100%; border-radius: 9999px; transition: width 0.4s ease;
+  &.cap--low       { background: #48bb78; }
+  &.cap--mid       { background: #ed8936; }
+  &.cap--high      { background: #e53e3e; }
+  &.cap--undefined { background: #cbd5e0; width: 0 !important; }
+}
+.cap-pct {
+  font-size: 0.74rem; font-weight: 700; color: #4a5568; white-space: nowrap; min-width: 52px; text-align: right;
+}
+
+.cap-accordion { margin-top: 0.5rem; }
+.cap-zone-panel { margin-bottom: 0.4rem; border-radius: 8px !important; border: 1px solid #e2e8f0; }
+.cap-zone-summary { display: flex; align-items: center; gap: 0.4rem; }
+.cap-zone-pill {
+  display: inline-flex; padding: 0.1rem 0.4rem; border-radius: 9999px;
+  font-size: 0.66rem; font-weight: 600;
+  &.cap--low       { background: #c6f6d5; color: #276749; }
+  &.cap--mid       { background: #feebc8; color: #7b341e; }
+  &.cap--high      { background: #fed7d7; color: #c53030; }
+  &.cap--undefined { background: #e2e8f0; color: #718096; }
+}
+.cap-no-zones { color: #a0aec0; font-size: 0.85rem; margin: 0; }
+.loc-grid { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 0.5rem; }
+.loc-cell {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  width: 72px; min-height: 50px; border-radius: 8px; padding: 0.35rem 0.25rem;
+  border: 2px solid transparent; cursor: default;
+  &.cap--low       { background: #c6f6d5; border-color: #9ae6b4; }
+  &.cap--mid       { background: #feebc8; border-color: #fbd38d; }
+  &.cap--high      { background: #fed7d7; border-color: #feb2b2; }
+  &.cap--undefined { background: #edf2f7; border-color: #e2e8f0; }
+}
+.loc-cell-code { font-family: monospace; font-size: 0.68rem; font-weight: 700; color: #2d3748; text-align: center; }
+.loc-cell-pct  { font-size: 0.64rem; color: #4a5568; margin-top: 0.15rem; }
