@@ -1,4 +1,4 @@
-import { Component, EventEmitter, Input, OnInit, Output, inject } from '@angular/core';
+import { Component, EventEmitter, Input, OnChanges, OnInit, Output, SimpleChanges, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterModule, Router } from '@angular/router';
 import { MatIconModule } from '@angular/material/icon';
@@ -54,7 +54,7 @@ const FORCE_DIRECT_LINK_KEYS = new Set(['monitoring', 'purchasing']);
   templateUrl: './sidebar.component.html',
   styleUrl: './sidebar.component.scss',
 })
-export class SidebarComponent implements OnInit {
+export class SidebarComponent implements OnInit, OnChanges {
   @Input() collapsed = false;
   @Output() expandRequest = new EventEmitter<void>();
 
@@ -65,9 +65,22 @@ export class SidebarComponent implements OnInit {
   expandedGroups = new Set<string>();
 
   ngOnInit(): void {
+    this.resetToActive();
+  }
+
+  ngOnChanges(changes: SimpleChanges): void {
+    // Al colapsar el sidebar deja solo el grupo activo como marcador
+    if (changes['collapsed'] && this.collapsed) {
+      this.resetToActive();
+    }
+  }
+
+  private resetToActive(): void {
+    this.expandedGroups.clear();
     for (const item of this.menuService.menu()) {
       if ((item.children?.length ?? 0) > 0 && this.isItemActive(item)) {
         this.expandedGroups.add(item.key);
+        break; // solo uno puede estar activo a la vez
       }
     }
   }
@@ -95,6 +108,8 @@ export class SidebarComponent implements OnInit {
 
   onGroupClick(item: MenuItem): void {
     if (this.collapsed) {
+      // Al estar comprimido: expande el sidebar y abre solo este grupo
+      this.expandedGroups.clear();
       this.expandedGroups.add(item.key);
       this.expandRequest.emit();
     } else {
@@ -111,9 +126,10 @@ export class SidebarComponent implements OnInit {
   }
 
   toggleGroup(key: string): void {
-    if (this.expandedGroups.has(key)) {
-      this.expandedGroups.delete(key);
-    } else {
+    const wasOpen = this.expandedGroups.has(key);
+    // Acordeón: cierra todos antes de abrir el nuevo
+    this.expandedGroups.clear();
+    if (!wasOpen) {
       this.expandedGroups.add(key);
     }
   }
