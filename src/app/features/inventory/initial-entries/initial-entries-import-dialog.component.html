@@ -7,7 +7,7 @@
       <mat-select [(ngModel)]="warehouseId">
         <mat-option [value]="null">Almacén por defecto del sistema</mat-option>
         @for (w of activeWarehouses; track w.id) {
-          <mat-option [value]="w.id">{{ w.code }} — {{ w.name }}</mat-option>
+          <mat-option [value]="w.id">{{ w.name }}</mat-option>
         }
       </mat-select>
     </mat-form-field>

@@ -214,7 +214,7 @@
                   <mat-option [value]="null">Sin ubicación específica</mat-option>
                   @for (l of locations(); track l.id) {
                     <mat-option [value]="l.id">
-                      {{ l.name }} <span class="loc-code">({{ l.code }})</span>
+                      {{ l.name }}
                     </mat-option>
                   }
                 </mat-select>

@@ -149,7 +149,7 @@
             }
             <mat-select [ngModel]="draftLocationId()" (ngModelChange)="onDraftLocationChange($event)">
               @for (l of locations(); track l.id) {
-                <mat-option [value]="l.id">{{ l.name }} <span class="loc-code">({{ l.code }})</span></mat-option>
+                <mat-option [value]="l.id">{{ l.name }}</mat-option>
               }
             </mat-select>
           </mat-form-field>

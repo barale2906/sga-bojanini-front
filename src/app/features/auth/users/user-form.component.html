@@ -150,7 +150,7 @@
                   <mat-select formControlName="sensor_ids" multiple>
                     @for (sensor of sensors(); track sensor.id) {
                       <mat-option [value]="sensor.id">
-                        {{ sensor.name }} — {{ sensor.code }}
+                        {{ sensor.name }}
                         @if (sensor.zone) {
                           <span class="sensor-zone">({{ sensor.zone.name }})</span>
                         }
