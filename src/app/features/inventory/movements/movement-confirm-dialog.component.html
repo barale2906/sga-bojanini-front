@@ -65,7 +65,7 @@
     <!-- ── Errores ─────────────────────────────────────────────── -->
     <app-form-errors [errors]="errors()"></app-form-errors>
 
-    <form [formGroup]="signerForm" class="signers-form">
+    <div class="signers-form">
 
       <!-- ── Quien entrega ─────────────────────────────────────── -->
       <div class="signer-block">
@@ -74,32 +74,68 @@
           <span>Quien entrega</span>
         </div>
 
-        <div class="signer-fields">
-          <mat-form-field appearance="outline" class="full-width">
-            <mat-label>Nombre completo *</mat-label>
-            <input matInput formControlName="delivered_name" maxlength="150" autocomplete="off">
-            @if (signerForm.get('delivered_name')?.invalid && signerForm.get('delivered_name')?.touched) {
-              <mat-error>Nombre requerido</mat-error>
-            }
-          </mat-form-field>
+        @if (loadingMySignature()) {
+          <div class="sig-loading">
+            <mat-spinner diameter="20"></mat-spinner>
+            Cargando su firma registrada…
+          </div>
+        } @else if (deliveredMode() === 'stored' && mySignature(); as sig) {
+          <div class="stored-sig">
+            <img class="stored-sig__img" [src]="sig.signature_data" alt="Firma registrada">
+            <div class="stored-sig__data">
+              <strong>{{ sig.signer_name }}</strong>
+              <span>{{ sig.document_type }} {{ sig.document_number }}</span>
+              <span class="stored-sig__badge">
+                <mat-icon>verified</mat-icon> Firma registrada
+              </span>
+            </div>
+          </div>
+          <button mat-button type="button" class="link-btn" (click)="setDeliveredMode('pad')">
+            <mat-icon>draw</mat-icon> Firmar manualmente esta vez
+          </button>
+        } @else {
+          <form [formGroup]="deliveredForm" class="signer-fields">
+            <mat-form-field appearance="outline" class="full-width">
+              <mat-label>Nombre completo *</mat-label>
+              <input matInput formControlName="name" maxlength="150" autocomplete="off">
+              @if (deliveredForm.get('name')?.invalid && deliveredForm.get('name')?.touched) {
+                <mat-error>Nombre requerido</mat-error>
+              }
+            </mat-form-field>
 
-          <mat-form-field appearance="outline" class="full-width">
-            <mat-label>Documento de identidad *</mat-label>
-            <input matInput formControlName="delivered_document" maxlength="50" autocomplete="off">
-            @if (signerForm.get('delivered_document')?.invalid && signerForm.get('delivered_document')?.touched) {
-              <mat-error>Documento requerido</mat-error>
-            }
-          </mat-form-field>
-        </div>
+            <mat-form-field appearance="outline" class="full-width">
+              <mat-label>Documento de identidad *</mat-label>
+              <input matInput formControlName="document" maxlength="50" autocomplete="off">
+              @if (deliveredForm.get('document')?.invalid && deliveredForm.get('document')?.touched) {
+                <mat-error>Documento requerido</mat-error>
+              }
+            </mat-form-field>
+          </form>
 
-        <div class="sig-label">
-          <mat-icon>draw</mat-icon>
-          Firma *
-          @if (padTouched() && deliveredPad?.isEmpty()) {
-            <span class="sig-required-hint">La firma es obligatoria</span>
+          <div class="sig-label">
+            <mat-icon>draw</mat-icon>
+            Firma *
+            @if (padTouched() && deliveredPad?.isEmpty()) {
+              <span class="sig-required-hint">La firma es obligatoria</span>
+            }
+          </div>
+          <app-signature-capture-pad #deliveredPad></app-signature-capture-pad>
+
+          @if (mySignature()) {
+            <button mat-button type="button" class="link-btn" (click)="setDeliveredMode('stored')">
+              <mat-icon>verified</mat-icon> Usar mi firma registrada
+            </button>
+          } @else {
+            <div class="sig-tip">
+              <mat-icon>lightbulb</mat-icon>
+              <span>
+                Registre su firma en
+                <a href="/profile/signature" target="_blank" rel="noopener">Mi perfil → Mi firma</a>
+                para no tener que firmar en cada entrega.
+              </span>
+            </div>
           }
-        </div>
-        <app-signature-capture-pad #deliveredPad></app-signature-capture-pad>
+        }
       </div>
 
       <mat-divider></mat-divider>
@@ -111,35 +147,73 @@
           <span>Quien recibe</span>
         </div>
 
-        <div class="signer-fields">
-          <mat-form-field appearance="outline" class="full-width">
-            <mat-label>Nombre completo *</mat-label>
-            <input matInput formControlName="received_name" maxlength="150" autocomplete="off">
-            @if (signerForm.get('received_name')?.invalid && signerForm.get('received_name')?.touched) {
-              <mat-error>Nombre requerido</mat-error>
+        <mat-button-toggle-group
+          class="receiver-mode"
+          [value]="receivedMode()"
+          (change)="setReceivedMode($event.value)"
+          aria-label="Forma de firma de quien recibe"
+        >
+          <mat-button-toggle value="pin">
+            <mat-icon>pin</mat-icon> Usuario con PIN
+          </mat-button-toggle>
+          <mat-button-toggle value="pad">
+            <mat-icon>draw</mat-icon> Externo / sin registro
+          </mat-button-toggle>
+        </mat-button-toggle-group>
+
+        @if (receivedMode() === 'pin') {
+          <mat-form-field appearance="outline" class="pin-field">
+            <mat-label>PIN de firma *</mat-label>
+            <mat-icon matPrefix>key</mat-icon>
+            <input
+              matInput
+              [formControl]="pinCtrl"
+              [type]="showPin() ? 'text' : 'password'"
+              inputmode="numeric"
+              [attr.maxlength]="pinLength"
+              autocomplete="off"
+              (input)="onPinInput($event)"
+              (keydown.enter)="confirm()"
+            >
+            <button mat-icon-button matSuffix type="button" (click)="showPin.update(v => !v)">
+              <mat-icon>{{ showPin() ? 'visibility_off' : 'visibility' }}</mat-icon>
+            </button>
+            <mat-hint>Quien recibe digita su PIN de {{ pinLength }} dígitos</mat-hint>
+            @if (pinCtrl.invalid && pinCtrl.touched) {
+              <mat-error>Digite los {{ pinLength }} dígitos del PIN</mat-error>
             }
           </mat-form-field>
+        } @else {
+          <form [formGroup]="receivedForm" class="signer-fields">
+            <mat-form-field appearance="outline" class="full-width">
+              <mat-label>Nombre completo *</mat-label>
+              <input matInput formControlName="name" maxlength="150" autocomplete="off">
+              @if (receivedForm.get('name')?.invalid && receivedForm.get('name')?.touched) {
+                <mat-error>Nombre requerido</mat-error>
+              }
+            </mat-form-field>
 
-          <mat-form-field appearance="outline" class="full-width">
-            <mat-label>Documento de identidad *</mat-label>
-            <input matInput formControlName="received_document" maxlength="50" autocomplete="off">
-            @if (signerForm.get('received_document')?.invalid && signerForm.get('received_document')?.touched) {
-              <mat-error>Documento requerido</mat-error>
+            <mat-form-field appearance="outline" class="full-width">
+              <mat-label>Documento de identidad *</mat-label>
+              <input matInput formControlName="document" maxlength="50" autocomplete="off">
+              @if (receivedForm.get('document')?.invalid && receivedForm.get('document')?.touched) {
+                <mat-error>Documento requerido</mat-error>
+              }
+            </mat-form-field>
+          </form>
+
+          <div class="sig-label">
+            <mat-icon>draw</mat-icon>
+            Firma *
+            @if (padTouched() && receivedPad?.isEmpty()) {
+              <span class="sig-required-hint">La firma es obligatoria</span>
             }
-          </mat-form-field>
-        </div>
-
-        <div class="sig-label">
-          <mat-icon>draw</mat-icon>
-          Firma *
-          @if (padTouched() && receivedPad?.isEmpty()) {
-            <span class="sig-required-hint">La firma es obligatoria</span>
-          }
-        </div>
-        <app-signature-capture-pad #receivedPad></app-signature-capture-pad>
+          </div>
+          <app-signature-capture-pad #receivedPad></app-signature-capture-pad>
+        }
       </div>
 
-    </form>
+    </div>
   }
 
   <!-- ── Estado confirmado ────────────────────────────────────── -->
@@ -195,7 +269,7 @@
         mat-flat-button
         type="button"
         color="primary"
-        [disabled]="confirming() || cancelling()"
+        [disabled]="confirming() || cancelling() || loadingMySignature()"
         (click)="confirm()"
       >
         @if (confirming()) {

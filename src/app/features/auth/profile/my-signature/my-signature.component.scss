@@ -1,0 +1,108 @@
+.my-signature-card {
+  max-width: 720px;
+
+  mat-card-title {
+    display: flex; align-items: center; gap: 0.4rem;
+  }
+}
+
+.state-center {
+  display: flex; justify-content: center; padding: 2rem 0;
+}
+
+.w-full { width: 100%; }
+
+// ── PIN revelado ─────────────────────────────────────────────
+.pin-reveal {
+  display: flex; align-items: center; gap: 0.85rem; flex-wrap: wrap;
+  background: #fffbeb; border: 1.5px solid #fcd34d; border-radius: 10px;
+  padding: 0.9rem 1rem; margin: 0.75rem 0 1rem;
+
+  &__icon { color: #b45309; font-size: 2rem; height: 2rem; width: 2rem; }
+
+  &__body {
+    display: flex; flex-direction: column; gap: 0.2rem; flex: 1; min-width: 200px;
+    strong { color: #92400e; font-size: 0.88rem; }
+  }
+
+  &__value {
+    font-family: 'Roboto Mono', monospace; font-size: 1.9rem; font-weight: 700;
+    letter-spacing: 0.4em; color: #1e2a3b;
+  }
+
+  &__hint { font-size: 0.78rem; color: #92400e; }
+
+  &__actions { display: flex; align-items: center; gap: 0.25rem; }
+}
+
+// ── Vista firma ──────────────────────────────────────────────
+.sig-view {
+  display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 1.25rem;
+  margin-top: 0.75rem;
+
+  @media (max-width: 600px) { grid-template-columns: 1fr; }
+
+  &__image {
+    border: 1.5px dashed #cbd5e0; border-radius: 10px; background: #fff;
+    display: flex; align-items: center; justify-content: center; padding: 0.75rem;
+    min-height: 140px;
+
+    img { max-width: 100%; max-height: 160px; }
+  }
+
+  &__data {
+    display: grid; grid-template-columns: auto 1fr; gap: 0.45rem 0.85rem; margin: 0;
+    font-size: 0.86rem;
+
+    dt { color: #718096; font-weight: 600; }
+    dd { margin: 0; color: #2d3748; }
+  }
+}
+
+.pin-badge {
+  display: inline-flex; align-items: center; gap: 0.25rem;
+  font-size: 0.78rem; font-weight: 600; border-radius: 9999px; padding: 0.1rem 0.55rem;
+
+  mat-icon { font-size: 0.95rem; height: 0.95rem; width: 0.95rem; }
+
+  &--ok   { background: #f0fff4; color: #276749; border: 1px solid #9ae6b4; }
+  &--none { background: #f7fafc; color: #718096; border: 1px solid #e2e8f0; }
+}
+
+// ── Formularios ──────────────────────────────────────────────
+.sig-form {
+  display: flex; flex-direction: column; gap: 0.5rem; margin-top: 0.75rem;
+
+  &__row {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 0.25rem 0.75rem;
+    @media (max-width: 540px) { grid-template-columns: 1fr; }
+  }
+}
+
+.password-field { margin-top: 0.75rem; }
+
+.sig-label {
+  display: flex; align-items: center; gap: 0.35rem;
+  font-size: 0.8rem; font-weight: 600; color: #4a5568;
+  mat-icon { font-size: 0.95rem; height: 0.95rem; width: 0.95rem; color: #718096; }
+}
+
+.sig-required-hint { color: #e53e3e; font-size: 0.75rem; font-weight: 400; }
+
+.info-banner {
+  display: flex; align-items: center; gap: 0.5rem;
+  background: #ebf8ff; border: 1px solid #bee3f8; border-radius: 8px;
+  padding: 0.6rem 0.85rem; font-size: 0.82rem; color: #2c5282; margin-top: 0.75rem;
+
+  mat-icon { color: #3182ce; flex-shrink: 0; }
+
+  &--warn {
+    background: #fffaf0; border-color: #fbd38d; color: #9c4221;
+    mat-icon { color: #dd6b20; }
+  }
+}
+
+.actions {
+  display: flex; justify-content: flex-end; gap: 0.5rem; margin-top: 1rem; flex-wrap: wrap;
+  mat-spinner { display: inline-block; margin-right: 0.35rem; }
+}

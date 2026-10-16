@@ -192,7 +192,7 @@
                   <mat-select [ngModel]="draftLocFromId()" (ngModelChange)="draftLocFromId.set($event)">
                     <mat-option [value]="null">Sin ubicación específica</mat-option>
                     @for (l of locationsFrom(); track l.id) {
-                      <mat-option [value]="l.id">{{ l.name }} <span class="loc-code">({{ l.code }})</span></mat-option>
+                      <mat-option [value]="l.id">{{ l.name }}</mat-option>
                     }
                   </mat-select>
                 </mat-form-field>
@@ -209,7 +209,7 @@
                   }
                   <mat-select [ngModel]="draftLocToId()" (ngModelChange)="draftLocToId.set($event)">
                     @for (l of locationsTo(); track l.id) {
-                      <mat-option [value]="l.id">{{ l.name }} <span class="loc-code">({{ l.code }})</span></mat-option>
+                      <mat-option [value]="l.id">{{ l.name }}</mat-option>
                     }
                   </mat-select>
                 </mat-form-field>

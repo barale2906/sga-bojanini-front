@@ -65,6 +65,11 @@ export const routes: Routes = [
         loadComponent: () =>
           import('./features/auth/profile/profile.component').then((m) => m.ProfileComponent),
       },
+      {
+        path: 'profile/signature',
+        loadComponent: () =>
+          import('./features/auth/profile/profile.component').then((m) => m.ProfileComponent),
+      },
 
       // Almacenes (Fase 2)
       {

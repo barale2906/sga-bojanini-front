@@ -5,11 +5,18 @@ import { MatDialogModule, MAT_DIALOG_DATA, MatDialogRef, MatDialog } from '@angu
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatButtonModule } from '@angular/material/button';
+import { MatButtonToggleModule } from '@angular/material/button-toggle';
 import { MatIconModule } from '@angular/material/icon';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatDividerModule } from '@angular/material/divider';
-import { InventoryService, Movement } from '../inventory.service';
+import {
+  ConfirmMovementPayload,
+  InventoryService,
+  Movement,
+  MovementSignatureRecord,
+} from '../inventory.service';
 import { AuthService } from '../../../core/services/auth.service';
+import { MySignature, MySignatureService, SIGNATURE_PIN_LENGTH } from '../../../core/services/my-signature.service';
 import { MovementPdfSignature } from '../../../shared/services/movement-pdf.service';
 import { FormErrorsComponent } from '../../../shared/components/form-errors/form-errors.component';
 import { SignatureCapturePadComponent } from '../../../shared/components/signature-capture-pad/signature-capture-pad.component';
@@ -29,6 +36,12 @@ export interface MovementConfirmDialogData {
   inventorySvc:  InventoryService;
 }
 
+/** Cómo firma quien entrega: con su firma registrada o dibujando en el pad. */
+type DeliveredMode = 'stored' | 'pad';
+
+/** Cómo firma quien recibe: usuario registrado con PIN, o externo/sin registro en el pad. */
+type ReceivedMode = 'pin' | 'pad';
+
 const TYPE_LABELS: Record<string, string> = {
   exit:                  'Salida de Stock',
   transfer:              'Transferencia',
@@ -43,7 +56,7 @@ const TYPE_LABELS: Record<string, string> = {
   standalone: true,
   imports: [
     CommonModule, ReactiveFormsModule, MatDialogModule, MatFormFieldModule,
-    MatInputModule, MatButtonModule, MatIconModule,
+    MatInputModule, MatButtonModule, MatButtonToggleModule, MatIconModule,
     MatProgressSpinnerModule, MatDividerModule,
     FormErrorsComponent, SignatureCapturePadComponent,
   ],
@@ -52,13 +65,14 @@ const TYPE_LABELS: Record<string, string> = {
 })
 export class MovementConfirmDialogComponent implements OnInit {
   data: MovementConfirmDialogData = inject(MAT_DIALOG_DATA);
-  private ref     = inject(MatDialogRef<MovementConfirmDialogComponent>);
-  private fb      = inject(FormBuilder);
-  private dialog  = inject(MatDialog);
-  protected authSvc = inject(AuthService);
+  private ref            = inject(MatDialogRef<MovementConfirmDialogComponent>);
+  private fb             = inject(FormBuilder);
+  private dialog         = inject(MatDialog);
+  private mySignatureSvc = inject(MySignatureService);
+  protected authSvc      = inject(AuthService);
 
-  @ViewChild('deliveredPad') deliveredPad!: SignatureCapturePadComponent;
-  @ViewChild('receivedPad')  receivedPad!:  SignatureCapturePadComponent;
+  @ViewChild('deliveredPad') deliveredPad?: SignatureCapturePadComponent;
+  @ViewChild('receivedPad')  receivedPad?:  SignatureCapturePadComponent;
 
   confirming       = signal(false);
   cancelling       = signal(false);
@@ -67,66 +81,82 @@ export class MovementConfirmDialogComponent implements OnInit {
   padTouched       = signal(false);
   showEmailPrompt  = signal(false);
 
-  // Guardadas antes de que @if(!confirmed()) destruya los canvas del DOM
-  private _capturedDeliveredB64 = '';
-  private _capturedReceivedB64  = '';
+  /** Firma registrada del usuario de la sesión (quien entrega). */
+  mySignature        = signal<MySignature | null>(null);
+  loadingMySignature = signal(true);
+  deliveredMode      = signal<DeliveredMode>('pad');
+  receivedMode       = signal<ReceivedMode>('pin');
+  showPin            = signal(false);
+  readonly pinLength = SIGNATURE_PIN_LENGTH;
 
-  signerForm = this.fb.group({
-    delivered_name:     ['', [Validators.required, Validators.maxLength(150)]],
-    delivered_document: ['', [Validators.required, Validators.maxLength(50)]],
-    received_name:      ['', [Validators.required, Validators.maxLength(150)]],
-    received_document:  ['', [Validators.required, Validators.maxLength(50)]],
+  /** Firmas devueltas por el backend al confirmar (fuente para el PDF). */
+  private _confirmedSignatures: MovementSignatureRecord[] = [];
+
+  deliveredForm = this.fb.group({
+    name:     ['', [Validators.required, Validators.maxLength(150)]],
+    document: ['', [Validators.required, Validators.maxLength(50)]],
   });
+
+  receivedForm = this.fb.group({
+    name:     ['', [Validators.required, Validators.maxLength(150)]],
+    document: ['', [Validators.required, Validators.maxLength(50)]],
+  });
+
+  pinCtrl = this.fb.control('', [Validators.required, Validators.pattern(new RegExp(`^\\d{${SIGNATURE_PIN_LENGTH}}$`))]);
 
   ngOnInit(): void {
     const user = this.authSvc.user();
     if (user?.name) {
-      this.signerForm.patchValue({ delivered_name: user.name }, { emitEvent: false });
+      this.deliveredForm.patchValue({ name: user.name }, { emitEvent: false });
     }
+
+    this.mySignatureSvc.get().subscribe({
+      next: res => {
+        this.mySignature.set(res.data.signature);
+        this.deliveredMode.set(res.data.signature ? 'stored' : 'pad');
+        this.loadingMySignature.set(false);
+      },
+      // Si no se puede consultar, se mantiene el flujo manual
+      error: () => this.loadingMySignature.set(false),
+    });
   }
 
   get isMultiLot(): boolean { return this.data.movements.length > 1; }
 
   typeLabel(type: string): string { return TYPE_LABELS[type] || type; }
 
-  confirm(): void {
-    this.padTouched.set(true);
-    if (this.signerForm.invalid || this.confirming()) return;
+  setDeliveredMode(mode: DeliveredMode): void {
+    this.deliveredMode.set(mode);
+    this.errors.set([]);
+  }
 
-    if (this.deliveredPad.isEmpty()) {
-      this.errors.set(['La firma de quien entrega es obligatoria.']);
-      return;
+  setReceivedMode(mode: ReceivedMode): void {
+    this.receivedMode.set(mode);
+    this.errors.set([]);
+  }
+
+  /** Solo permite dígitos en el campo PIN. */
+  onPinInput(event: Event): void {
+    const input  = event.target as HTMLInputElement;
+    const digits = input.value.replace(/\D/g, '').slice(0, SIGNATURE_PIN_LENGTH);
+    if (digits !== input.value) {
+      this.pinCtrl.setValue(digits);
     }
-    if (this.receivedPad.isEmpty()) {
-      this.errors.set(['La firma de quien recibe es obligatoria.']);
-      return;
-    }
+  }
+
+  confirm(): void {
+    if (this.confirming() || this.loadingMySignature()) return;
+    this.padTouched.set(true);
+
+    const payload = this.buildPayload();
+    if (!payload) return;
 
     this.errors.set([]);
     this.confirming.set(true);
 
-    // Capturar imágenes AHORA, mientras los canvas siguen en el DOM.
-    // confirmed.set(true) los destruye vía @if(!confirmed()), por lo que
-    // no se pueden leer después desde ViewChild.
-    this._capturedDeliveredB64 = this.deliveredPad.getBase64();
-    this._capturedReceivedB64  = this.receivedPad.getBase64();
-
-    const v = this.signerForm.value;
-    const payload = {
-      delivered_by: {
-        name:      v.delivered_name!,
-        document:  v.delivered_document!,
-        signature: this._capturedDeliveredB64,
-      },
-      received_by: {
-        name:      v.received_name!,
-        document:  v.received_document!,
-        signature: this._capturedReceivedB64,
-      },
-    };
-
     this.data.inventorySvc.confirmMovement(this.data.document_id, payload).subscribe({
-      next: () => {
+      next: res => {
+        this._confirmedSignatures = res.data?.signatures ?? [];
         this.confirming.set(false);
         this.confirmed.set(true);
         if (this.authSvc.hasPermission('movimientos.enviar_correo')) {
@@ -135,14 +165,68 @@ export class MovementConfirmDialogComponent implements OnInit {
       },
       error: err => {
         this.confirming.set(false);
-        if (err.status === 422)
+        if (err.status === 422) {
+          if (err.error?.errors?.['received_by.pin']) {
+            this.pinCtrl.setValue('');
+          }
           this.errors.set(Object.values(err.error?.errors || {}).flat() as string[]);
-        else if (err.status === 400)
+        } else if (err.status === 429) {
+          this.pinCtrl.setValue('');
+          this.errors.set(['Demasiados intentos de PIN fallidos. Espere 15 minutos o use la firma manual.']);
+        } else if (err.status === 400) {
           this.errors.set([err.error?.message || 'El movimiento ya fue confirmado anteriormente.']);
-        else
+        } else {
           this.errors.set([err.error?.message || 'Error al confirmar el movimiento.']);
+        }
       },
     });
+  }
+
+  /** Valida según el modo de cada rol y arma el payload; null si hay errores. */
+  private buildPayload(): ConfirmMovementPayload | null {
+    const errors: string[] = [];
+    let deliveredBy: ConfirmMovementPayload['delivered_by'];
+    let receivedBy: ConfirmMovementPayload['received_by'] | null = null;
+
+    if (this.deliveredMode() === 'pad') {
+      this.deliveredForm.markAllAsTouched();
+      if (this.deliveredForm.invalid) errors.push('Complete nombre y documento de quien entrega.');
+      if (!this.deliveredPad || this.deliveredPad.isEmpty()) errors.push('La firma de quien entrega es obligatoria.');
+      if (this.deliveredPad && this.deliveredForm.valid) {
+        deliveredBy = {
+          name:      this.deliveredForm.value.name!,
+          document:  this.deliveredForm.value.document!,
+          signature: this.deliveredPad.getBase64(),
+        };
+      }
+    }
+
+    if (this.receivedMode() === 'pin') {
+      this.pinCtrl.markAsTouched();
+      if (this.pinCtrl.invalid) {
+        errors.push(`Quien recibe debe digitar su PIN de ${SIGNATURE_PIN_LENGTH} dígitos.`);
+      } else {
+        receivedBy = { pin: this.pinCtrl.value! };
+      }
+    } else {
+      this.receivedForm.markAllAsTouched();
+      if (this.receivedForm.invalid) errors.push('Complete nombre y documento de quien recibe.');
+      if (!this.receivedPad || this.receivedPad.isEmpty()) errors.push('La firma de quien recibe es obligatoria.');
+      if (this.receivedPad && this.receivedForm.valid) {
+        receivedBy = {
+          name:      this.receivedForm.value.name!,
+          document:  this.receivedForm.value.document!,
+          signature: this.receivedPad.getBase64(),
+        };
+      }
+    }
+
+    if (errors.length || !receivedBy) {
+      this.errors.set(errors);
+      return null;
+    }
+
+    return deliveredBy ? { delivered_by: deliveredBy, received_by: receivedBy } : { received_by: receivedBy };
   }
 
   cancelMovements(): void {
@@ -173,24 +257,26 @@ export class MovementConfirmDialogComponent implements OnInit {
     }).afterClosed().subscribe(() => this.closeConfirmed());
   }
 
+  /**
+   * Cierra devolviendo las firmas tal como quedaron en el backend: con firma
+   * registrada o PIN el frontend no conoce de antemano nombre, documento ni imagen.
+   */
   closeConfirmed(): void {
-    const v   = this.signerForm.value;
-    const now = new Date().toISOString();
     const result: MovementConfirmResult = {
       confirmed:    true,
-      delivered_by: {
-        signer_name:     v.delivered_name!,
-        signer_document: v.delivered_document!,
-        signature_data:  this._capturedDeliveredB64,
-        signed_at:       now,
-      },
-      received_by: {
-        signer_name:     v.received_name!,
-        signer_document: v.received_document!,
-        signature_data:  this._capturedReceivedB64,
-        signed_at:       now,
-      },
+      delivered_by: this.toPdfSignature('delivered_by'),
+      received_by:  this.toPdfSignature('received_by'),
     };
     this.ref.close(result);
+  }
+
+  private toPdfSignature(role: 'delivered_by' | 'received_by'): MovementPdfSignature {
+    const sig = this._confirmedSignatures.find(s => s.role === role);
+    return {
+      signer_name:     sig?.signer_name ?? '',
+      signer_document: sig?.signer_document ?? '',
+      signature_data:  sig?.signature_data ?? '',
+      signed_at:       sig?.signed_at ?? new Date().toISOString(),
+    };
   }
 }

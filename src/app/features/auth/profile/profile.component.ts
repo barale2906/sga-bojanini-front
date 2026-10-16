@@ -16,6 +16,7 @@ import { AuthService } from '../../../core/services/auth.service';
 import { PageHeaderComponent } from '../../../shared/components/page-header/page-header.component';
 import { FormErrorsComponent } from '../../../shared/components/form-errors/form-errors.component';
 import { CustomValidators } from '../../../shared/validators/custom-validators';
+import { MySignatureComponent } from './my-signature/my-signature.component';
 
 @Component({
   selector: 'app-profile',
@@ -35,6 +36,7 @@ import { CustomValidators } from '../../../shared/validators/custom-validators';
     MatDividerModule,
     PageHeaderComponent,
     FormErrorsComponent,
+    MySignatureComponent,
   ],
   templateUrl: './profile.component.html',
   styleUrl: './profile.component.scss',
@@ -52,8 +54,10 @@ export class ProfileComponent {
   passwordErrors = signal<string[]>([]);
   fieldErrors = signal<Record<string, string[]>>({});
 
-  // Selected tab: if route is /profile/password, open tab 1
-  selectedTab = this.route.snapshot.url.some((s) => s.path === 'password') ? 1 : 0;
+  // Selected tab: /profile/password → tab 1, /profile/signature → tab 2
+  selectedTab = this.route.snapshot.url.some((s) => s.path === 'password')
+    ? 1
+    : this.route.snapshot.url.some((s) => s.path === 'signature') ? 2 : 0;
 
   passwordForm = this.fb.group(
     {

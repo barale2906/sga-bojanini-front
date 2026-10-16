@@ -85,6 +85,8 @@ export interface MedicalService {
 export interface MovementSignatureRecord {
   id?: number;
   role: 'delivered_by' | 'received_by';
+  /** pad = dibujada en el momento · stored = firma registrada (sesión) · pin = firma registrada validada con PIN */
+  method?: 'pad' | 'stored' | 'pin';
   signer_name: string;
   signer_document: string;
   signed_at: string;
@@ -121,9 +123,19 @@ export interface MovementDocument {
   movements?: Movement[];
 }
 
+export interface PadSignerPayload {
+  name:      string;
+  document:  string;
+  signature: string;
+}
+
+/**
+ * - `delivered_by` omitido → el backend usa la firma registrada del usuario autenticado.
+ * - `received_by` con `pin` → firma registrada del dueño del PIN; si no, firma en pad.
+ */
 export interface ConfirmMovementPayload {
-  delivered_by: { name: string; document: string; signature: string };
-  received_by:  { name: string; document: string; signature: string };
+  delivered_by?: PadSignerPayload;
+  received_by:   PadSignerPayload | { pin: string };
 }
 
 export interface UserSearchResult {

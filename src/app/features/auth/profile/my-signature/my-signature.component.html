@@ -1,0 +1,193 @@
+<mat-card class="my-signature-card">
+  <mat-card-header>
+    <mat-card-title>
+      <mat-icon>draw</mat-icon>
+      Mi firma
+    </mat-card-title>
+    <mat-card-subtitle>
+      Regístrela una vez: se aplicará al entregar movimientos y, con su PIN, al recibirlos.
+    </mat-card-subtitle>
+  </mat-card-header>
+
+  <mat-card-content>
+
+    @if (loading()) {
+      <div class="state-center">
+        <mat-spinner diameter="32"></mat-spinner>
+      </div>
+    } @else {
+
+      <!-- ── PIN recién generado (se muestra una sola vez) ── -->
+      @if (revealedPin()) {
+        <div class="pin-reveal">
+          <mat-icon class="pin-reveal__icon">key</mat-icon>
+          <div class="pin-reveal__body">
+            <strong>Su PIN de firma</strong>
+            <span class="pin-reveal__value">
+              {{ pinVisible() ? revealedPin() : pinMask }}
+            </span>
+            <span class="pin-reveal__hint">
+              Guárdelo en un lugar seguro. <b>No se volverá a mostrar.</b>
+              Lo usará para firmar cuando reciba un movimiento. No lo comparta.
+            </span>
+          </div>
+          <div class="pin-reveal__actions">
+            <button mat-icon-button type="button" (click)="pinVisible.update(v => !v)"
+                    [matTooltip]="pinVisible() ? 'Ocultar' : 'Mostrar'">
+              <mat-icon>{{ pinVisible() ? 'visibility_off' : 'visibility' }}</mat-icon>
+            </button>
+            <button mat-icon-button type="button" (click)="copyPin()" matTooltip="Copiar">
+              <mat-icon>content_copy</mat-icon>
+            </button>
+            <button mat-flat-button color="primary" type="button" (click)="dismissPin()">
+              Ya lo guardé
+            </button>
+          </div>
+        </div>
+      }
+
+      <app-form-errors [errors]="errors()"></app-form-errors>
+
+      <!-- ── Vista de la firma registrada ── -->
+      @if (mode() === 'view' && signature(); as sig) {
+        <div class="sig-view">
+          <div class="sig-view__image">
+            <img [src]="sig.signature_data" alt="Mi firma registrada">
+          </div>
+
+          <dl class="sig-view__data">
+            <dt>Nombre</dt>
+            <dd>{{ sig.signer_name }}</dd>
+            <dt>Documento</dt>
+            <dd>{{ sig.document_type_label }} · {{ sig.document_number }}</dd>
+            <dt>Registrada</dt>
+            <dd>{{ sig.registered_at | date: 'dd/MM/yyyy HH:mm' }}</dd>
+            <dt>PIN</dt>
+            <dd>
+              @if (sig.has_pin) {
+                <span class="pin-badge pin-badge--ok">
+                  <mat-icon>verified_user</mat-icon> Activo
+                  @if (sig.pin_generated_at) {
+                    desde {{ sig.pin_generated_at | date: 'dd/MM/yyyy' }}
+                  }
+                </span>
+              } @else {
+                <span class="pin-badge pin-badge--none">Sin PIN</span>
+              }
+            </dd>
+          </dl>
+        </div>
+
+        <div class="actions">
+          <button mat-stroked-button type="button" (click)="startRegenerate()">
+            <mat-icon>key</mat-icon>
+            Generar nuevo PIN
+          </button>
+          <button mat-flat-button color="primary" type="button" (click)="startEdit()">
+            <mat-icon>edit</mat-icon>
+            Actualizar firma
+          </button>
+        </div>
+      }
+
+      <!-- ── Registrar / actualizar ── -->
+      @if (mode() === 'edit') {
+        @if (!signature()) {
+          <div class="info-banner">
+            <mat-icon>info</mat-icon>
+            Aún no tiene firma registrada. Al guardarla el sistema le asignará un PIN de {{ pinLength }} dígitos.
+          </div>
+        }
+
+        <form [formGroup]="form" (ngSubmit)="save()" novalidate class="sig-form">
+          <div class="sig-form__row">
+            <mat-form-field appearance="outline">
+              <mat-label>Tipo de documento</mat-label>
+              <mat-select formControlName="document_type">
+                @for (t of documentTypes(); track t.value) {
+                  <mat-option [value]="t.value">{{ t.label }}</mat-option>
+                }
+              </mat-select>
+            </mat-form-field>
+
+            <mat-form-field appearance="outline">
+              <mat-label>Número de documento</mat-label>
+              <input matInput formControlName="document_number" maxlength="20" autocomplete="off">
+              <mat-hint>Sin puntos ni espacios</mat-hint>
+              @if (form.get('document_number')?.hasError('pattern')) {
+                <mat-error>Solo letras y números</mat-error>
+              } @else if (form.get('document_number')?.invalid && form.get('document_number')?.touched) {
+                <mat-error>Entre 4 y 20 caracteres</mat-error>
+              }
+            </mat-form-field>
+          </div>
+
+          <div class="sig-label">
+            <mat-icon>draw</mat-icon>
+            Firma
+            @if (padTouched() && pad?.isEmpty()) {
+              <span class="sig-required-hint">La firma es obligatoria</span>
+            }
+          </div>
+          <app-signature-capture-pad #pad></app-signature-capture-pad>
+
+          <mat-form-field appearance="outline" class="w-full password-field">
+            <mat-label>Contraseña actual</mat-label>
+            <mat-icon matPrefix>lock_outline</mat-icon>
+            <input matInput [type]="showPassword() ? 'text' : 'password'" formControlName="current_password" autocomplete="current-password">
+            <button mat-icon-button matSuffix type="button" (click)="showPassword.update(v => !v)">
+              <mat-icon>{{ showPassword() ? 'visibility_off' : 'visibility' }}</mat-icon>
+            </button>
+            <mat-hint>Por seguridad, confirme su identidad</mat-hint>
+          </mat-form-field>
+
+          <div class="actions">
+            @if (signature()) {
+              <button mat-button type="button" (click)="cancel()" [disabled]="saving()">Cancelar</button>
+            }
+            <button mat-flat-button color="primary" type="submit" [disabled]="saving()">
+              @if (saving()) {
+                <mat-spinner diameter="16"></mat-spinner>
+              } @else {
+                <mat-icon>save</mat-icon>
+              }
+              {{ signature() ? 'Guardar nueva firma' : 'Registrar firma' }}
+            </button>
+          </div>
+        </form>
+      }
+
+      <!-- ── Regenerar PIN ── -->
+      @if (mode() === 'regenerate') {
+        <div class="info-banner info-banner--warn">
+          <mat-icon>warning</mat-icon>
+          Su PIN actual dejará de funcionar de inmediato.
+        </div>
+
+        <form [formGroup]="pinForm" (ngSubmit)="regeneratePin()" novalidate class="sig-form">
+          <mat-form-field appearance="outline" class="w-full">
+            <mat-label>Contraseña actual</mat-label>
+            <mat-icon matPrefix>lock_outline</mat-icon>
+            <input matInput [type]="showPassword() ? 'text' : 'password'" formControlName="current_password" autocomplete="current-password">
+            <button mat-icon-button matSuffix type="button" (click)="showPassword.update(v => !v)">
+              <mat-icon>{{ showPassword() ? 'visibility_off' : 'visibility' }}</mat-icon>
+            </button>
+          </mat-form-field>
+
+          <div class="actions">
+            <button mat-button type="button" (click)="cancel()" [disabled]="saving()">Cancelar</button>
+            <button mat-flat-button color="warn" type="submit" [disabled]="saving()">
+              @if (saving()) {
+                <mat-spinner diameter="16"></mat-spinner>
+              } @else {
+                <mat-icon>key</mat-icon>
+              }
+              Generar nuevo PIN
+            </button>
+          </div>
+        </form>
+      }
+    }
+
+  </mat-card-content>
+</mat-card>
