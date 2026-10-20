@@ -200,27 +200,8 @@
             </mat-form-field>
           }
 
-          <!-- Ubicación de origen + botón agregar -->
+          <!-- Botón agregar (la ubicación de origen la decide el backend según dónde está guardado el lote) -->
           @if (draftProduct() && !loadingDraftFefo() && !draftFetchError()) {
-            @if (locations().length > 0) {
-              <mat-form-field appearance="outline" class="full-field">
-                <mat-label>Ubicación de origen</mat-label>
-                @if (loadingLocations()) {
-                  <mat-spinner matPrefix diameter="16" style="margin:0 6px 0 4px"></mat-spinner>
-                } @else {
-                  <mat-icon matPrefix>place</mat-icon>
-                }
-                <mat-select [ngModel]="draftLocationId()" (ngModelChange)="draftLocationId.set($event)">
-                  <mat-option [value]="null">Sin ubicación específica</mat-option>
-                  @for (l of locations(); track l.id) {
-                    <mat-option [value]="l.id">
-                      {{ l.name }}
-                    </mat-option>
-                  }
-                </mat-select>
-              </mat-form-field>
-            }
-
             <div class="add-btn-row">
               <button mat-raised-button color="accent" type="button"
                       [disabled]="!canAdd()"

@@ -1,0 +1,105 @@
+.tab-body { padding-top: 1rem; }
+
+.tab-toolbar {
+  display: flex; gap: 0.75rem; align-items: center; flex-wrap: wrap; margin-bottom: 1rem;
+  .search-field { flex: 1; min-width: 220px; }
+  .select-field { width: 170px; }
+  .spacer { flex: 1 1 0; }
+  mat-form-field { margin-bottom: -1.25em; }
+}
+
+.toolbar-hint {
+  display: flex; align-items: center; gap: 0.4rem; margin: 0; color: #4a5568; font-size: 0.85rem;
+  mat-icon { color: #3182ce; }
+}
+
+.stat-cards {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 0.75rem; margin-bottom: 1rem;
+}
+
+.stat-card {
+  display: flex; flex-direction: column; align-items: flex-start; gap: 0.15rem;
+  padding: 0.85rem 1rem; border-radius: 10px; border: 1px solid #e2e8f0; background: #fff;
+  font: inherit; text-align: left; cursor: pointer; transition: box-shadow 0.15s;
+  &:hover { box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08); }
+  &__n { font-size: 1.6rem; font-weight: 700; color: #2d3748; line-height: 1.1; }
+  &__n--sm { font-size: 1.1rem; }
+  &__l { font-size: 0.78rem; color: #718096; }
+  &--ok .stat-card__n { color: #2f855a; }
+  &--warn .stat-card__n { color: #c05621; }
+  &--bad .stat-card__n { color: #c53030; }
+  &--info .stat-card__n { color: #2b6cb0; }
+}
+
+div.stat-card { cursor: default; &:hover { box-shadow: none; } }
+
+.site-distribution { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 1rem; }
+
+.site-pill {
+  display: inline-flex; align-items: center; gap: 0.35rem; padding: 0.3rem 0.8rem;
+  border-radius: 9999px; border: 1px solid #e2e8f0; background: #fff; cursor: pointer; font: inherit; font-size: 0.82rem; color: #4a5568;
+  mat-icon { font-size: 1rem; width: 1rem; height: 1rem; }
+  &--active { border-color: #C02F86; background: #fdf2f8; color: #97266d; }
+}
+
+.table-wrap { border-radius: 8px; overflow: auto; background: #fff; }
+
+.code-tag {
+  background: #EDF2F7; color: #4a5568; padding: 0.15rem 0.5rem; border-radius: 4px;
+  font-size: 0.8rem; font-family: monospace; text-decoration: none;
+}
+
+.asset-name { color: #2d3748; font-weight: 600; text-decoration: none; &:hover { text-decoration: underline; } }
+
+.sub { font-size: 0.75rem; color: #718096; }
+
+.off-premises {
+  display: inline-flex; align-items: center; gap: 0.25rem; color: #c05621; font-size: 0.85rem;
+  mat-icon { font-size: 1rem; width: 1rem; height: 1rem; }
+}
+
+.overdue { color: #c53030; font-weight: 600; }
+
+.pending-icon, .sign-icon { font-size: 1.05rem; width: 1.05rem; height: 1.05rem; vertical-align: middle; color: #dd6b20; margin-left: 0.25rem; }
+
+.sel { width: 44px; }
+.act { width: 1%; white-space: nowrap; text-align: right; }
+
+tr.retired td { opacity: 0.6; }
+
+.no-data { text-align: center; padding: 2.5rem; color: #a0aec0; }
+
+.tab-badge {
+  margin-left: 0.4rem; background: #dd6b20; color: #fff; border-radius: 9999px;
+  font-size: 0.7rem; font-weight: 700; padding: 0.05rem 0.45rem;
+}
+
+// ── Catálogos ───────────────────────────────────────────────
+.catalogs { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; align-items: start;
+  @media (max-width: 1100px) { grid-template-columns: 1fr; } }
+
+.section-head {
+  display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.75rem;
+  h3 { margin: 0; color: #2d3748; }
+}
+
+.site-card {
+  border: 1px solid #e2e8f0; border-radius: 10px; background: #fff; margin-bottom: 0.75rem;
+  &.inactive { opacity: 0.6; }
+  &__head {
+    display: flex; align-items: center; gap: 0.5rem; padding: 0.4rem 0.75rem; border-bottom: 1px solid #edf2f7;
+    mat-icon { color: #C02F86; }
+    .spacer { flex: 1; }
+  }
+}
+
+.places { display: flex; flex-wrap: wrap; gap: 0.5rem; padding: 0.75rem; }
+
+.place {
+  display: inline-flex; align-items: center; gap: 0.3rem; padding: 0.15rem 0.3rem 0.15rem 0.6rem;
+  border-radius: 9999px; background: #f7fafc; border: 1px solid #e2e8f0; font-size: 0.82rem;
+  &.inactive { opacity: 0.55; text-decoration: line-through; }
+  > mat-icon { font-size: 1rem; width: 1rem; height: 1rem; color: #718096; }
+  .count { background: #e2e8f0; border-radius: 9999px; padding: 0 0.4rem; font-size: 0.72rem; font-weight: 700; }
+  .mini { width: 28px; height: 28px; padding: 2px; mat-icon { font-size: 1rem; width: 1rem; height: 1rem; } }
+}

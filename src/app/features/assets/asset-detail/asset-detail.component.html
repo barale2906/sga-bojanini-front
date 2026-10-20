@@ -1,0 +1,117 @@
+<app-loading-spinner [loading]="loading() && !asset()"></app-loading-spinner>
+
+@if (asset(); as a) {
+  <div class="detail-header">
+    <a mat-icon-button routerLink="/assets" matTooltip="Volver al inventario"><mat-icon>arrow_back</mat-icon></a>
+    <div class="title-block">
+      <div class="title-row">
+        <span class="code">{{ a.code }}</span>
+        <h1>{{ a.name }}</h1>
+        <app-tone-chip [label]="a.status_label" [tone]="statusTone[a.status]"></app-tone-chip>
+      </div>
+      <div class="subtitle">
+        {{ a.category?.name }} · {{ a.asset_type_label }}
+        · <mat-icon class="inline-icon">place</mat-icon>
+        @if (a.location.is_off_premises) {
+          <span class="off">Fuera de las instalaciones: {{ a.location.off_premises_location }}</span>
+        } @else {
+          {{ a.location.site_name }} → {{ a.location.place_name }}
+        }
+        @if (a.responsible) { · <mat-icon class="inline-icon">person</mat-icon> {{ a.responsible.name }} }
+      </div>
+    </div>
+    <div class="header-actions">
+      @if (!retired()) {
+        <button *sgaPermission="'activos_traslados.solicitar'" mat-flat-button color="primary" (click)="transfer()" [disabled]="!!a.pending_transfer">
+          <mat-icon>swap_horiz</mat-icon> Trasladar
+        </button>
+      }
+      <button mat-stroked-button [matMenuTriggerFor]="moreMenu"><mat-icon>more_horiz</mat-icon></button>
+      <mat-menu #moreMenu="matMenu">
+        @if (!retired()) {
+          <button mat-menu-item *sgaPermission="'activos.editar'" (click)="edit()"><mat-icon>edit</mat-icon> Editar datos</button>
+          <button mat-menu-item *sgaPermission="'activos.editar'" (click)="changeStatus()"><mat-icon>published_with_changes</mat-icon> Cambiar estado</button>
+        }
+        <button mat-menu-item (click)="lifeSheet()"><mat-icon>picture_as_pdf</mat-icon> Hoja de vida (PDF)</button>
+        <button mat-menu-item (click)="label()"><mat-icon>qr_code_2</mat-icon> Etiqueta con código de barras</button>
+      </mat-menu>
+    </div>
+  </div>
+
+  @if (a.pending_transfer) {
+    <div class="banner banner--warn">
+      <mat-icon>pending_actions</mat-icon>
+      <span><strong>{{ a.pending_transfer.type_label }}</strong> pendiente de firma de entrega y recibido. El activo no cambia de ubicación hasta firmar.</span>
+      <button *sgaPermission="'activos_traslados.confirmar'" mat-flat-button color="primary" (click)="signPendingTransfer()"><mat-icon>draw</mat-icon> Firmar</button>
+    </div>
+  }
+  @if (retired()) {
+    <div class="banner banner--muted">
+      <mat-icon>block</mat-icon>
+      <span>Activo dado de baja el {{ a.retired_at | date:'dd/MM/yyyy':'UTC' }}. Motivo: {{ a.retirement_reason }}</span>
+    </div>
+  }
+  @if (a.next_maintenance?.is_overdue) {
+    <div class="banner banner--bad">
+      <mat-icon>warning</mat-icon>
+      <span>Mantenimiento {{ a.next_maintenance?.type_label?.toLowerCase() }} vencido desde el {{ a.next_maintenance?.scheduled_date | date:'dd/MM/yyyy':'UTC' }}.</span>
+    </div>
+  }
+
+  <mat-tab-group color="primary" animationDuration="150ms">
+    <mat-tab label="Resumen">
+      <div class="tab-body summary-grid">
+        <section class="card">
+          <h3><mat-icon>info</mat-icon> Datos generales</h3>
+          <dl class="data-list">
+            <dt>Marca / modelo</dt><dd>{{ a.brand ?? '—' }} / {{ a.model ?? '—' }}</dd>
+            <dt>Serial</dt><dd>{{ a.serial ?? '—' }}</dd>
+            <dt>Fecha de adquisición</dt><dd>{{ a.acquisition_date ? (a.acquisition_date | date:'dd/MM/yyyy':'UTC') : '—' }}</dd>
+            <dt>Valor de adquisición</dt><dd>{{ a.acquisition_value ? (+a.acquisition_value | currency:'COP':'symbol-narrow':'1.0-0') : '—' }}</dd>
+            <dt>Proveedor</dt><dd>{{ a.supplier?.name ?? '—' }}</dd>
+            <dt>Factura</dt><dd>{{ a.invoice_number ?? '—' }}</dd>
+            <dt>Garantía hasta</dt><dd>{{ a.warranty_until ? (a.warranty_until | date:'dd/MM/yyyy':'UTC') : '—' }}</dd>
+            @if (a.requires_maintenance) {
+              <dt>Próximo mantenimiento</dt>
+              <dd>
+                @if (a.next_maintenance; as m) { {{ m.type_label }} — {{ m.scheduled_date | date:'dd/MM/yyyy':'UTC' }} } @else { Sin programar }
+              </dd>
+            }
+            @if (a.description) { <dt>Descripción</dt><dd>{{ a.description }}</dd> }
+            @if (a.notes) { <dt>Observaciones</dt><dd>{{ a.notes }}</dd> }
+            <dt>Registrado</dt><dd>{{ a.created_at | date:'dd/MM/yyyy' }} · {{ a.created_by?.name }}</dd>
+          </dl>
+        </section>
+        <section class="card">
+          <app-asset-comments-panel [assetId]="a.id" [readonly]="retired()"></app-asset-comments-panel>
+        </section>
+      </div>
+    </mat-tab>
+
+    @if (a.requires_maintenance && a.asset_type) {
+      <mat-tab label="Hoja de vida">
+        <div class="tab-body">
+          <app-technical-profile-form [assetId]="a.id" [assetType]="a.asset_type" [readonly]="retired()"></app-technical-profile-form>
+        </div>
+      </mat-tab>
+
+      <mat-tab label="Mantenimiento" *sgaPermission="'activos_mantenimientos.ver'">
+        <div class="tab-body">
+          <app-asset-maintenance-panel [asset]="a" [readonly]="retired()" (changed)="refresh()"></app-asset-maintenance-panel>
+        </div>
+      </mat-tab>
+    }
+
+    <mat-tab label="Documentos">
+      <div class="tab-body">
+        <app-asset-documents-panel [assetId]="a.id" [readonly]="retired()"></app-asset-documents-panel>
+      </div>
+    </mat-tab>
+
+    <mat-tab label="Historial">
+      <div class="tab-body">
+        <app-asset-history-panel [assetId]="a.id"></app-asset-history-panel>
+      </div>
+    </mat-tab>
+  </mat-tab-group>
+}

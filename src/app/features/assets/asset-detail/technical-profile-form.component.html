@@ -1,0 +1,120 @@
+<form [formGroup]="form" class="profile-form">
+  <app-form-errors [errors]="errors()"></app-form-errors>
+
+  <h4 class="group-title">Datos generales</h4>
+  <div class="fields">
+    <mat-form-field appearance="outline"><mat-label>Fabricante</mat-label><input matInput formControlName="manufacturer"></mat-form-field>
+    <mat-form-field appearance="outline"><mat-label>País de origen</mat-label><input matInput formControlName="country_of_origin"></mat-form-field>
+    <mat-form-field appearance="outline"><mat-label>Año de fabricación</mat-label><input matInput type="number" formControlName="manufacture_year"></mat-form-field>
+    <mat-form-field appearance="outline"><mat-label>Vida útil (años)</mat-label><input matInput type="number" formControlName="useful_life_years"></mat-form-field>
+    <mat-form-field appearance="outline">
+      <mat-label>Forma de adquisición</mat-label>
+      <mat-select formControlName="acquisition_mode">
+        <mat-option value="">—</mat-option>
+        <mat-option value="purchase">Compra</mat-option>
+        <mat-option value="donation">Donación</mat-option>
+        <mat-option value="comodato">Comodato</mat-option>
+        <mat-option value="leasing">Leasing</mat-option>
+      </mat-select>
+    </mat-form-field>
+  </div>
+
+  @if (assetType === 'biomedical') {
+    <h4 class="group-title">Equipo biomédico</h4>
+    <div class="fields">
+      <mat-form-field appearance="outline"><mat-label>Registro INVIMA</mat-label><input matInput formControlName="invima_registry"></mat-form-field>
+      <mat-form-field appearance="outline">
+        <mat-label>Clase de riesgo</mat-label>
+        <mat-select formControlName="risk_class">
+          <mat-option value="">—</mat-option>
+          <mat-option value="I">I — Bajo</mat-option>
+          <mat-option value="IIa">IIa — Moderado</mat-option>
+          <mat-option value="IIb">IIb — Alto</mat-option>
+          <mat-option value="III">III — Muy alto</mat-option>
+        </mat-select>
+      </mat-form-field>
+      <mat-form-field appearance="outline">
+        <mat-label>Clasificación biomédica</mat-label>
+        <mat-select formControlName="biomedical_class">
+          <mat-option value="">—</mat-option>
+          <mat-option value="diagnosis">Diagnóstico</mat-option>
+          <mat-option value="treatment">Tratamiento</mat-option>
+          <mat-option value="rehabilitation">Rehabilitación</mat-option>
+          <mat-option value="prevention">Prevención</mat-option>
+          <mat-option value="laboratory">Análisis de laboratorio</mat-option>
+        </mat-select>
+      </mat-form-field>
+      <mat-form-field appearance="outline">
+        <mat-label>Fuente de energía</mat-label>
+        <mat-select formControlName="power_source">
+          <mat-option value="">—</mat-option>
+          <mat-option value="electric">Eléctrica</mat-option>
+          <mat-option value="battery">Batería</mat-option>
+          <mat-option value="pneumatic">Neumática</mat-option>
+          <mat-option value="mechanical">Mecánica</mat-option>
+          <mat-option value="other">Otra</mat-option>
+        </mat-select>
+      </mat-form-field>
+      <mat-form-field appearance="outline"><mat-label>Voltaje</mat-label><input matInput formControlName="voltage"></mat-form-field>
+      <mat-form-field appearance="outline"><mat-label>Corriente</mat-label><input matInput formControlName="current"></mat-form-field>
+      <mat-form-field appearance="outline"><mat-label>Potencia</mat-label><input matInput formControlName="power"></mat-form-field>
+      <mat-form-field appearance="outline"><mat-label>Frecuencia</mat-label><input matInput formControlName="frequency"></mat-form-field>
+      <mat-slide-toggle formControlName="requires_calibration" color="primary" class="toggle">Requiere calibración</mat-slide-toggle>
+      <mat-form-field appearance="outline" class="wide"><mat-label>Condiciones de operación</mat-label><textarea matInput formControlName="operating_conditions" rows="2"></textarea></mat-form-field>
+    </div>
+  }
+
+  @if (assetType === 'computing') {
+    <h4 class="group-title">Equipo de cómputo</h4>
+    <div class="fields">
+      <mat-form-field appearance="outline"><mat-label>Procesador</mat-label><input matInput formControlName="processor"></mat-form-field>
+      <mat-form-field appearance="outline"><mat-label>Memoria RAM</mat-label><input matInput formControlName="ram"></mat-form-field>
+      <mat-form-field appearance="outline"><mat-label>Almacenamiento</mat-label><input matInput formControlName="storage"></mat-form-field>
+      <mat-form-field appearance="outline"><mat-label>Sistema operativo</mat-label><input matInput formControlName="operating_system"></mat-form-field>
+      <mat-form-field appearance="outline"><mat-label>Nombre del equipo</mat-label><input matInput formControlName="hostname"></mat-form-field>
+      <mat-form-field appearance="outline"><mat-label>Dirección IP</mat-label><input matInput formControlName="ip_address"></mat-form-field>
+      <mat-form-field appearance="outline"><mat-label>Dirección MAC</mat-label><input matInput formControlName="mac_address" placeholder="00:1A:2B:3C:4D:5E"></mat-form-field>
+    </div>
+
+    <h4 class="group-title">Licencias
+      @if (canEdit) { <button mat-button type="button" color="primary" (click)="addLicense()"><mat-icon>add</mat-icon> Agregar</button> }
+    </h4>
+    <div formArrayName="licenses" class="dyn-list">
+      @for (l of licenses.controls; track $index; let i = $index) {
+        <div class="dyn-row" [formGroupName]="i">
+          <mat-form-field appearance="outline"><mat-label>Software</mat-label><input matInput formControlName="name"></mat-form-field>
+          <mat-form-field appearance="outline"><mat-label>Clave / serial</mat-label><input matInput formControlName="key"></mat-form-field>
+          <mat-form-field appearance="outline"><mat-label>Vence (AAAA-MM-DD)</mat-label><input matInput formControlName="expires_at"></mat-form-field>
+          @if (canEdit) { <button mat-icon-button type="button" color="warn" (click)="licenses.removeAt(i)"><mat-icon>delete</mat-icon></button> }
+        </div>
+      } @empty { <p class="empty">Sin licencias registradas.</p> }
+    </div>
+  }
+
+  <h4 class="group-title">Especificaciones técnicas
+    @if (canEdit) { <button mat-button type="button" color="primary" (click)="addSpec()"><mat-icon>add</mat-icon> Agregar</button> }
+  </h4>
+  <div formArrayName="specs" class="dyn-list">
+    @for (s of specs.controls; track $index; let i = $index) {
+      <div class="dyn-row dyn-row--2" [formGroupName]="i">
+        <mat-form-field appearance="outline"><mat-label>Característica</mat-label><input matInput formControlName="key"></mat-form-field>
+        <mat-form-field appearance="outline"><mat-label>Valor</mat-label><input matInput formControlName="value"></mat-form-field>
+        @if (canEdit) { <button mat-icon-button type="button" color="warn" (click)="specs.removeAt(i)"><mat-icon>delete</mat-icon></button> }
+      </div>
+    } @empty { <p class="empty">Sin especificaciones adicionales.</p> }
+  </div>
+
+  <div class="fields">
+    <mat-form-field appearance="outline" class="wide"><mat-label>Accesorios</mat-label><textarea matInput formControlName="accessories" rows="2"></textarea></mat-form-field>
+    <mat-form-field appearance="outline" class="wide"><mat-label>Recomendaciones de uso</mat-label><textarea matInput formControlName="usage_recommendations" rows="2"></textarea></mat-form-field>
+  </div>
+
+  @if (canEdit) {
+    <div class="form-actions">
+      @if (updatedAt()) { <span class="empty">Última actualización: {{ updatedAt()?.substring(0, 10) }}</span> }
+      <button mat-flat-button color="primary" type="button" (click)="save()" [disabled]="form.invalid || saving()">
+        <mat-icon>save</mat-icon> Guardar hoja de vida
+      </button>
+    </div>
+  }
+</form>

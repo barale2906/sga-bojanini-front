@@ -1,0 +1,99 @@
+// Estilos compartidos por la ficha del activo y sus paneles.
+
+.detail-header {
+  display: flex; align-items: flex-start; gap: 0.75rem; margin-bottom: 1rem;
+  padding-bottom: 1rem; border-bottom: 1px solid #e2e8f0;
+}
+
+.title-block { flex: 1; min-width: 0; }
+
+.title-row {
+  display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap;
+  h1 { margin: 0; font-size: 1.4rem; color: #2d3748; }
+}
+
+.code {
+  font-family: monospace; font-size: 0.95rem; font-weight: 700; letter-spacing: 1px;
+  background: #fdf2f8; color: #97266d; padding: 0.15rem 0.5rem; border-radius: 6px;
+}
+
+.subtitle { margin-top: 0.35rem; color: #4a5568; font-size: 0.88rem; display: flex; align-items: center; flex-wrap: wrap; gap: 0.25rem; }
+
+.inline-icon { font-size: 1rem; width: 1rem; height: 1rem; color: #718096; }
+
+.off { color: #c05621; font-weight: 600; }
+
+.header-actions { display: flex; gap: 0.5rem; align-items: center; }
+
+.banner {
+  display: flex; align-items: center; gap: 0.6rem; padding: 0.65rem 0.9rem; border-radius: 8px;
+  margin-bottom: 0.75rem; font-size: 0.88rem;
+  span { flex: 1; }
+  &--warn { background: #fffaf0; border: 1px solid #fbd38d; color: #7b341e; mat-icon { color: #dd6b20; } }
+  &--bad { background: #fff5f5; border: 1px solid #feb2b2; color: #742a2a; mat-icon { color: #c53030; } }
+  &--muted { background: #f7fafc; border: 1px solid #e2e8f0; color: #4a5568; }
+}
+
+.tab-body { padding-top: 1rem; }
+
+.summary-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; align-items: start;
+  @media (max-width: 960px) { grid-template-columns: 1fr; } }
+
+.card {
+  background: #fff; border: 1px solid #e2e8f0; border-radius: 10px; padding: 1rem;
+  h3 { display: flex; align-items: center; gap: 0.4rem; margin: 0 0 0.75rem; font-size: 1rem; color: #2d3748;
+    mat-icon { color: #C02F86; } }
+}
+
+.data-list {
+  display: grid; grid-template-columns: 180px 1fr; gap: 0.4rem 0.75rem; margin: 0; font-size: 0.88rem;
+  dt { color: #718096; }
+  dd { margin: 0; color: #2d3748; }
+}
+
+// ── Paneles con tablas ──────────────────────────────────────
+.panel-head {
+  display: flex; align-items: center; justify-content: space-between; gap: 1rem; margin-bottom: 0.75rem;
+  h3 { display: flex; align-items: center; gap: 0.4rem; margin: 0; font-size: 1rem; color: #2d3748;
+    mat-icon { color: #C02F86; } }
+  &.spaced { margin-top: 1.5rem; }
+}
+
+.hint { color: #718096; font-size: 0.85rem; }
+
+.table-wrap { border-radius: 8px; overflow: auto; background: #fff; }
+
+.sub { font-size: 0.75rem; color: #718096; }
+
+.act { width: 1%; white-space: nowrap; text-align: right; }
+
+.no-data { text-align: center; padding: 2rem; color: #a0aec0; }
+
+.expired { color: #c53030; font-weight: 600; }
+
+.tag-icon { font-size: 1rem; width: 1rem; height: 1rem; vertical-align: middle; color: #718096; margin-left: 0.25rem; }
+
+// ── Hoja de vida ────────────────────────────────────────────
+.profile-form { max-width: 1100px; }
+
+.group-title {
+  display: flex; align-items: center; gap: 0.5rem; margin: 1rem 0 0.5rem; color: #2d3748; font-size: 0.95rem;
+  border-bottom: 1px solid #edf2f7; padding-bottom: 0.25rem;
+}
+
+.fields {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 0 0.75rem; align-items: center;
+  .wide { grid-column: 1 / -1; }
+  .toggle { margin-bottom: 1.25rem; }
+}
+
+.dyn-list { display: flex; flex-direction: column; }
+
+.dyn-row {
+  display: grid; grid-template-columns: 2fr 2fr 1.2fr auto; gap: 0.5rem; align-items: center;
+  &--2 { grid-template-columns: 1fr 2fr auto; }
+}
+
+.empty { color: #a0aec0; font-size: 0.85rem; margin: 0 0 0.5rem; }
+
+.form-actions { display: flex; justify-content: flex-end; align-items: center; gap: 1rem; margin-top: 0.5rem; }

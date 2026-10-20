@@ -1,0 +1,125 @@
+<h2 mat-dialog-title class="dlg-title">
+  <mat-icon>swap_horiz</mat-icon> Trasladar {{ asset.code }} — {{ asset.name }}
+</h2>
+
+<mat-dialog-content class="dlg-content">
+  <div class="current-location">
+    <mat-icon>place</mat-icon>
+    <span>
+      Ubicación actual:
+      <strong>
+        @if (asset.location.is_off_premises) {
+          Fuera de las instalaciones ({{ asset.location.off_premises_location }})
+        } @else {
+          {{ asset.location.site_name }} → {{ asset.location.place_name }}
+        }
+      </strong>
+      @if (asset.responsible) { · Responsable: {{ asset.responsible.name }} }
+    </span>
+  </div>
+
+  <app-form-errors [errors]="errors()"></app-form-errors>
+
+  <form [formGroup]="form" class="form-col">
+    <mat-form-field appearance="outline">
+      <mat-label>Tipo de traslado *</mat-label>
+      <mat-select formControlName="type">
+        @for (t of types(); track t.value) {
+          <mat-option [value]="t.value">{{ t.label }}</mat-option>
+        }
+      </mat-select>
+    </mat-form-field>
+
+    @if (needsPlace()) {
+      <app-site-place-picker [placeControl]="form.controls.to_place_id" [required]="form.value.type === 'return'"
+                             [excludePlaceId]="asset.location.place_id"></app-site-place-picker>
+
+      <mat-form-field appearance="outline">
+        <mat-label>Nuevo responsable</mat-label>
+        <mat-select formControlName="to_responsible_id">
+          <mat-option [value]="null">Sin cambio</mat-option>
+          @for (u of store.users(); track u.id) {
+            <mat-option [value]="u.id">{{ u.name }}</mat-option>
+          }
+        </mat-select>
+        @if (form.value.type === 'relocation') {
+          <mat-hint>Puede cambiar solo el sitio, solo el responsable o ambos</mat-hint>
+        }
+      </mat-form-field>
+    }
+
+    @if (goesOut()) {
+      <mat-form-field appearance="outline">
+        <mat-label>{{ form.value.type === 'retirement' ? 'Disposición final' : 'Destino fuera de las instalaciones' }}{{ form.value.type === 'retirement' ? '' : ' *' }}</mat-label>
+        <input matInput formControlName="external_destination" maxlength="200"
+               [placeholder]="form.value.type === 'retirement' ? 'Gestor de residuos, donación…' : 'Taller, entidad, sede externa…'">
+      </mat-form-field>
+    }
+
+    @if (form.value.type === 'external_repair') {
+      <mat-form-field appearance="outline">
+        <mat-label>Proveedor</mat-label>
+        <mat-select formControlName="supplier_id">
+          <mat-option [value]="null">—</mat-option>
+          @for (s of store.suppliers(); track s.id) {
+            <mat-option [value]="s.id">{{ s.name }}</mat-option>
+          }
+        </mat-select>
+      </mat-form-field>
+    }
+
+    @if (form.value.type === 'external_repair' || form.value.type === 'loan') {
+      <mat-form-field appearance="outline">
+        <mat-label>Fecha esperada de retorno</mat-label>
+        <input matInput [matDatepicker]="returnPicker" formControlName="expected_return_date" [min]="today">
+        <mat-datepicker-toggle matSuffix [for]="returnPicker"></mat-datepicker-toggle>
+        <mat-datepicker #returnPicker></mat-datepicker>
+      </mat-form-field>
+    }
+
+    @if (form.value.type === 'return') {
+      <mat-form-field appearance="outline">
+        <mat-label>Estado al regresar</mat-label>
+        <mat-select formControlName="resulting_status">
+          @for (s of store.catalogs()?.settable_statuses ?? []; track s.value) {
+            <mat-option [value]="s.value">{{ s.label }}</mat-option>
+          }
+        </mat-select>
+      </mat-form-field>
+    }
+
+    <mat-form-field appearance="outline">
+      <mat-label>Motivo{{ form.value.type === 'retirement' ? ' de la baja *' : '' }}</mat-label>
+      <textarea matInput formControlName="reason" rows="2" maxlength="1000"></textarea>
+    </mat-form-field>
+
+    @if (resolved().requiresSignature) {
+      <div class="notice notice--warn">
+        <mat-icon>verified_user</mat-icon>
+        <div>
+          <strong>{{ resolved().type === 'site_transfer' ? 'Traslado a otra sede' : 'El activo sale del edificio' }}: la firma es obligatoria.</strong>
+          <span>Puede firmar ahora o dejar el traslado pendiente; no se aplica hasta que firmen quien entrega y quien recibe.</span>
+        </div>
+      </div>
+      <mat-slide-toggle formControlName="sign_now" color="primary">Firmar ahora</mat-slide-toggle>
+    } @else {
+      <mat-slide-toggle formControlName="sign_now" color="primary">Registrar firmas de entrega y recibido (opcional)</mat-slide-toggle>
+    }
+
+    @if (form.value.sign_now) {
+      <app-signers-form></app-signers-form>
+    }
+  </form>
+</mat-dialog-content>
+
+<mat-dialog-actions align="end">
+  <button mat-button [mat-dialog-close]="null">Cancelar</button>
+  <button mat-flat-button color="primary" (click)="submit()" [disabled]="!canSubmit()">
+    @if (saving()) { <mat-spinner diameter="16" class="inline-spinner"></mat-spinner> }
+    @if (resolved().requiresSignature && !form.value.sign_now) {
+      Registrar (pendiente de firma)
+    } @else {
+      {{ form.value.sign_now ? 'Firmar y aplicar' : 'Aplicar traslado' }}
+    }
+  </button>
+</mat-dialog-actions>

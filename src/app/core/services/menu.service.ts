@@ -51,6 +51,11 @@ export class MenuService {
     'service-orders.approve':   '/service-orders/descuentos',
     'price-lists.index':        '/service-orders/precios',
     'price-lists.create':       '/service-orders/precios',
+    // Activos
+    'assets.index': '/assets',
+    'asset-transfers.index': '/assets',
+    'asset-catalogs.index': '/assets',
+    'asset-maintenance.index': '/assets/maintenance',
     // Reportes / Auditoría
     'reports.index': '/reports',
     'audit.index': '/audit',

@@ -13,7 +13,7 @@ import { MatSnackBar } from '@angular/material/snack-bar';
 import { MatDialog } from '@angular/material/dialog';
 import { finalize } from 'rxjs';
 import { InventoryService, BatchDetail, CostCenter, MovementDocument } from '../inventory.service';
-import { WarehouseService, Warehouse, Location } from '../../warehouse/warehouse.service';
+import { WarehouseService, Warehouse } from '../../warehouse/warehouse.service';
 import { MedicalServicesService, MedicalService } from '../medical-services.service';
 import { Product } from '../../catalog/catalog.service';
 import { MovementPdfService } from '../../../shared/services/movement-pdf.service';
@@ -25,7 +25,6 @@ import { FormErrorsComponent } from '../../../shared/components/form-errors/form
 interface CartItem {
   product:     Product;
   quantity:    number;           // total (suma de lotes o qty de kit)
-  location_id: number | null;
   fefo:        BatchDetail[];    // solo lotes con cantidad > 0, en orden FEFO
   lotQtys:     Record<string, number>; // qty por lot_number → para el payload
   isKit:       boolean;
@@ -72,8 +71,6 @@ export class ExitPageComponent implements OnInit {
   medicalServices    = signal<MedicalService[]>([]);
   loadingServices    = signal(false);
   warehouses         = signal<Warehouse[]>([]);
-  locations          = signal<Location[]>([]);
-  loadingLocations   = signal(false);
 
   readonly today = new Date().toISOString().split('T')[0];
 
@@ -84,7 +81,6 @@ export class ExitPageComponent implements OnInit {
   draftLotQtys     = signal<Record<string, number>>({});
   /** Para kits: cantidad única */
   draftQtyKit      = signal<number | null>(null);
-  draftLocationId  = signal<number | null>(null);
   loadingDraftFefo = signal(false);
   draftFetchError  = signal<string | null>(null);
   _kitAvailable    = signal<number | null>(null);
@@ -171,13 +167,9 @@ export class ExitPageComponent implements OnInit {
 
   onWarehouseChange(id: number | null): void {
     this.warehouseId.set(id);
-    this.locations.set([]);
     this._clearDraft();
-    if (!id) return;
-    this.loadingLocations.set(true);
-    this.wSvc.getWarehouseLocations(id)
-      .pipe(finalize(() => this.loadingLocations.set(false)))
-      .subscribe({ next: r => this.locations.set(r.data), error: () => {} });
+    // Los lotes del carrito se consultaron para el almacén anterior.
+    this.cartItems.set([]);
   }
 
   // ── Draft producto ────────────────────────────────────────────
@@ -187,7 +179,6 @@ export class ExitPageComponent implements OnInit {
     this.draftFefo.set([]);
     this.draftLotQtys.set({});
     this.draftQtyKit.set(null);
-    this.draftLocationId.set(null);
     this.draftFetchError.set(null);
     this._kitAvailable.set(null);
     if (!product || !this.warehouseId()) return;
@@ -251,7 +242,6 @@ export class ExitPageComponent implements OnInit {
     this.cartItems.update(list => [...list, {
       product,
       quantity:    qty,
-      location_id: this.draftLocationId(),
       fefo:        selectedBatches,
       lotQtys:     isKit ? {} : { ...this.draftLotQtys() },
       isKit,
@@ -270,7 +260,6 @@ export class ExitPageComponent implements OnInit {
     this.draftFefo.set([]);
     this.draftLotQtys.set({});
     this.draftQtyKit.set(null);
-    this.draftLocationId.set(null);
     this.draftFetchError.set(null);
     this._kitAvailable.set(null);
   }
@@ -295,7 +284,6 @@ export class ExitPageComponent implements OnInit {
           return [{
             generic_product_id: item.product.id,
             quantity:           Number(item.quantity),
-            ...(item.location_id ? { location_id: item.location_id } : {}),
           }];
         }
         // Un ítem por lote seleccionado, en orden FEFO (fefo ya está filtrado y ordenado)
@@ -304,7 +292,6 @@ export class ExitPageComponent implements OnInit {
             generic_product_id: item.product.id,
             batch_id:           b.id,
             quantity:           item.lotQtys[b.lot_number] || 0,
-            ...(item.location_id ? { location_id: item.location_id } : {}),
           }))
           .filter(i => i.quantity > 0);
       }),

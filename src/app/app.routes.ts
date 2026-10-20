@@ -107,6 +107,15 @@ export const routes: Routes = [
         data: { title: 'Centros de Costo', permission: 'centros_costo.ver' },
       },
 
+      // Activos (equipos biomédicos, cómputo y bienes generales)
+      {
+        path: 'assets',
+        loadChildren: () =>
+          import('./features/assets/assets.routes').then((m) => m.assetsRoutes),
+        canActivate: [permissionGuard],
+        data: { title: 'Activos', permission: 'activos.ver' },
+      },
+
       // Órdenes de Servicio
       {
         path: 'service-orders',

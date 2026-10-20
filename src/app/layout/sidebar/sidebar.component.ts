@@ -41,6 +41,10 @@ const ICON_MAP: Record<string, string> = {
   'sliders-horizontal': 'tune',
   'clipboard-list': 'assignment',
   'clipboard-check': 'fact_check',
+  'monitor-cog': 'devices',
+  'factory': 'precision_manufacturing',
+  'wrench': 'build',
+  'calendar-clock': 'event_repeat',
 };
 
 // Grupos que el backend modela con hijos pero que en el frontend no tienen

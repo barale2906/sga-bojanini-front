@@ -1,0 +1,116 @@
+<div class="panel-head">
+  <h3><mat-icon>event_repeat</mat-icon> Planes de mantenimiento</h3>
+  @if (!readonly) {
+    <button *sgaPermission="'activos_mantenimientos.programar'" mat-stroked-button color="primary" (click)="openPlan()">
+      <mat-icon>add</mat-icon> Nuevo plan
+    </button>
+  }
+</div>
+<div class="table-wrap mat-elevation-z1">
+  <table mat-table [dataSource]="plans()">
+    <ng-container matColumnDef="type">
+      <th mat-header-cell *matHeaderCellDef>Tipo</th>
+      <td mat-cell *matCellDef="let p">{{ p.maintenance_type_label }}</td>
+    </ng-container>
+    <ng-container matColumnDef="frequency">
+      <th mat-header-cell *matHeaderCellDef>Frecuencia</th>
+      <td mat-cell *matCellDef="let p">{{ p.frequency_label }}</td>
+    </ng-container>
+    <ng-container matColumnDef="performer">
+      <th mat-header-cell *matHeaderCellDef>Ejecuta</th>
+      <td mat-cell *matCellDef="let p">{{ p.performed_by_type_label }}<div class="sub">{{ p.technician?.name ?? p.supplier?.name ?? 'Por asignar' }}</div></td>
+    </ng-container>
+    <ng-container matColumnDef="next">
+      <th mat-header-cell *matHeaderCellDef>Próxima fecha</th>
+      <td mat-cell *matCellDef="let p">{{ p.next_date ? (p.next_date | date:'dd/MM/yyyy':'UTC') : '—' }}</td>
+    </ng-container>
+    <ng-container matColumnDef="status">
+      <th mat-header-cell *matHeaderCellDef>Estado</th>
+      <td mat-cell *matCellDef="let p"><app-tone-chip [label]="p.is_active ? 'Activo' : 'Inactivo'" [tone]="p.is_active ? 'ok' : 'muted'"></app-tone-chip></td>
+    </ng-container>
+    <ng-container matColumnDef="actions">
+      <th mat-header-cell *matHeaderCellDef></th>
+      <td mat-cell *matCellDef="let p" class="act">
+        @if (!readonly) {
+          <button *sgaPermission="'activos_mantenimientos.programar'" mat-icon-button color="primary" (click)="openPlan(p)"><mat-icon>edit</mat-icon></button>
+          <button *sgaPermission="'activos_mantenimientos.programar'" mat-icon-button color="warn" (click)="deletePlan(p)"><mat-icon>delete</mat-icon></button>
+        }
+      </td>
+    </ng-container>
+    <tr mat-header-row *matHeaderRowDef="planCols"></tr>
+    <tr mat-row *matRowDef="let row; columns: planCols;"></tr>
+    <tr class="mat-row" *matNoDataRow><td class="no-data" [attr.colspan]="planCols.length">Sin planes. Cree uno para generar el cronograma.</td></tr>
+  </table>
+</div>
+
+<div class="panel-head spaced">
+  <h3><mat-icon>build</mat-icon> Órdenes e historial</h3>
+  @if (!readonly) {
+    <button *sgaPermission="'activos_mantenimientos.programar'" mat-stroked-button color="primary" (click)="scheduleOrder()">
+      <mat-icon>add</mat-icon> Programar / correctivo
+    </button>
+  }
+</div>
+<div class="table-wrap mat-elevation-z1">
+  <table mat-table [dataSource]="orders()">
+    <ng-container matColumnDef="date">
+      <th mat-header-cell *matHeaderCellDef>Fecha</th>
+      <td mat-cell *matCellDef="let m">
+        <span [class.expired]="m.is_overdue">{{ m.scheduled_date | date:'dd/MM/yyyy':'UTC' }}</span>
+        @if (m.performed_at) { <div class="sub">Ejecutado {{ m.performed_at | date:'dd/MM/yyyy HH:mm' }}</div> }
+      </td>
+    </ng-container>
+    <ng-container matColumnDef="type">
+      <th mat-header-cell *matHeaderCellDef>Tipo</th>
+      <td mat-cell *matCellDef="let m">{{ m.maintenance_type_label }}<div class="sub">{{ m.plan_id ? 'Plan' : 'Puntual' }}</div></td>
+    </ng-container>
+    <ng-container matColumnDef="status">
+      <th mat-header-cell *matHeaderCellDef>Estado</th>
+      <td mat-cell *matCellDef="let m">
+        <app-tone-chip [label]="m.is_overdue ? 'Vencido' : m.status_label" [tone]="m.is_overdue ? 'bad' : statusTone[m.status]"></app-tone-chip>
+      </td>
+    </ng-container>
+    <ng-container matColumnDef="performer">
+      <th mat-header-cell *matHeaderCellDef>Ejecutó / registró</th>
+      <td mat-cell *matCellDef="let m">
+        @if (m.status === 'completed') {
+          {{ m.performed_by_type === 'external' ? (m.supplier?.name + ' — ' + m.external_technician_name) : m.technician?.name }}
+          <div class="sub">Registró: {{ m.registered_by?.name }}</div>
+        } @else { <span class="sub">—</span> }
+      </td>
+    </ng-container>
+    <ng-container matColumnDef="result">
+      <th mat-header-cell *matHeaderCellDef>Resultado</th>
+      <td mat-cell *matCellDef="let m">{{ m.result_label ?? '—' }}
+        @if (m.documents_count) { <mat-icon class="tag-icon" [matTooltip]="m.documents_count + ' soporte(s)'">attach_file</mat-icon> }
+      </td>
+    </ng-container>
+    <ng-container matColumnDef="actions">
+      <th mat-header-cell *matHeaderCellDef></th>
+      <td mat-cell *matCellDef="let m" class="act">
+        <button mat-icon-button [matMenuTriggerFor]="orderMenu" [matMenuTriggerData]="{ m: m }"><mat-icon>more_vert</mat-icon></button>
+      </td>
+    </ng-container>
+    <tr mat-header-row *matHeaderRowDef="orderCols"></tr>
+    <tr mat-row *matRowDef="let row; columns: orderCols;"></tr>
+    <tr class="mat-row" *matNoDataRow><td class="no-data" [attr.colspan]="orderCols.length">Sin órdenes de mantenimiento</td></tr>
+  </table>
+</div>
+
+<mat-menu #orderMenu="matMenu">
+  <ng-template matMenuContent let-m="m">
+    @if (!readonly && m.status === 'scheduled' && actions.canExecute()) {
+      <button mat-menu-item (click)="run(actions.start(m))"><mat-icon>play_arrow</mat-icon> Iniciar</button>
+    }
+    @if (!readonly && (m.status === 'scheduled' || m.status === 'in_progress') && actions.canExecute()) {
+      <button mat-menu-item (click)="run(actions.complete(m))"><mat-icon>task_alt</mat-icon> Registrar ejecución</button>
+    }
+    @if (!readonly && m.status === 'scheduled' && actions.canSchedule()) {
+      <button mat-menu-item (click)="run(actions.reschedule(m))"><mat-icon>event</mat-icon> Reprogramar</button>
+    }
+    @if (!readonly && (m.status === 'scheduled' || m.status === 'in_progress') && actions.canCancel()) {
+      <button mat-menu-item (click)="run(actions.cancel(m))"><mat-icon color="warn">cancel</mat-icon> Cancelar</button>
+    }
+    <button mat-menu-item (click)="actions.openReport(m)"><mat-icon>picture_as_pdf</mat-icon> Reporte PDF</button>
+  </ng-template>
+</mat-menu>

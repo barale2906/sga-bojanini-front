@@ -1,0 +1,60 @@
+.toolbar { display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; margin-bottom: 0.75rem; }
+
+.month-nav {
+  display: flex; align-items: center; gap: 0.25rem;
+  h2 { margin: 0; min-width: 190px; text-align: center; text-transform: capitalize; font-size: 1.15rem; color: #2d3748; }
+}
+
+.legend {
+  flex: 1; display: flex; align-items: center; gap: 0.4rem; flex-wrap: wrap; font-size: 0.8rem; color: #4a5568;
+  .dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; margin-left: 0.6rem; }
+}
+
+.dot--bad { background: #e53e3e; }
+.dot--info { background: #3182ce; }
+.dot--warn { background: #dd6b20; }
+.dot--ok { background: #38a169; }
+
+.filters {
+  display: flex; gap: 0.75rem; flex-wrap: wrap; margin-bottom: 0.5rem;
+  mat-form-field { width: 180px; }
+  .search { flex: 1; min-width: 220px; }
+}
+
+.calendar {
+  border: 1px solid #e2e8f0; border-radius: 10px; overflow: hidden; background: #fff;
+  &__head, &__week { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); }
+  &__head div { padding: 0.5rem; text-align: center; font-size: 0.78rem; font-weight: 600; color: #718096; background: #f7fafc; border-bottom: 1px solid #e2e8f0; }
+  &__day {
+    min-height: 110px; padding: 0.3rem; border-right: 1px solid #edf2f7; border-bottom: 1px solid #edf2f7;
+    display: flex; flex-direction: column; gap: 0.2rem; overflow: hidden;
+    &:nth-child(7n) { border-right: none; }
+    &.out { background: #fafbfc; .calendar__num { color: #cbd5e0; } }
+    &.today .calendar__num { background: #C02F86; color: #fff; }
+  }
+  &__num { align-self: flex-end; font-size: 0.78rem; color: #4a5568; width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; }
+}
+
+.event {
+  display: block; width: 100%; text-align: left; border: none; border-left: 3px solid; border-radius: 4px;
+  padding: 0.15rem 0.35rem; font: inherit; font-size: 0.72rem; cursor: pointer;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  &__code { font-family: monospace; font-weight: 700; }
+  &--bad { background: #fff5f5; border-color: #e53e3e; color: #742a2a; }
+  &--info { background: #ebf8ff; border-color: #3182ce; color: #2a4365; }
+  &--warn { background: #fffaf0; border-color: #dd6b20; color: #7b341e; }
+  &--ok { background: #f0fff4; border-color: #38a169; color: #22543d; }
+  &--muted { background: #f7fafc; border-color: #a0aec0; color: #718096; text-decoration: line-through; }
+}
+
+.table-wrap { border-radius: 8px; overflow: auto; background: #fff; }
+
+.code-tag { background: #EDF2F7; color: #4a5568; padding: 0.15rem 0.5rem; border-radius: 4px; font-size: 0.8rem; font-family: monospace; text-decoration: none; }
+
+.sub { font-size: 0.75rem; color: #718096; }
+
+.overdue { color: #c53030; font-weight: 600; }
+
+.act { width: 1%; text-align: right; }
+
+.no-data { text-align: center; padding: 2.5rem; color: #a0aec0; }

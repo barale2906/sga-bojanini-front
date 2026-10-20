@@ -1,0 +1,386 @@
+<app-page-header title="Activos" subtitle="Equipos biomédicos, de cómputo, mobiliario y demás bienes de la institución" icon="devices_other">
+  <button mat-stroked-button routerLink="/assets/maintenance" *sgaPermission="'activos_mantenimientos.ver'">
+    <mat-icon>calendar_month</mat-icon> Cronograma de mantenimiento
+  </button>
+</app-page-header>
+
+<mat-tab-group color="primary" animationDuration="200ms" [selectedIndex]="selectedTab()" (selectedIndexChange)="onTabChange($event)">
+
+  <!-- ══ TAB 1: INVENTARIO ══ -->
+  <mat-tab label="Inventario">
+    <div class="tab-body">
+
+      @if (stats(); as s) {
+        <div class="stat-cards">
+          <button type="button" class="stat-card" (click)="filterByStatus('')">
+            <span class="stat-card__n">{{ s.total }}</span><span class="stat-card__l">Activos vigentes</span>
+          </button>
+          <button type="button" class="stat-card stat-card--ok" (click)="filterByStatus('operational')">
+            <span class="stat-card__n">{{ s.by_status.operational }}</span><span class="stat-card__l">Operativos</span>
+          </button>
+          <button type="button" class="stat-card stat-card--warn" (click)="filterByStatus('maintenance')">
+            <span class="stat-card__n">{{ s.by_status.maintenance }}</span><span class="stat-card__l">En mantenimiento</span>
+          </button>
+          <button type="button" class="stat-card stat-card--bad" (click)="filterByStatus('out_of_service')">
+            <span class="stat-card__n">{{ s.by_status.out_of_service }}</span><span class="stat-card__l">Fuera de servicio</span>
+          </button>
+          <button type="button" class="stat-card stat-card--bad" (click)="filters.patchValue({ maintenance_overdue: true })">
+            <span class="stat-card__n">{{ s.maintenance.overdue }}</span><span class="stat-card__l">Mantenimientos vencidos</span>
+          </button>
+          <div class="stat-card stat-card--info">
+            <span class="stat-card__n">{{ s.maintenance.upcoming }}</span><span class="stat-card__l">Próximos 15 días</span>
+          </div>
+          <button type="button" class="stat-card stat-card--warn" (click)="onTabChange(1)">
+            <span class="stat-card__n">{{ s.pending_transfers }}</span><span class="stat-card__l">Traslados por firmar</span>
+          </button>
+          <div class="stat-card">
+            <span class="stat-card__n stat-card__n--sm">{{ s.total_value | currency:'COP':'symbol-narrow':'1.0-0' }}</span>
+            <span class="stat-card__l">Valor de adquisición</span>
+          </div>
+        </div>
+
+        @if (s.by_site.length > 1) {
+          <div class="site-distribution">
+            @for (site of s.by_site; track site.site) {
+              <button type="button" class="site-pill" [class.site-pill--active]="filters.value.site_id === site.site_id"
+                      (click)="filters.patchValue({ site_id: filters.value.site_id === site.site_id ? null : site.site_id })">
+                <mat-icon>apartment</mat-icon> {{ site.site }} <strong>{{ site.total }}</strong>
+              </button>
+            }
+          </div>
+        }
+      }
+
+      <div class="tab-toolbar" [formGroup]="filters">
+        <mat-form-field appearance="outline" class="search-field">
+          <mat-label>Buscar</mat-label>
+          <mat-icon matPrefix>search</mat-icon>
+          <input matInput formControlName="search" placeholder="Código, nombre, serial, marca…">
+        </mat-form-field>
+        <mat-form-field appearance="outline" class="select-field">
+          <mat-label>Tipo</mat-label>
+          <mat-select formControlName="asset_type">
+            <mat-option value="">Todos</mat-option>
+            @for (t of store.catalogs()?.asset_types ?? []; track t.value) { <mat-option [value]="t.value">{{ t.label }}</mat-option> }
+          </mat-select>
+        </mat-form-field>
+        <mat-form-field appearance="outline" class="select-field">
+          <mat-label>Categoría</mat-label>
+          <mat-select formControlName="category_id">
+            <mat-option [value]="null">Todas</mat-option>
+            @for (c of store.categories(); track c.id) { <mat-option [value]="c.id">{{ c.name }}</mat-option> }
+          </mat-select>
+        </mat-form-field>
+        <mat-form-field appearance="outline" class="select-field">
+          <mat-label>Sede</mat-label>
+          <mat-select formControlName="site_id">
+            <mat-option [value]="null">Todas</mat-option>
+            @for (s of store.sites(); track s.id) { <mat-option [value]="s.id">{{ s.name }}</mat-option> }
+          </mat-select>
+        </mat-form-field>
+        <mat-form-field appearance="outline" class="select-field">
+          <mat-label>Estado</mat-label>
+          <mat-select formControlName="status">
+            <mat-option value="">Vigentes</mat-option>
+            @for (s of store.catalogs()?.statuses ?? []; track s.value) { <mat-option [value]="s.value">{{ s.label }}</mat-option> }
+          </mat-select>
+        </mat-form-field>
+        <mat-checkbox formControlName="maintenance_overdue" color="warn">Mant. vencido</mat-checkbox>
+        <button mat-icon-button matTooltip="Limpiar filtros" (click)="clearFilters()"><mat-icon>filter_alt_off</mat-icon></button>
+
+        <span class="spacer"></span>
+
+        <button mat-stroked-button [matMenuTriggerFor]="moreMenu"><mat-icon>more_horiz</mat-icon> Más</button>
+        <mat-menu #moreMenu="matMenu">
+          <button mat-menu-item *sgaPermission="'activos.importar'" (click)="openImport()"><mat-icon>upload_file</mat-icon> Importar desde Excel</button>
+          <button mat-menu-item *sgaPermission="'activos.exportar'" (click)="exportExcel()"><mat-icon>download</mat-icon> Exportar a Excel</button>
+          <button mat-menu-item [disabled]="!selected().size" (click)="printLabels()">
+            <mat-icon>qr_code_2</mat-icon> Imprimir etiquetas ({{ selected().size }})
+          </button>
+        </mat-menu>
+        <button *sgaPermission="'activos.crear'" mat-raised-button color="primary" (click)="openForm()">
+          <mat-icon>add</mat-icon> Registrar activo
+        </button>
+      </div>
+
+      <app-loading-spinner [loading]="loading()" [inline]="true"></app-loading-spinner>
+
+      <div class="table-wrap mat-elevation-z1">
+        <table mat-table [dataSource]="assets()">
+          <ng-container matColumnDef="select">
+            <th mat-header-cell *matHeaderCellDef class="sel">
+              <mat-checkbox [checked]="selected().size > 0 && selected().size === assets().length"
+                            [indeterminate]="selected().size > 0 && selected().size < assets().length"
+                            (change)="toggleAll($event.checked)"></mat-checkbox>
+            </th>
+            <td mat-cell *matCellDef="let a" class="sel">
+              <mat-checkbox [checked]="selected().has(a.id)" (change)="toggleSelected(a.id)"></mat-checkbox>
+            </td>
+          </ng-container>
+
+          <ng-container matColumnDef="code">
+            <th mat-header-cell *matHeaderCellDef>Código</th>
+            <td mat-cell *matCellDef="let a"><a class="code-tag" [routerLink]="['/assets', a.id]">{{ a.code }}</a></td>
+          </ng-container>
+
+          <ng-container matColumnDef="name">
+            <th mat-header-cell *matHeaderCellDef>Activo</th>
+            <td mat-cell *matCellDef="let a">
+              <a class="asset-name" [routerLink]="['/assets', a.id]">{{ a.name }}</a>
+              <div class="sub">{{ assetSubtitle(a) }}</div>
+            </td>
+          </ng-container>
+
+          <ng-container matColumnDef="category">
+            <th mat-header-cell *matHeaderCellDef>Categoría</th>
+            <td mat-cell *matCellDef="let a">
+              {{ a.category?.name }}
+              <div class="sub">{{ a.asset_type_label }}</div>
+            </td>
+          </ng-container>
+
+          <ng-container matColumnDef="location">
+            <th mat-header-cell *matHeaderCellDef>Ubicación</th>
+            <td mat-cell *matCellDef="let a">
+              @if (a.location.is_off_premises) {
+                <span class="off-premises"><mat-icon>logout</mat-icon> {{ a.location.off_premises_location }}</span>
+              } @else {
+                {{ a.location.place_name }}
+                <div class="sub">{{ a.location.site_name }}</div>
+              }
+            </td>
+          </ng-container>
+
+          <ng-container matColumnDef="responsible">
+            <th mat-header-cell *matHeaderCellDef>Responsable</th>
+            <td mat-cell *matCellDef="let a">{{ a.responsible?.name ?? '—' }}</td>
+          </ng-container>
+
+          <ng-container matColumnDef="status">
+            <th mat-header-cell *matHeaderCellDef>Estado</th>
+            <td mat-cell *matCellDef="let a">
+              <app-tone-chip [label]="a.status_label" [tone]="statusTone[a.status]"></app-tone-chip>
+              @if (a.pending_transfer) {
+                <mat-icon class="pending-icon" [matTooltip]="a.pending_transfer.type_label + ' pendiente de firma'">pending_actions</mat-icon>
+              }
+            </td>
+          </ng-container>
+
+          <ng-container matColumnDef="next_maintenance">
+            <th mat-header-cell *matHeaderCellDef>Próx. mantenimiento</th>
+            <td mat-cell *matCellDef="let a">
+              @if (a.next_maintenance; as m) {
+                <span [class.overdue]="m.is_overdue">{{ m.scheduled_date | date:'dd/MM/yyyy':'UTC' }}</span>
+                <div class="sub">{{ m.type_label }}</div>
+              } @else if (a.requires_maintenance) {
+                <span class="sub">Sin programar</span>
+              } @else {
+                <span class="sub">No aplica</span>
+              }
+            </td>
+          </ng-container>
+
+          <ng-container matColumnDef="actions">
+            <th mat-header-cell *matHeaderCellDef class="act"></th>
+            <td mat-cell *matCellDef="let a" class="act">
+              <button mat-icon-button [matMenuTriggerFor]="rowMenu" [matMenuTriggerData]="{ a: a }"><mat-icon>more_vert</mat-icon></button>
+            </td>
+          </ng-container>
+
+          <tr mat-header-row *matHeaderRowDef="cols"></tr>
+          <tr mat-row *matRowDef="let row; columns: cols;" [class.retired]="row.status === 'retired'"></tr>
+          <tr class="mat-row" *matNoDataRow>
+            <td class="no-data" [attr.colspan]="cols.length">No hay activos con los filtros seleccionados</td>
+          </tr>
+        </table>
+        <mat-paginator [length]="meta().total" [pageSize]="meta().per_page" [pageIndex]="meta().current_page - 1"
+                       [pageSizeOptions]="[15, 30, 50, 100]" (page)="onPage($event)" showFirstLastButtons></mat-paginator>
+      </div>
+
+      <mat-menu #rowMenu="matMenu">
+        <ng-template matMenuContent let-a="a">
+          <a mat-menu-item [routerLink]="['/assets', a.id]"><mat-icon>visibility</mat-icon> Ver ficha</a>
+          @if (a.status !== 'retired') {
+            <button mat-menu-item *sgaPermission="'activos.editar'" (click)="openForm(a)"><mat-icon>edit</mat-icon> Editar</button>
+            <button mat-menu-item *sgaPermission="'activos_traslados.solicitar'" (click)="openTransfer(a)" [disabled]="!!a.pending_transfer">
+              <mat-icon>swap_horiz</mat-icon> Trasladar / dar de baja
+            </button>
+          }
+          <button mat-menu-item *sgaPermission="'activos.eliminar'" (click)="delete(a)"><mat-icon color="warn">delete</mat-icon> Eliminar</button>
+        </ng-template>
+      </mat-menu>
+    </div>
+  </mat-tab>
+
+  <!-- ══ TAB 2: TRASLADOS ══ -->
+  <mat-tab>
+    <ng-template mat-tab-label>
+      Traslados
+      @if ((stats()?.pending_transfers ?? 0) > 0) { <span class="tab-badge">{{ stats()?.pending_transfers }}</span> }
+    </ng-template>
+    <div class="tab-body">
+      <div class="tab-toolbar">
+        <mat-form-field appearance="outline" class="select-field">
+          <mat-label>Estado</mat-label>
+          <mat-select [value]="transferStatus()" (selectionChange)="setTransferStatus($event.value)">
+            <mat-option value="pending_signature">Pendientes de firma</mat-option>
+            <mat-option value="confirmed">Confirmados</mat-option>
+            <mat-option value="cancelled">Cancelados</mat-option>
+            <mat-option value="">Todos</mat-option>
+          </mat-select>
+        </mat-form-field>
+        <p class="toolbar-hint">
+          <mat-icon>info</mat-icon>
+          La firma es obligatoria solo cuando el activo sale del edificio: traslado a otra sede, reparación externa, préstamo o baja.
+        </p>
+      </div>
+
+      <app-loading-spinner [loading]="loadingTransfers()" [inline]="true"></app-loading-spinner>
+
+      <div class="table-wrap mat-elevation-z1">
+        <table mat-table [dataSource]="transfers()">
+          <ng-container matColumnDef="asset">
+            <th mat-header-cell *matHeaderCellDef>Activo</th>
+            <td mat-cell *matCellDef="let t">
+              <a class="code-tag" [routerLink]="['/assets', t.asset.id]">{{ t.asset.code }}</a> {{ t.asset.name }}
+            </td>
+          </ng-container>
+          <ng-container matColumnDef="type">
+            <th mat-header-cell *matHeaderCellDef>Tipo</th>
+            <td mat-cell *matCellDef="let t">
+              {{ t.type_label }}
+              @if (t.requires_signature) { <mat-icon class="sign-icon" matTooltip="Requiere firma">draw</mat-icon> }
+            </td>
+          </ng-container>
+          <ng-container matColumnDef="route">
+            <th mat-header-cell *matHeaderCellDef>Origen → Destino</th>
+            <td mat-cell *matCellDef="let t">
+              {{ t.from ?? '—' }} → {{ t.to ?? '—' }}
+              @if (t.to_responsible) { <div class="sub">Responsable: {{ t.to_responsible.name }}</div> }
+            </td>
+          </ng-container>
+          <ng-container matColumnDef="requested">
+            <th mat-header-cell *matHeaderCellDef>Solicitado</th>
+            <td mat-cell *matCellDef="let t">
+              {{ t.created_at | date:'dd/MM/yyyy HH:mm' }}
+              <div class="sub">{{ t.requested_by?.name }}</div>
+            </td>
+          </ng-container>
+          <ng-container matColumnDef="status">
+            <th mat-header-cell *matHeaderCellDef>Estado</th>
+            <td mat-cell *matCellDef="let t">
+              <app-tone-chip [label]="t.status_label" [tone]="t.status === 'confirmed' ? 'ok' : t.status === 'cancelled' ? 'muted' : 'warn'"></app-tone-chip>
+            </td>
+          </ng-container>
+          <ng-container matColumnDef="actions">
+            <th mat-header-cell *matHeaderCellDef class="act"></th>
+            <td mat-cell *matCellDef="let t" class="act">
+              @if (t.status === 'pending_signature') {
+                <button *sgaPermission="'activos_traslados.confirmar'" mat-flat-button color="primary" (click)="confirmTransfer(t)">
+                  <mat-icon>draw</mat-icon> Firmar
+                </button>
+                <button *sgaPermission="'activos_traslados.confirmar'" mat-icon-button color="warn" matTooltip="Cancelar" (click)="cancelTransfer(t)">
+                  <mat-icon>cancel</mat-icon>
+                </button>
+              }
+              <button mat-icon-button matTooltip="Acta PDF" (click)="openAct(t)"><mat-icon>picture_as_pdf</mat-icon></button>
+            </td>
+          </ng-container>
+
+          <tr mat-header-row *matHeaderRowDef="transferCols"></tr>
+          <tr mat-row *matRowDef="let row; columns: transferCols;"></tr>
+          <tr class="mat-row" *matNoDataRow>
+            <td class="no-data" [attr.colspan]="transferCols.length">Sin traslados</td>
+          </tr>
+        </table>
+        <mat-paginator [length]="transfersMeta().total" [pageSize]="transfersMeta().per_page"
+                       [pageIndex]="transfersMeta().current_page - 1" [pageSizeOptions]="[15, 30, 50]"
+                       (page)="onTransfersPage($event)"></mat-paginator>
+      </div>
+    </div>
+  </mat-tab>
+
+  <!-- ══ TAB 3: CATÁLOGOS ══ -->
+  <mat-tab label="Categorías y ubicaciones">
+    <div class="tab-body catalogs">
+      <section>
+        <div class="section-head">
+          <h3>Categorías</h3>
+          <button *sgaPermission="'activos_catalogos.crear'" mat-stroked-button color="primary" (click)="openCategory()">
+            <mat-icon>add</mat-icon> Nueva categoría
+          </button>
+        </div>
+        <div class="table-wrap mat-elevation-z1">
+          <table mat-table [dataSource]="categories()">
+            <ng-container matColumnDef="code">
+              <th mat-header-cell *matHeaderCellDef>Código</th>
+              <td mat-cell *matCellDef="let c"><code class="code-tag">{{ c.code }}</code></td>
+            </ng-container>
+            <ng-container matColumnDef="name">
+              <th mat-header-cell *matHeaderCellDef>Nombre</th>
+              <td mat-cell *matCellDef="let c">{{ c.name }}</td>
+            </ng-container>
+            <ng-container matColumnDef="type">
+              <th mat-header-cell *matHeaderCellDef>Tipo</th>
+              <td mat-cell *matCellDef="let c">
+                {{ c.asset_type_label }}
+                @if (c.requires_maintenance) { <mat-icon class="sign-icon" matTooltip="Hoja de vida y mantenimiento">build</mat-icon> }
+              </td>
+            </ng-container>
+            <ng-container matColumnDef="status">
+              <th mat-header-cell *matHeaderCellDef>Estado</th>
+              <td mat-cell *matCellDef="let c"><app-tone-chip [label]="c.is_active ? 'Activa' : 'Inactiva'" [tone]="c.is_active ? 'ok' : 'muted'"></app-tone-chip></td>
+            </ng-container>
+            <ng-container matColumnDef="actions">
+              <th mat-header-cell *matHeaderCellDef class="act"></th>
+              <td mat-cell *matCellDef="let c" class="act">
+                <button *sgaPermission="'activos_catalogos.editar'" mat-icon-button color="primary" (click)="openCategory(c)"><mat-icon>edit</mat-icon></button>
+                <button *sgaPermission="'activos_catalogos.eliminar'" mat-icon-button color="warn" (click)="deleteCatalog('category', c.id, c.name)"><mat-icon>delete</mat-icon></button>
+              </td>
+            </ng-container>
+            <tr mat-header-row *matHeaderRowDef="categoryCols"></tr>
+            <tr mat-row *matRowDef="let row; columns: categoryCols;"></tr>
+          </table>
+        </div>
+      </section>
+
+      <section>
+        <div class="section-head">
+          <h3>Sedes y sitios</h3>
+          <button *sgaPermission="'activos_catalogos.crear'" mat-stroked-button color="primary" (click)="openSite()">
+            <mat-icon>add</mat-icon> Nueva sede
+          </button>
+        </div>
+        @for (site of sites(); track site.id) {
+          <div class="site-card" [class.inactive]="!site.is_active">
+            <div class="site-card__head">
+              <mat-icon>apartment</mat-icon>
+              <strong>{{ site.name }}</strong>
+              @if (site.address) { <span class="sub">{{ site.address }}</span> }
+              @if (!site.is_active) { <app-tone-chip label="Inactiva" tone="muted"></app-tone-chip> }
+              <span class="spacer"></span>
+              <button *sgaPermission="'activos_catalogos.crear'" mat-button color="primary" (click)="openPlace(site)"><mat-icon>add</mat-icon> Sitio</button>
+              <button *sgaPermission="'activos_catalogos.editar'" mat-icon-button (click)="openSite(site)"><mat-icon>edit</mat-icon></button>
+              <button *sgaPermission="'activos_catalogos.eliminar'" mat-icon-button color="warn" (click)="deleteCatalog('site', site.id, site.name)"><mat-icon>delete</mat-icon></button>
+            </div>
+            <div class="places">
+              @for (place of site.places ?? []; track place.id) {
+                <div class="place" [class.inactive]="!place.is_active">
+                  <mat-icon>meeting_room</mat-icon>
+                  <span>{{ place.name }}</span>
+                  <span class="count" matTooltip="Activos en el sitio">{{ place.assets_count ?? 0 }}</span>
+                  <button *sgaPermission="'activos_catalogos.editar'" mat-icon-button class="mini" (click)="openPlace(site, place)"><mat-icon>edit</mat-icon></button>
+                  <button *sgaPermission="'activos_catalogos.eliminar'" mat-icon-button class="mini" color="warn" (click)="deleteCatalog('place', place.id, place.name)"><mat-icon>close</mat-icon></button>
+                </div>
+              } @empty {
+                <span class="sub">Sin sitios registrados</span>
+              }
+            </div>
+          </div>
+        } @empty {
+          <p class="no-data">Registre la primera sede (p. ej. "Clínica") y sus sitios (p. ej. "Consultorio 1").</p>
+        }
+      </section>
+    </div>
+  </mat-tab>
+</mat-tab-group>
