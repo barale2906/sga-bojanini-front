@@ -32,6 +32,8 @@ export interface BatchDetail {
   quantity_available: number;
   status: 'active' | 'expired' | 'depleted';
   days_until_expiry: number | null;
+  /** Comentario registrado al dar entrada al lote */
+  notes?: string | null;
   received_at: string;
   variant?: VariantWithGeneric | null;
   locations: BatchLocation[];

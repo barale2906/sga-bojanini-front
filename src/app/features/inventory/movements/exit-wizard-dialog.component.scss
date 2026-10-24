@@ -453,6 +453,14 @@
   span { white-space: nowrap; }
 }
 
+.lot-notes {
+  flex-basis: 100%; display: flex; align-items: flex-start; gap: 0.3rem;
+  margin: 0.3rem 0 0; padding: 0.3rem 0.5rem;
+  background: #fffbeb; border-left: 3px solid #f59e0b; border-radius: 4px;
+  color: #78350f; font-size: 0.74rem; white-space: pre-line;
+  mat-icon { font-size: 0.85rem; height: 0.85rem; width: 0.85rem; color: #b45309; flex-shrink: 0; margin-top: 0.1rem; }
+}
+
 // ── Empty cart hint ───────────────────────────────────────────
 .cart-empty-hint {
   display: flex; align-items: center; justify-content: center; gap: 0.5rem;

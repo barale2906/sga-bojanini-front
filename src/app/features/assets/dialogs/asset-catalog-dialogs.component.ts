@@ -41,8 +41,6 @@ const DIALOG_IMPORTS = [
   MatButtonModule, MatSlideToggleModule, FormErrorsComponent,
 ];
 
-const DIALOG_STYLES = `.form-col { display:flex; flex-direction:column; gap:0.25rem; min-width:400px; padding-top:0.5rem; }`;
-
 @Component({
   selector: 'app-asset-category-dialog',
   standalone: true,
@@ -51,7 +49,7 @@ const DIALOG_STYLES = `.form-col { display:flex; flex-direction:column; gap:0.25
     <h2 mat-dialog-title>{{ category ? 'Editar categoría' : 'Nueva categoría' }}</h2>
     <mat-dialog-content>
       <app-form-errors [errors]="errors()"></app-form-errors>
-      <form [formGroup]="form" class="form-col">
+      <form [formGroup]="form" class="form-col form-col--wide">
         <mat-form-field appearance="outline">
           <mat-label>Código *</mat-label>
           <input matInput formControlName="code" maxlength="20" style="text-transform:uppercase">
@@ -83,7 +81,7 @@ const DIALOG_STYLES = `.form-col { display:flex; flex-direction:column; gap:0.25
       <button mat-raised-button color="primary" (click)="save()" [disabled]="form.invalid || saving()">Guardar</button>
     </mat-dialog-actions>
   `,
-  styles: [DIALOG_STYLES],
+  styleUrl: './asset-dialogs.scss',
 })
 export class AssetCategoryDialogComponent extends CatalogDialog<AssetCategory> {
   category: AssetCategory | null = inject(MAT_DIALOG_DATA);
@@ -117,7 +115,7 @@ export class AssetCategoryDialogComponent extends CatalogDialog<AssetCategory> {
     <h2 mat-dialog-title>{{ site ? 'Editar sede' : 'Nueva sede' }}</h2>
     <mat-dialog-content>
       <app-form-errors [errors]="errors()"></app-form-errors>
-      <form [formGroup]="form" class="form-col">
+      <form [formGroup]="form" class="form-col form-col--wide">
         <mat-form-field appearance="outline">
           <mat-label>Nombre *</mat-label>
           <input matInput formControlName="name" maxlength="120" placeholder="Clínica, Edificio 2…">
@@ -136,7 +134,7 @@ export class AssetCategoryDialogComponent extends CatalogDialog<AssetCategory> {
       <button mat-raised-button color="primary" (click)="save()" [disabled]="form.invalid || saving()">Guardar</button>
     </mat-dialog-actions>
   `,
-  styles: [DIALOG_STYLES],
+  styleUrl: './asset-dialogs.scss',
 })
 export class AssetSiteDialogComponent extends CatalogDialog<AssetSite> {
   site: AssetSite | null = inject(MAT_DIALOG_DATA);
@@ -167,7 +165,7 @@ export interface AssetPlaceDialogData {
     <h2 mat-dialog-title>{{ data.place ? 'Editar sitio' : 'Nuevo sitio' }} — {{ data.site.name }}</h2>
     <mat-dialog-content>
       <app-form-errors [errors]="errors()"></app-form-errors>
-      <form [formGroup]="form" class="form-col">
+      <form [formGroup]="form" class="form-col form-col--wide">
         <mat-form-field appearance="outline">
           <mat-label>Nombre del sitio *</mat-label>
           <input matInput formControlName="name" maxlength="120" placeholder="Consultorio 1, Call center…">
@@ -182,7 +180,7 @@ export interface AssetPlaceDialogData {
       <button mat-raised-button color="primary" (click)="save()" [disabled]="form.invalid || saving()">Guardar</button>
     </mat-dialog-actions>
   `,
-  styles: [DIALOG_STYLES],
+  styleUrl: './asset-dialogs.scss',
 })
 export class AssetPlaceDialogComponent extends CatalogDialog<AssetPlace> {
   data: AssetPlaceDialogData = inject(MAT_DIALOG_DATA);

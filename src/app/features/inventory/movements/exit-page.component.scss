@@ -135,6 +135,14 @@
 .lot-expiry { color: #4a5568; }
 .lot-qty   { color: #276749; font-size: 0.73rem; }
 
+.lot-notes {
+  flex-basis: 100%; display: flex; align-items: flex-start; gap: 0.3rem;
+  margin: 0.1rem 0 0.3rem; padding: 0.3rem 0.5rem;
+  background: #fffbeb; border-left: 3px solid #f59e0b; border-radius: 4px;
+  color: #78350f; font-size: 0.74rem; white-space: pre-line;
+  mat-icon { font-size: 0.85rem; height: 0.85rem; width: 0.85rem; color: #b45309; flex-shrink: 0; margin-top: 0.1rem; }
+}
+
 .fefo-badge {
   background: #1d4ed8; color: white; font-size: 0.67rem; font-weight: 700;
   padding: 0.1rem 0.4rem; border-radius: 9999px; flex-shrink: 0;

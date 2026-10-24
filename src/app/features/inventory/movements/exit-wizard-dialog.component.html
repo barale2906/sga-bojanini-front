@@ -169,6 +169,14 @@
                   </span>
                 }
               </div>
+              @for (lote of item.fefo; track lote.id) {
+                @if (lote.notes) {
+                  <div class="lot-notes">
+                    <mat-icon>comment</mat-icon>
+                    <span><strong>{{ lote.lot_number }}:</strong> {{ lote.notes }}</span>
+                  </div>
+                }
+              }
             } @else if (item.expiredOnly) {
               <div class="zero-stock-warn zero-stock-warn--expired">
                 <mat-icon>event_busy</mat-icon>

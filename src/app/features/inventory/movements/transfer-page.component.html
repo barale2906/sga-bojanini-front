@@ -162,6 +162,12 @@
                       <mat-hint>máx {{ b.quantity_available }}</mat-hint>
                     </mat-form-field>
                   </div>
+                  @if (b.notes) {
+                    <div class="lot-notes">
+                      <mat-icon>comment</mat-icon>
+                      <span>{{ b.notes }}</span>
+                    </div>
+                  }
                 </div>
               }
 
@@ -278,6 +284,14 @@
               <mat-icon>login</mat-icon>{{ item.loc_to_name }}
             </span>
           </div>
+          @for (b of item.fefo; track b.lot_number) {
+            @if (b.notes) {
+              <div class="lot-notes">
+                <mat-icon>comment</mat-icon>
+                <span><strong>{{ b.lot_number }}:</strong> {{ b.notes }}</span>
+              </div>
+            }
+          }
         </div>
       }
 
