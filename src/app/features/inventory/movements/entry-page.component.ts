@@ -109,6 +109,12 @@ export class EntryPageComponent implements OnInit {
   items = signal<EntryItem[]>([]);
 
   readonly today = new Date().toISOString().split('T')[0];
+  // Rango aceptado en fechas de lote: evita años de 2 dígitos tecleados en el input nativo (ej. "28" → 0028)
+  readonly minLotDate = '2000-01-01';
+  readonly maxLotDate = '2099-12-31';
+
+  expiryInvalid = computed(() => !!this.draftExpiry() && !this._isValidLotDate(this.draftExpiry()));
+  mfgInvalid    = computed(() => !!this.draftMfg() && !this._isValidLotDate(this.draftMfg()));
 
   // ── Computed helpers ──────────────────────────────────────────
 
@@ -128,7 +134,7 @@ export class EntryPageComponent implements OnInit {
   canAdd = computed((): boolean => {
     if (!this.draftVariantId()) return false;
     if (!this.draftLot().trim()) return false;
-    if (!this.draftExpiry()) return false;
+    if (!this.draftExpiry() || this.expiryInvalid() || this.mfgInvalid()) return false;
     if (!this.draftLocationId()) return false;
     if (this.draftPresMode()) {
       return !!(this.draftPresId() && this.draftQtyInPres() && this.draftQtyInPres()! > 0);
@@ -264,6 +270,10 @@ export class EntryPageComponent implements OnInit {
 
   removeItem(i: number): void {
     this.items.update(list => list.filter((_, idx) => idx !== i));
+  }
+
+  private _isValidLotDate(value: string): boolean {
+    return /^\d{4}-\d{2}-\d{2}$/.test(value) && value >= this.minLotDate && value <= this.maxLotDate;
   }
 
   private _clearDraft(): void {

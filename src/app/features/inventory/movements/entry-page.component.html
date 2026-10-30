@@ -123,17 +123,24 @@
 
             <mat-form-field appearance="outline">
               <mat-label>Fecha de vencimiento *</mat-label>
-              <input matInput type="date"
+              <input matInput type="date" [min]="minLotDate" [max]="maxLotDate"
                      [ngModel]="draftExpiry()" (ngModelChange)="draftExpiry.set($event)" />
               <mat-icon matSuffix>event</mat-icon>
+              @if (expiryInvalid()) {
+                <mat-hint class="date-error">Año inválido: escriba el año completo (ej. 2028)</mat-hint>
+              }
             </mat-form-field>
 
             <mat-form-field appearance="outline">
               <mat-label>Fecha de fabricación</mat-label>
-              <input matInput type="date"
+              <input matInput type="date" [min]="minLotDate" [max]="maxLotDate"
                      [ngModel]="draftMfg()" (ngModelChange)="draftMfg.set($event)" />
               <mat-icon matSuffix>factory</mat-icon>
-              <mat-hint>Opcional</mat-hint>
+              @if (mfgInvalid()) {
+                <mat-hint class="date-error">Año inválido: escriba el año completo (ej. 2026)</mat-hint>
+              } @else {
+                <mat-hint>Opcional</mat-hint>
+              }
             </mat-form-field>
           </div>
         }

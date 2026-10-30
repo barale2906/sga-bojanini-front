@@ -250,11 +250,11 @@
               </mat-form-field>
               <mat-form-field appearance="outline">
                 <mat-label>Fecha de Vencimiento *</mat-label>
-                <input matInput type="date" formControlName="expiration_date" />
+                <input matInput type="date" min="2000-01-01" max="2099-12-31" formControlName="expiration_date" />
               </mat-form-field>
               <mat-form-field appearance="outline" class="span2">
                 <mat-label>Fecha de Fabricación</mat-label>
-                <input matInput type="date" formControlName="manufacturing_date" />
+                <input matInput type="date" min="2000-01-01" max="2099-12-31" formControlName="manufacturing_date" />
               </mat-form-field>
 
               <!-- Ubicación dentro del almacén -->
