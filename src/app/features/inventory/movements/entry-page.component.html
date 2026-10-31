@@ -12,6 +12,75 @@
   <!-- ══════════════════ PANEL FORMULARIO ══════════════════ -->
   <div class="entry-form-panel">
 
+    <!-- ── Aviso de OC pendientes por recibir ───────────── -->
+    @if (pendingOrders().length > 0) {
+      <section class="form-section po-section">
+        <div class="section-heading">
+          <mat-icon class="po-icon">local_shipping</mat-icon>
+          <span>
+            Hay {{ pendingOrders().length }} orden{{ pendingOrders().length !== 1 ? 'es' : '' }}
+            de compra pendiente{{ pendingOrders().length !== 1 ? 's' : '' }} por recibir
+          </span>
+        </div>
+        <mat-form-field appearance="outline" class="full-field">
+          <mat-label>Vincular esta entrada a una orden de compra</mat-label>
+          <mat-select [ngModel]="poOrder()?.id ?? null" (ngModelChange)="onPoSelected($event)"
+                      [disabled]="poLocked()">
+            <mat-option [value]="null">— Entrada sin orden de compra —</mat-option>
+            @for (o of pendingOrders(); track o.id) {
+              <mat-option [value]="o.id">
+                {{ o.code }} · {{ o.supplier?.name }} · {{ o.warehouse?.name }}
+                @if (o.status === 'partially_received') { <span class="po-partial">(parcial)</span> }
+              </mat-option>
+            }
+          </mat-select>
+          @if (poLocked()) {
+            <mat-hint>Quita de la lista los ítems de la OC actual para cambiar de orden</mat-hint>
+          }
+        </mat-form-field>
+      </section>
+    }
+
+    <!-- ── Orden de compra vinculada ────────────────────── -->
+    @if (loadingPo()) {
+      <section class="form-section po-section">
+        <div class="po-loading"><mat-spinner diameter="18"></mat-spinner> Cargando orden de compra…</div>
+      </section>
+    }
+    @if (poOrder(); as po) {
+      <section class="form-section po-section">
+        <div class="section-heading">
+          <mat-icon class="po-icon">shopping_cart</mat-icon>
+          <span>Recepción de {{ po.code }}</span>
+          @if (po.supplier?.name) { <span class="po-supplier">{{ po.supplier?.name }}</span> }
+        </div>
+
+        @if (!poReceivable()) {
+          <div class="po-notice">Esta orden no está en estado para recibir mercancía (debe estar enviada al proveedor o recibida parcialmente).</div>
+        } @else {
+          <div class="po-notice">Selecciona un ítem para precargarlo; completa lote, vencimiento y ubicación. Puedes recibir un ítem en varios lotes.</div>
+          @for (it of po.items ?? []; track it.id) {
+            <div class="po-item" [class.po-item--active]="draftPoItem()?.id === it.id"
+                 [class.po-item--done]="poPending(it) === 0">
+              <div class="po-item-info">
+                <strong>{{ it.variant?.generic?.name }}</strong>
+                <span class="po-item-sub">{{ it.variant?.lab_brand || 'Sin marca' }} · {{ it.presentation?.name }}</span>
+              </div>
+              <span class="po-item-qty">
+                {{ +it.quantity_requested - poPending(it) }} / {{ +it.quantity_requested }}
+              </span>
+              <button mat-stroked-button type="button"
+                      [disabled]="poPending(it) === 0 || loadingPoItem() || !warehouseSelected"
+                      (click)="loadPoItem(it)">
+                <mat-icon>{{ poPending(it) === 0 ? 'check' : 'download' }}</mat-icon>
+                {{ poPending(it) === 0 ? 'Completo' : 'Cargar (' + poPending(it) + ')' }}
+              </button>
+            </div>
+          }
+        }
+      </section>
+    }
+
     <!-- ── Sección 1: Datos generales ───────────────────── -->
     <section class="form-section">
       <div class="section-heading">
@@ -171,6 +240,7 @@
               <span class="mode-label">Modo de ingreso:</span>
               <button mat-stroked-button type="button" class="mode-btn"
                       [class.mode-btn--active]="!draftPresMode()"
+                      [disabled]="!!draftPoItem()"
                       (click)="togglePresMode(false)">
                 <mat-icon>scale</mat-icon>Unidad base directa
               </button>
@@ -194,7 +264,8 @@
               <div class="two-col">
                 <mat-form-field appearance="outline">
                   <mat-label>Presentación *</mat-label>
-                  <mat-select [ngModel]="draftPresId()" (ngModelChange)="draftPresId.set($event)">
+                  <mat-select [ngModel]="draftPresId()" (ngModelChange)="draftPresId.set($event)"
+                              [disabled]="!!draftPoItem()">
                     @for (p of draftPresentations(); track p.id) {
                       <mat-option [value]="p.id">{{ p.name }}</mat-option>
                     }
@@ -204,13 +275,23 @@
                   <mat-label>Cantidad *</mat-label>
                   <input matInput type="number" min="1" step="1"
                          [ngModel]="draftQtyInPres()" (ngModelChange)="draftQtyInPres.set($event ? +$event : null)" />
-                  @if (draftPreviewBaseUnits()) {
+                  @if (draftPoItem()) {
+                    <mat-hint>Pendiente en la OC: {{ draftPoPending() }}@if (draftPreviewBaseUnits()) { · ≈ {{ draftPreviewBaseUnits() }} u. base }</mat-hint>
+                  } @else if (draftPreviewBaseUnits()) {
                     <mat-hint>≈ {{ draftPreviewBaseUnits() }} u. base</mat-hint>
                   }
                 </mat-form-field>
               </div>
             }
           </div>
+
+          @if (draftPoItem()) {
+            <div class="po-link-row">
+              <mat-icon>link</mat-icon>
+              <span>Vinculado a la OC {{ poOrder()?.code }}</span>
+              <button mat-button type="button" (click)="unlinkPoItem()">Desvincular</button>
+            </div>
+          }
 
           <mat-form-field appearance="outline" class="full-field">
             <mat-label>Notas del ítem</mat-label>
@@ -279,6 +360,11 @@
           <span class="meta-chip meta-chip--qty">
             <mat-icon>numbers</mat-icon>{{ item.qty_display }}
           </span>
+          @if (item.po_item_id) {
+            <span class="meta-chip meta-chip--po">
+              <mat-icon>shopping_cart</mat-icon>{{ poOrder()?.code }}
+            </span>
+          }
         </div>
         @if (item.notes) {
           <div class="list-item-notes">{{ item.notes }}</div>

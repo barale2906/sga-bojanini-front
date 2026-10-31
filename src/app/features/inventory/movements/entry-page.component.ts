@@ -11,17 +11,18 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { MatDividerModule } from '@angular/material/divider';
 import { MatSnackBar } from '@angular/material/snack-bar';
-import { finalize } from 'rxjs';
+import { finalize, Observable, of, map, catchError, forkJoin } from 'rxjs';
 import { InventoryService, MovementDocument } from '../inventory.service';
 import { WarehouseService, Warehouse, Location, LocationCapacity } from '../../warehouse/warehouse.service';
 import { CatalogService, Product, ProductVariant, ProductPresentation } from '../../catalog/catalog.service';
-import { PurchasingService, PurchaseOrder } from '../../purchasing/purchasing.service';
+import { PurchasingService, PurchaseOrder, PurchaseOrderItem } from '../../purchasing/purchasing.service';
 import { MovementPdfService } from '../../../shared/services/movement-pdf.service';
 import { MovementConfirmDialogComponent, MovementConfirmResult } from './movement-confirm-dialog.component';
 import { MatDialog } from '@angular/material/dialog';
 import { PageHeaderComponent } from '../../../shared/components/page-header/page-header.component';
 import { ProductSearchComponent } from '../../../shared/components/product-search/product-search.component';
 import { FormErrorsComponent } from '../../../shared/components/form-errors/form-errors.component';
+import { AuthService } from '../../../core/services/auth.service';
 
 // ── Interfaces ────────────────────────────────────────────────
 
@@ -44,6 +45,9 @@ interface EntryItem {
   quantity_base:           number | null;
   product_presentation_id: number | null;
   quantity_in_presentation: number | null;
+  // vínculo con la OC (cantidad en la presentación de la OC)
+  po_item_id:  number | null;
+  po_quantity: number | null;
 }
 
 @Component({
@@ -70,6 +74,7 @@ export class EntryPageComponent implements OnInit {
   private pdfSvc    = inject(MovementPdfService);
   private dialog    = inject(MatDialog);
   private snack     = inject(MatSnackBar);
+  private authSvc   = inject(AuthService);
 
   // ── Page state ────────────────────────────────────────────────
   saving  = signal(false);
@@ -108,6 +113,37 @@ export class EntryPageComponent implements OnInit {
   // ── Committed items list ──────────────────────────────────────
   items = signal<EntryItem[]>([]);
 
+  // ── Orden de compra vinculada (?po_id=) ───────────────────────
+  poOrder        = signal<PurchaseOrder | null>(null);
+  loadingPo      = signal(false);
+  draftPoItem    = signal<PurchaseOrderItem | null>(null);
+  loadingPoItem  = signal(false);
+  pendingOrders  = signal<PurchaseOrder[]>([]);
+
+  /** No se puede cambiar de OC con ítems de la actual ya en la lista. */
+  poLocked = computed((): boolean => this.items().some(i => !!i.po_item_id));
+
+  poReceivable = computed((): boolean =>
+    ['sent', 'partially_received'].includes(this.poOrder()?.status ?? '')
+  );
+
+  /** Pendiente por ítem de la OC, descontando lo ya agregado a la lista. */
+  poPendingMap = computed((): Map<number, number> => {
+    const m = new Map<number, number>();
+    for (const it of this.poOrder()?.items ?? []) {
+      if (!it.id) continue;
+      const added = this.items()
+        .filter(e => e.po_item_id === it.id)
+        .reduce((sum, e) => sum + (e.po_quantity ?? 0), 0);
+      m.set(it.id, Math.max(0, Number(it.quantity_requested) - Number(it.quantity_received ?? 0) - added));
+    }
+    return m;
+  });
+
+  draftPoPending = computed((): number =>
+    this.draftPoItem()?.id ? (this.poPendingMap().get(this.draftPoItem()!.id!) ?? 0) : 0
+  );
+
   readonly today = new Date().toISOString().split('T')[0];
   // Rango aceptado en fechas de lote: evita años de 2 dígitos tecleados en el input nativo (ej. "28" → 0028)
   readonly minLotDate = '2000-01-01';
@@ -136,6 +172,11 @@ export class EntryPageComponent implements OnInit {
     if (!this.draftLot().trim()) return false;
     if (!this.draftExpiry() || this.expiryInvalid() || this.mfgInvalid()) return false;
     if (!this.draftLocationId()) return false;
+    if (this.draftPoItem()) {
+      const qty = this.draftQtyInPres();
+      return !!(this.draftPresMode() && this.draftPresId() && qty && Number.isInteger(qty)
+        && qty > 0 && qty <= this.draftPoPending());
+    }
     if (this.draftPresMode()) {
       return !!(this.draftPresId() && this.draftQtyInPres() && this.draftQtyInPres()! > 0);
     }
@@ -153,6 +194,7 @@ export class EntryPageComponent implements OnInit {
 
     const poId = this.route.snapshot.queryParamMap.get('po_id');
     if (poId) this._loadPoItems(Number(poId));
+    this._loadPendingOrders();
   }
 
   // ── Warehouse change ──────────────────────────────────────────
@@ -172,6 +214,7 @@ export class EntryPageComponent implements OnInit {
   // ── Draft product ─────────────────────────────────────────────
 
   onDraftProductSelected(product: Product | null): void {
+    this.draftPoItem.set(null);
     this.draftProduct.set(product);
     this.draftVariants.set([]);
     this.draftVariantId.set(null);
@@ -263,6 +306,8 @@ export class EntryPageComponent implements OnInit {
       quantity_base:            this.draftPresMode() ? null : Number(this.draftQtyBase()),
       product_presentation_id:  this.draftPresMode() ? (this.draftPresId() ?? null) : null,
       quantity_in_presentation: this.draftPresMode() ? Number(this.draftQtyInPres()) : null,
+      po_item_id:               this.draftPoItem()?.id ?? null,
+      po_quantity:              this.draftPoItem() ? Number(this.draftQtyInPres()) : null,
     }]);
 
     this._clearDraft();
@@ -277,6 +322,7 @@ export class EntryPageComponent implements OnInit {
   }
 
   private _clearDraft(): void {
+    this.draftPoItem.set(null);
     this.draftProduct.set(null);
     this.draftVariants.set([]);
     this.draftVariantId.set(null);
@@ -296,19 +342,108 @@ export class EntryPageComponent implements OnInit {
   // ── PO prefill ────────────────────────────────────────────────
 
   private _loadPoItems(poId: number): void {
-    this.poSvc.getOrder(poId).subscribe({
-      next: r => {
-        const order: PurchaseOrder = r.data;
-        if (order.items?.length) {
-          // Auto-select warehouse if set on the order; OC items will be shown as hints
-          this._poOrder.set(order);
-        }
-      },
+    this.loadingPo.set(true);
+    this.poSvc.getOrder(poId)
+      .pipe(finalize(() => this.loadingPo.set(false)))
+      .subscribe({
+        next: r => {
+          const order: PurchaseOrder = r.data;
+          this.poOrder.set(order);
+          if (!this.poReceivable()) return;
+          if (order.warehouse_id) this.onWarehouseChange(order.warehouse_id);
+          this.reason.set(`Recepción ${order.code}`);
+        },
+        error: () => this.errors.set(['No se pudo cargar la orden de compra']),
+      });
+  }
+
+  /** OC enviadas o recibidas parcialmente, para avisar al entrar sin ?po_id. */
+  private _loadPendingOrders(): void {
+    if (!this.authSvc.hasAnyPermission(['ordenes_compra.recibir'])) return;
+    forkJoin([
+      this.poSvc.getOrders({ status: 'sent', order_type: 'purchase', per_page: 100 }),
+      this.poSvc.getOrders({ status: 'partially_received', order_type: 'purchase', per_page: 100 }),
+    ]).subscribe({
+      next: ([sent, partial]) => this.pendingOrders.set([...(sent.data ?? []), ...(partial.data ?? [])]),
       error: () => {},
     });
   }
 
-  _poOrder = signal<PurchaseOrder | null>(null);
+  onPoSelected(poId: number | null): void {
+    if (this.poLocked()) return;
+    this.draftPoItem.set(null);
+    this.poOrder.set(null);
+    this.router.navigate([], {
+      relativeTo: this.route, replaceUrl: true,
+      queryParams: { po_id: poId ?? null },
+    });
+    if (poId) this._loadPoItems(poId);
+    else this.reason.set('');
+  }
+
+  poPending(item: PurchaseOrderItem): number {
+    return item.id ? (this.poPendingMap().get(item.id) ?? 0) : 0;
+  }
+
+  /** Precarga el formulario con un ítem de la OC; lote, vencimiento y ubicación los completa el usuario. */
+  loadPoItem(item: PurchaseOrderItem): void {
+    const genericId = item.variant?.generic?.id;
+    if (!genericId || !this.warehouseSelected) return;
+    this._clearDraft();
+    this.loadingPoItem.set(true);
+    this.catSvc.getProduct(genericId).subscribe({
+      next: r => {
+        this.draftProduct.set(r.data);
+        this.draftPoItem.set(item);
+        this.catSvc.getVariants(genericId).subscribe({
+          next: vr => {
+            this.draftVariants.set((vr.data ?? []).filter(v => v.is_active || v.id === item.product_variant_id));
+            this.draftVariantId.set(item.product_variant_id);
+            this.catSvc.getPresentations(genericId)
+              .pipe(finalize(() => this.loadingPoItem.set(false)))
+              .subscribe({
+                next: pr => {
+                  this.draftPresentations.set(pr.data ?? []);
+                  this.draftPresMode.set(true);
+                  this.draftPresId.set(item.product_presentation_id);
+                  this.draftQtyInPres.set(this.poPending(item) || null);
+                },
+                error: () => {},
+              });
+          },
+          error: () => this.loadingPoItem.set(false),
+        });
+      },
+      error: () => this.loadingPoItem.set(false),
+    });
+  }
+
+  /** Aviso cuando la entrada se guardó pero la OC no pudo actualizarse. */
+  private poWarning: string | null = null;
+
+  unlinkPoItem(): void {
+    this.draftPoItem.set(null);
+  }
+
+  /** Actualiza el seguimiento de recepción de la OC; la entrada al inventario ya quedó registrada. */
+  private _receivePo(): Observable<string | null> {
+    const order  = this.poOrder();
+    const linked = this.items().filter(i => i.po_item_id && i.po_quantity);
+    if (!order || !linked.length) return of(null);
+    return this.poSvc.receive(order.id, linked.map(i => ({
+      item_id:           i.po_item_id!,
+      quantity_received: i.po_quantity!,
+      lot_number:        i.lot_number_raw,
+      expiration_date:   i.expiration_date_raw,
+      location_id:       i.location_id,
+    }))).pipe(
+      map(() => null),
+      catchError(err => of(
+        `La entrada se registró, pero no se actualizó la OC ${order.code}: ` +
+        (err.error?.message || 'error desconocido'),
+      )),
+    );
+  }
 
   // ── Save ──────────────────────────────────────────────────────
 
@@ -337,7 +472,8 @@ export class EntryPageComponent implements OnInit {
     };
 
     this.invSvc.entry(payload).subscribe({
-      next: res => {
+      next: res => this._receivePo().subscribe(poError => {
+        this.poWarning = poError;
         const doc: MovementDocument = res.data;
         const needsSignature = doc.status === 'pending_signature';
         this.saving.set(false);
@@ -360,13 +496,14 @@ export class EntryPageComponent implements OnInit {
             if (result && 'confirmed' in result) {
               this._printAndNavigate(doc, result.delivered_by, result.received_by);
             } else {
+              if (this.poWarning) this.snack.open(this.poWarning, 'OK', { duration: 8000 });
               this.router.navigate(['/inventory']);
             }
           });
         } else {
           this._printAndNavigate(doc, null, null);
         }
-      },
+      }),
       error: err => {
         this.saving.set(false);
         if (err.status === 422) {
@@ -409,7 +546,8 @@ export class EntryPageComponent implements OnInit {
       delivered_by: deliveredBy,
       received_by:  receivedBy,
     });
-    this.snack.open('Entrada registrada exitosamente', 'OK', { duration: 3500 });
+    if (this.poWarning) this.snack.open(this.poWarning, 'OK', { duration: 8000 });
+    else this.snack.open('Entrada registrada exitosamente', 'OK', { duration: 3500 });
     this.router.navigate(['/inventory']);
   }
 

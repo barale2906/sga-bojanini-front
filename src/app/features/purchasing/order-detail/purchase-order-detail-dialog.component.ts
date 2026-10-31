@@ -13,7 +13,6 @@ import { MatDividerModule } from '@angular/material/divider';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { PurchasingService, PurchaseOrder, PurchaseOrderItem, PurchaseOrderApprovalRecord } from '../purchasing.service';
-import { PurchaseReceiveContextService } from '../purchase-receive-context.service';
 import { DateFormatPipe } from '../../../shared/pipes/date-format.pipe';
 import { FormErrorsComponent } from '../../../shared/components/form-errors/form-errors.component';
 import { PermissionDirective } from '../../../shared/directives/permission.directive';
@@ -40,7 +39,6 @@ export class PurchaseOrderDetailDialogComponent implements OnInit {
   private snack       = inject(MatSnackBar);
   private fb          = inject(FormBuilder);
   private router      = inject(Router);
-  private receiveCtx  = inject(PurchaseReceiveContextService);
   private authSvc     = inject(AuthService);
   private dialog      = inject(MatDialog);
 
@@ -138,9 +136,8 @@ export class PurchaseOrderDetailDialogComponent implements OnInit {
   }
 
   goToInventoryEntry(): void {
-    this.receiveCtx.setOrder(this.order());
     this.ref.close(null);
-    this.router.navigate(['/inventory']);
+    this.router.navigate(['/inventory/entry'], { queryParams: { po_id: this.order().id } });
   }
 
   approvalStatusIcon(status: string): string {

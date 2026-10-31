@@ -35,8 +35,6 @@ import { MovementFormDialogComponent } from './movements/movement-form-dialog.co
 import { InitialEntriesImportDialogComponent } from './initial-entries/initial-entries-import-dialog.component';
 import { ConfirmDialogComponent } from '../../shared/components/confirm-dialog/confirm-dialog.component';
 import { SendDocumentEmailDialogComponent, SendDocumentEmailDialogData } from '../../shared/components/send-document-email-dialog/send-document-email-dialog.component';
-import { PurchaseReceiveContextService } from '../purchasing/purchase-receive-context.service';
-import { PurchaseOrder } from '../purchasing/purchasing.service';
 import { EsDateAdapter, ES_DATE_FORMATS } from '../../shared/adapters/es-date.adapter';
 
 interface MovementRow {
@@ -102,7 +100,6 @@ export class InventoryPageComponent implements OnInit {
   private snack        = inject(MatSnackBar);
   private fb           = inject(FormBuilder);
   private router       = inject(Router);
-  private poReceiveCtx = inject(PurchaseReceiveContextService);
   private movPdfSvc    = inject(MovementPdfService);
   protected authSvc    = inject(AuthService);
 
@@ -193,9 +190,7 @@ export class InventoryPageComponent implements OnInit {
   ];
 
   ngOnInit(): void {
-    const pendingOrder = this.poReceiveCtx.consumeOrder();
-
-    // Carga inicial de almacenes, productos y categorías; si hay OC pendiente, esperar antes de abrir diálogos
+    // Carga inicial de almacenes, productos y categorías
     forkJoin([
       this.wSvc.getWarehouses(),
       this.cSvc.getProducts({ per_page: 200 }),
@@ -205,9 +200,6 @@ export class InventoryPageComponent implements OnInit {
         this.warehouses.set(wRes.data);
         this.products.set(pRes.data);
         this.categories.set(cRes.data);
-        if (pendingOrder) {
-          this._openPoReceiveSequentially(pendingOrder);
-        }
       },
       error: () => {},
     });
@@ -216,11 +208,6 @@ export class InventoryPageComponent implements OnInit {
     this.batchFilters.valueChanges.subscribe(() => this.loadBatches(1));
     this.stockFilters.valueChanges.subscribe(() => this.loadStock(1));
     this.moveFilters.valueChanges.subscribe(() => this.loadMovements(1));
-  }
-
-  private _openPoReceiveSequentially(order: PurchaseOrder): void {
-    // Navegar a la página de entradas pasando el ID de la OC para pre-cargar los ítems
-    this.router.navigate(['/inventory/entry'], { queryParams: { po_id: order.id } });
   }
 
   loadBatches(page = 1): void {

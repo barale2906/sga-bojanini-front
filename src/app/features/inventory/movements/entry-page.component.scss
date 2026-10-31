@@ -160,6 +160,7 @@
 
   &--lot { background: #dbeafe; color: #1e40af; }
   &--qty { background: #d1fae5; color: #065f46; font-weight: 700; }
+  &--po  { background: #fef3c7; color: #92400e; }
 }
 
 .list-item-notes {
@@ -178,3 +179,36 @@
 }
 
 .date-error { color: var(--mat-sys-error, #d32f2f); }
+
+// ── Orden de compra vinculada ──────────────────────────────────
+.po-section { border-color: #fbbf24; background: #fffbeb; }
+
+.po-icon { color: #b45309; font-size: 1.1rem; height: 1.1rem; width: 1.1rem; }
+
+.po-supplier { margin-left: auto; font-size: 0.75rem; font-weight: 500; color: #718096; }
+
+.po-loading { display: flex; align-items: center; gap: 0.5rem; font-size: 0.85rem; color: #4a5568; }
+
+.po-notice { font-size: 0.78rem; color: #4a5568; }
+
+.po-item {
+  display: flex; align-items: center; gap: 0.75rem;
+  background: #fff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 0.5rem 0.75rem;
+
+  &--active { border-color: #C02F86; box-shadow: 0 0 0 1px #C02F86; }
+  &--done   { opacity: 0.6; }
+}
+
+.po-item-info { display: flex; flex-direction: column; flex: 1; min-width: 0; font-size: 0.85rem; }
+
+.po-item-sub { font-size: 0.75rem; color: #718096; }
+
+.po-item-qty { font-size: 0.8rem; font-weight: 600; color: #2d3748; white-space: nowrap; }
+
+.po-link-row {
+  display: flex; align-items: center; gap: 0.4rem; font-size: 0.8rem; color: #92400e;
+  mat-icon { font-size: 1rem; height: 1rem; width: 1rem; }
+  button { margin-left: auto; }
+}
+
+.po-partial { font-size: 0.75rem; color: #b45309; }
