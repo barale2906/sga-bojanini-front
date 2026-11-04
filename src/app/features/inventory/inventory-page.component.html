@@ -52,7 +52,7 @@
             @for (c of categories(); track c.id) { <mat-option [value]="c.id">{{ c.name }}</mat-option> }
           </mat-select>
         </mat-form-field>
-        <div class="sel">
+        <div class="sel sel--product">
           <app-product-search
             label="Producto"
             [selectedProduct]="stockFilterProduct()"
@@ -102,7 +102,7 @@
             @for (c of categories(); track c.id) { <mat-option [value]="c.id">{{ c.name }}</mat-option> }
           </mat-select>
         </mat-form-field>
-        <div class="sel">
+        <div class="sel sel--product">
           <app-product-search
             label="Producto"
             [selectedProduct]="batchFilterProduct()"
@@ -177,7 +177,7 @@
             @for (c of categories(); track c.id) { <mat-option [value]="c.id">{{ c.name }}</mat-option> }
           </mat-select>
         </mat-form-field>
-        <div class="sel">
+        <div class="sel sel--product">
           <app-product-search
             label="Producto"
             [selectedProduct]="moveFilterProduct()"

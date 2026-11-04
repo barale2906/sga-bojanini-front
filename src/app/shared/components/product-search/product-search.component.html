@@ -10,6 +10,9 @@
          [matAutocomplete]="productAuto"
          placeholder="Nombre, código o SKU..."
          (keydown)="onKeydown($event)"
+         (focus)="updatePanelWidth()"
+         [matTooltip]="selectedLabel"
+         [matTooltipDisabled]="!selectedLabel"
          autocomplete="off">
 
   @if (loading()) {
@@ -25,13 +28,14 @@
 
   <mat-autocomplete #productAuto
                     [displayWith]="displayFn"
+                    [panelWidth]="panelWidth()"
                     (optionSelected)="onOptionSelected($event)"
                     class="product-autocomplete-panel">
     @for (p of results(); track p.id) {
       <mat-option [value]="p" class="product-option">
         <div class="product-option-inner">
           <span class="product-option-code">{{ p.barcode }}</span>
-          <span class="product-option-name">{{ p.name }}</span>
+          <span class="product-option-name" [title]="p.name">{{ p.name }}</span>
           @if (p.product_type === 'kit') {
             <span class="product-option-type product-option-type--kit">Kit</span>
           }

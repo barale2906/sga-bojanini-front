@@ -29,7 +29,10 @@ export interface BatchDetail {
   expiration_date: string | null;
   manufacturing_date: string | null;
   quantity_received: number;
+  /** Con filtro `warehouse_id`: saldo del lote en ESE almacén. Sin filtro: total del lote. */
   quantity_available: number;
+  /** Total del lote en todos los almacenes. */
+  total_quantity_available?: number;
   status: 'active' | 'expired' | 'depleted';
   days_until_expiry: number | null;
   /** Comentario registrado al dar entrada al lote */
@@ -45,6 +48,17 @@ export interface BatchLocation {
   location_code: string;
   quantity: number;
   zone: { zone_id: number; zone_name: string; zone_code: string; warehouse_id: number; warehouse_name: string | null; warehouse_code: string | null } | null;
+}
+
+/** Saldo (solo lectura) de un lote en otro almacén, próximo a vencer. */
+export interface OtherWarehouseExpiringBatch {
+  batch_id: number;
+  lot_number: string;
+  expiration_date: string;
+  days_until_expiry: number;
+  lab_brand: string | null;
+  warehouse: { id: number; code: string; name: string };
+  quantity: number;
 }
 
 /** Respuesta de GET /stock/summary */
@@ -256,6 +270,17 @@ export class InventoryService {
     if (availableForExit) params = params.set('available_for_exit', '1');
     if (warehouseId) params = params.set('warehouse_id', String(warehouseId));
     return this.http.get<ApiResponse<BatchDetail[]>>(`${this.api}/generic-products/${productId}/batches`, { params });
+  }
+
+  /**
+   * Saldos del producto en OTROS almacenes que vencen dentro de la ventana
+   * configurada en el backend (SGA_EXIT_OTHER_WAREHOUSES_DAYS, 90 por defecto).
+   * Solo informativo: no se pueden sacar desde la salida del almacén actual.
+   */
+  getOtherWarehousesExpiring(productId: number, excludeWarehouseId: number): Observable<ApiResponse<{ days: number; items: OtherWarehouseExpiringBatch[] }>> {
+    const params = new HttpParams().set('exclude_warehouse_id', String(excludeWarehouseId));
+    return this.http.get<ApiResponse<{ days: number; items: OtherWarehouseExpiringBatch[] }>>(
+      `${this.api}/generic-products/${productId}/batches/other-warehouses-expiring`, { params });
   }
 
   // Stock

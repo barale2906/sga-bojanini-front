@@ -1,6 +1,6 @@
 import {
   Component, Input, Output, EventEmitter, OnInit, OnChanges,
-  SimpleChanges, inject, signal, OnDestroy, ViewChild, ElementRef,
+  SimpleChanges, inject, signal, OnDestroy, ViewChild, ElementRef, HostListener,
 } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormControl, ReactiveFormsModule } from '@angular/forms';
@@ -37,6 +37,7 @@ export class ProductSearchComponent implements OnInit, OnChanges, OnDestroy {
   @ViewChild('searchInput') private searchInputRef?: ElementRef<HTMLInputElement>;
 
   private cSvc          = inject(CatalogService);
+  private host          = inject<ElementRef<HTMLElement>>(ElementRef);
   private destroy$      = new Subject<void>();
   /** Trigger unificado: permite que el Enter cancele cualquier debounce pendiente. */
   private searchTrigger$ = new Subject<{ term: string; immediate: boolean }>();
@@ -46,12 +47,39 @@ export class ProductSearchComponent implements OnInit, OnChanges, OnDestroy {
   loading    = signal(false);
   showClear  = signal(false);
   searched   = signal(false);
+  /**
+   * Ancho del panel de resultados. El campo puede ser angosto (p. ej. 180 px en
+   * filtros), así que el panel crece hasta PANEL_MAX_WIDTH sin salirse del viewport.
+   */
+  panelWidth = signal<number | string>('');
+
+  private static readonly PANEL_MAX_WIDTH = 520;
+  private static readonly VIEWPORT_GUTTER = 16;
 
   displayFn = (value: Product | string | null): string => {
     if (!value) return '';
     if (typeof value === 'string') return value;
     return `${value.barcode} — ${value.name}`;
   };
+
+  /** Texto completo del producto seleccionado (tooltip cuando el input lo recorta). */
+  get selectedLabel(): string {
+    const v = this.searchCtrl.value;
+    return v && typeof v !== 'string' ? this.displayFn(v) : '';
+  }
+
+  /**
+   * Recalcula el ancho antes de abrir el panel: al menos el ancho del campo y,
+   * si hay espacio a la derecha, hasta PANEL_MAX_WIDTH.
+   */
+  @HostListener('window:resize')
+  updatePanelWidth(): void {
+    const rect = this.host.nativeElement.getBoundingClientRect();
+    if (!rect.width) return;
+    const available = window.innerWidth - rect.left - ProductSearchComponent.VIEWPORT_GUTTER;
+    const width = Math.max(rect.width, Math.min(ProductSearchComponent.PANEL_MAX_WIDTH, available));
+    this.panelWidth.set(Math.floor(width));
+  }
 
   ngOnInit(): void {
     // Alimenta el trigger con el tipeo normal del usuario.

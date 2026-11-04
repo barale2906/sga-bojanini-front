@@ -12,7 +12,7 @@ import { MatTooltipModule } from '@angular/material/tooltip';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { MatDialog } from '@angular/material/dialog';
 import { finalize } from 'rxjs';
-import { InventoryService, BatchDetail, CostCenter, MovementDocument } from '../inventory.service';
+import { InventoryService, BatchDetail, CostCenter, MovementDocument, OtherWarehouseExpiringBatch } from '../inventory.service';
 import { WarehouseService, Warehouse } from '../../warehouse/warehouse.service';
 import { MedicalServicesService, MedicalService } from '../medical-services.service';
 import { Product } from '../../catalog/catalog.service';
@@ -84,6 +84,9 @@ export class ExitPageComponent implements OnInit {
   loadingDraftFefo = signal(false);
   draftFetchError  = signal<string | null>(null);
   _kitAvailable    = signal<number | null>(null);
+  /** Saldos del mismo producto en otros almacenes próximos a vencer (solo lectura). */
+  otherExpiring     = signal<OtherWarehouseExpiringBatch[]>([]);
+  otherExpiringDays = signal<number | null>(null);
 
   // ── Lista de ítems confirmados ────────────────────────────────
   cartItems = signal<CartItem[]>([]);
@@ -181,11 +184,15 @@ export class ExitPageComponent implements OnInit {
     this.draftQtyKit.set(null);
     this.draftFetchError.set(null);
     this._kitAvailable.set(null);
+    this.otherExpiring.set([]);
+    this.otherExpiringDays.set(null);
     if (!product || !this.warehouseId()) return;
 
     const wId   = this.warehouseId()!;
     const isKit = product.product_type === 'kit';
     this.loadingDraftFefo.set(true);
+
+    if (!isKit) this._loadOtherExpiring(product.id, wId);
 
     if (isKit) {
       this.invSvc.getKitAvailability(product.id, wId)
@@ -218,6 +225,18 @@ export class ExitPageComponent implements OnInit {
         },
         error: () => this.draftFetchError.set(`Error al verificar stock de "${product.name}"`),
       });
+  }
+
+  private _loadOtherExpiring(productId: number, warehouseId: number): void {
+    this.invSvc.getOtherWarehousesExpiring(productId, warehouseId).subscribe({
+      next: r => {
+        // Ignorar respuestas tardías si el usuario ya cambió de producto
+        if (this.draftProduct()?.id !== productId) return;
+        this.otherExpiring.set(r.data.items);
+        this.otherExpiringDays.set(r.data.days);
+      },
+      error: () => {},
+    });
   }
 
   setLotQty(lotNumber: string, rawVal: number | null): void {
@@ -262,6 +281,8 @@ export class ExitPageComponent implements OnInit {
     this.draftQtyKit.set(null);
     this.draftFetchError.set(null);
     this._kitAvailable.set(null);
+    this.otherExpiring.set([]);
+    this.otherExpiringDays.set(null);
   }
 
   // ── Guardar salida ────────────────────────────────────────────

@@ -10,6 +10,11 @@
 .tab-toolbar {
   display: flex; gap: 0.75rem; align-items: flex-end; flex-wrap: wrap; margin-bottom: 1rem;
   .sel { width: 180px; }
+  // El buscador de producto necesita más espacio para mostrar el nombre seleccionado.
+  .sel--product { width: 320px; max-width: 100%; }
+  @media (max-width: 600px) {
+    .sel, .sel--product, .date-field { width: 100%; }
+  }
   .date-field {
     width: 170px;
     input[type="date"] { cursor: pointer; }

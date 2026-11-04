@@ -189,6 +189,28 @@
             </div>
           }
 
+          <!-- Saldos en otros almacenes próximos a vencer (solo informativo, no se pueden sacar aquí) -->
+          @if (draftProduct() && !loadingDraftFefo() && otherExpiring().length > 0) {
+            <div class="other-expiring-panel">
+              <div class="other-expiring-label">
+                <mat-icon>schedule</mat-icon>
+                En otros almacenes, vencen en los próximos {{ otherExpiringDays() }} días
+              </div>
+              <div class="other-expiring-hint">
+                Solo informativo: para usarlos, trasládalos o haz la salida desde ese almacén.
+              </div>
+              @for (o of otherExpiring(); track o.batch_id + '-' + o.warehouse.id) {
+                <div class="other-expiring-row">
+                  <span class="lot-cell lot-num"><mat-icon>tag</mat-icon>{{ o.lot_number }}</span>
+                  <span class="lot-cell lot-expiry"><mat-icon>event</mat-icon>{{ o.expiration_date }}</span>
+                  <span class="lot-cell other-days">{{ o.days_until_expiry }} días</span>
+                  <span class="lot-cell other-wh"><mat-icon>warehouse</mat-icon>{{ o.warehouse.name }}</span>
+                  <span class="lot-cell other-qty">{{ o.quantity }} u.</span>
+                </div>
+              }
+            </div>
+          }
+
           <!-- Kit: cantidad directa -->
           @if (draftProduct()?.product_type === 'kit' && !loadingDraftFefo() && !draftFetchError()) {
             <div class="status-row status-row--checking">

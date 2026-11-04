@@ -152,10 +152,17 @@ th.actions-col, td.actions-col {
 
 .product-option-inner {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 0.5rem;
   width: 100%;
-  overflow: hidden;
+  min-width: 0;
+}
+
+// El texto de mat-option no debe recortarse: el nombre se parte en varias líneas.
+.product-option .mdc-list-item__primary-text {
+  white-space: normal;
+  width: 100%;
+  min-width: 0;
 }
 
 .product-option-code {
@@ -171,9 +178,10 @@ th.actions-col, td.actions-col {
 
 .product-option-name {
   flex: 1;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  min-width: 0;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  line-height: 1.3;
   font-size: 0.88rem;
   color: #2d3748;
 }
