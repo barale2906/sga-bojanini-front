@@ -8,7 +8,13 @@ export class DateFormatPipe implements PipeTransform {
   transform(value: string | null | undefined, format: 'date' | 'datetime' | 'relative' = 'date'): string {
     if (!value) return '—';
 
-    const date = new Date(value);
+    // 'YYYY-MM-DD' (sin hora) se interpreta como fecha local: new Date('2028-02-28')
+    // la toma como medianoche UTC y en Bogotá (UTC-5) se mostraba un día antes.
+    const dateOnly = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+    const date = dateOnly
+      ? new Date(+dateOnly[1], +dateOnly[2] - 1, +dateOnly[3])
+      : new Date(value);
+    if (dateOnly) date.setFullYear(+dateOnly[1]); // new Date(28, …) daría 1928
     if (isNaN(date.getTime())) return value;
 
     const options: Intl.DateTimeFormatOptions =
