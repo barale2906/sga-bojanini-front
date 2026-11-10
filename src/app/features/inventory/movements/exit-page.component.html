@@ -174,6 +174,15 @@
                       <span>{{ b.notes }}</span>
                     </div>
                   }
+                  @if ((draftLotQtys()[b.lot_number] || 0) > 0) {
+                    <mat-form-field appearance="outline" class="lot-note-field">
+                      <mat-label>Nota para el lote {{ b.lot_number }} (opcional)</mat-label>
+                      <input matInput [ngModel]="draftLotNotes()[b.lot_number] || ''"
+                             (ngModelChange)="setLotNote(b.lot_number, $event)"
+                             placeholder="Se anota en este lote al confirmar" />
+                      <mat-icon matSuffix>sticky_note_2</mat-icon>
+                    </mat-form-field>
+                  }
                 </div>
               }
 
@@ -225,6 +234,15 @@
                 <mat-hint>Máx. {{ _kitAvailable() }}</mat-hint>
               }
               <mat-icon matSuffix>numbers</mat-icon>
+            </mat-form-field>
+          }
+
+          @if (draftProduct()?.product_type === 'kit' && !loadingDraftFefo() && !draftFetchError()) {
+            <mat-form-field appearance="outline" class="full-field">
+              <mat-label>Notas del kit</mat-label>
+              <input matInput [ngModel]="draftNotes()" (ngModelChange)="draftNotes.set($event)"
+                     placeholder="Opcional · se anota en los lotes de los componentes al confirmar" />
+              <mat-icon matSuffix>sticky_note_2</mat-icon>
             </mat-form-field>
           }
 
@@ -296,7 +314,13 @@
               }
             }
           </div>
+          @if (item.notes) {
+            <div class="list-item-notes">{{ item.notes }}</div>
+          }
           @for (b of item.fefo; track b.lot_number) {
+            @if (item.lotNotes[b.lot_number]) {
+              <div class="list-item-notes"><strong>{{ b.lot_number }}:</strong> {{ item.lotNotes[b.lot_number] }}</div>
+            }
             @if (b.notes) {
               <div class="lot-notes">
                 <mat-icon>comment</mat-icon>

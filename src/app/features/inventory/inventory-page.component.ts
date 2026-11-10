@@ -431,9 +431,9 @@ export class InventoryPageComponent implements OnInit {
   }
 
   writeOff(batch: Batch): void {
-    this.dialog.open(ConfirmDialogComponent, { data: { title: 'Dar de baja lote', message: `¿Dar de baja el lote "${batch.lot_number}" por vencimiento? Esto eliminará ${batch.quantity_available} unidades del inventario.`, confirmColor: 'warn', confirmText: 'Dar de baja' }, width: '460px' })
+    this.dialog.open(ConfirmDialogComponent, { data: { title: 'Dar de baja lote', message: `¿Dar de baja el lote "${batch.lot_number}" por vencimiento? Esto eliminará ${batch.quantity_available} unidades del inventario.`, confirmColor: 'warn', confirmText: 'Dar de baja', notesLabel: 'Notas del ítem (opcional)' }, width: '460px' })
       .afterClosed().subscribe(ok => {
-        if (ok) this.svc.writeOff(batch.id).subscribe({ next: () => { this.snack.open('Lote dado de baja', 'OK', { duration: 3000 }); this.loadBatches(); this.loadStock(); }, error: () => {} });
+        if (ok) this.svc.writeOff(batch.id, ok.notes).subscribe({ next: () => { this.snack.open('Lote dado de baja', 'OK', { duration: 3000 }); this.loadBatches(); this.loadStock(); }, error: () => {} });
       });
   }
 

@@ -34,6 +34,7 @@ interface TransferItem {
   product_variant_id: number;
   location_from_id:   number | null;
   location_to_id:     number | null;
+  lotNotes:           Record<string, string>; // nota por lot_number; se anota en ese lote al confirmar
 }
 
 @Component({
@@ -85,6 +86,7 @@ export class TransferPageComponent implements OnInit {
   draftLotQtys     = signal<Record<string, number>>({});
   draftLocFromId   = signal<number | null>(null);
   draftLocToId     = signal<number | null>(null);
+  draftLotNotes    = signal<Record<string, string>>({});
   loadingVariants  = signal(false);
   loadingDraftFefo = signal(false);
   draftFetchError  = signal<string | null>(null);
@@ -215,6 +217,7 @@ export class TransferPageComponent implements OnInit {
   private _clearDraftStock(): void {
     this.draftFefo.set([]);
     this.draftLotQtys.set({});
+    this.draftLotNotes.set({});
     this.draftFetchError.set(null);
   }
 
@@ -239,10 +242,19 @@ export class TransferPageComponent implements OnInit {
       product_variant_id: variant.id,
       location_from_id:   this.draftLocFromId(),
       location_to_id:     this.draftLocToId(),
+      lotNotes:           Object.fromEntries(
+        selectedBatches
+          .map(b => [b.lot_number, (this.draftLotNotes()[b.lot_number] ?? '').trim()] as [string, string])
+          .filter(([, n]) => n),
+      ),
     }]);
 
     setTimeout(() => this.productScannerRef?.focus(), 50);
     this._clearDraftFull();
+  }
+
+  setLotNote(lotNumber: string, value: string): void {
+    this.draftLotNotes.update(prev => ({ ...prev, [lotNumber]: value }));
   }
 
   removeItem(i: number): void {
@@ -250,6 +262,7 @@ export class TransferPageComponent implements OnInit {
   }
 
   private _clearDraftFull(): void {
+    this.draftLotNotes.set({});
     this.draftProduct.set(null);
     this.draftVariants.set([]);
     this.draftVariantId.set(null);
@@ -277,6 +290,7 @@ export class TransferPageComponent implements OnInit {
             product_variant_id: item.product_variant_id,
             batch_id:           b.id,
             quantity:           item.lotQtys[b.lot_number] || 0,
+            notes:              item.lotNotes[b.lot_number] || undefined,
             ...(item.location_from_id ? { location_from_id: item.location_from_id } : {}),
             ...(item.location_to_id   ? { location_to_id:   item.location_to_id }   : {}),
           }))

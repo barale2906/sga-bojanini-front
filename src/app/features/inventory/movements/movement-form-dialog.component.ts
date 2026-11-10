@@ -407,6 +407,7 @@ export class MovementFormDialogComponent implements OnInit {
     invoice_number:           [''],
     entry_temperature:        [null as number | null],
     reason:                   [''],
+    item_notes:               [''],
     loss_reason_category:     [null as string | null],
     notes:                    [''],
     cost_center_id:           [null as number | null],
@@ -1177,8 +1178,8 @@ export class MovementFormDialogComponent implements OnInit {
 
     // Salida usa generic_product_id; todos los demás usan product_variant_id
     const basePayload: Record<string, unknown> = this.isExit
-      ? { generic_product_id: v.product_id, warehouse_id: v.warehouse_id, reason: v.reason || undefined }
-      : { product_variant_id: v.product_variant_id, warehouse_id: v.warehouse_id, reason: v.reason || undefined };
+      ? { generic_product_id: v.product_id, warehouse_id: v.warehouse_id, reason: v.reason || undefined, notes: v.item_notes?.trim() || undefined }
+      : { product_variant_id: v.product_variant_id, warehouse_id: v.warehouse_id, reason: v.reason || undefined, notes: v.item_notes?.trim() || undefined };
 
     // Adjuntar referencia OC si hay una vinculada
     const linkedPo   = this._linkedPo;
@@ -1234,6 +1235,7 @@ export class MovementFormDialogComponent implements OnInit {
           location_from_id:   v.location_from_id,
           location_to_id:     row.location_to_id,
           quantity:           Number(row.quantity),
+          notes:              v.item_notes?.trim() || undefined,
         }));
         this.data.inventorySvc.transfer({ warehouse_from_id: v.warehouse_id, warehouse_to_id: v.warehouse_id, movement_date: v.movement_date || undefined, reason: v.reason || undefined, items: transferItems })
           .subscribe({
@@ -1250,7 +1252,7 @@ export class MovementFormDialogComponent implements OnInit {
         warehouse_to_id:   v.warehouse_id,
         movement_date:     v.movement_date || undefined,
         reason:            v.reason || undefined,
-        items: [{ product_variant_id: v.product_variant_id, location_from_id: v.location_from_id, location_to_id: v.location_to_id, quantity: Number(v.quantity) }],
+        items: [{ product_variant_id: v.product_variant_id, location_from_id: v.location_from_id, location_to_id: v.location_to_id, quantity: Number(v.quantity), notes: v.item_notes?.trim() || undefined }],
       }).subscribe({
         next: res => {
           const doc = res.data;

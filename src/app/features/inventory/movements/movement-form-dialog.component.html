@@ -583,6 +583,12 @@
         <input matInput formControlName="reason" />
       </mat-form-field>
 
+      <mat-form-field appearance="outline" class="span2">
+        <mat-label>Notas del ítem (opcional)</mat-label>
+        <textarea matInput formControlName="item_notes" rows="2"
+                  placeholder="Se anota en el lote al confirmar el movimiento"></textarea>
+      </mat-form-field>
+
     } <!-- /isTransfer -->
 
 
@@ -682,6 +688,12 @@
       <mat-form-field appearance="outline">
         <mat-label>Motivo *</mat-label>
         <input matInput formControlName="reason" placeholder="Ajuste por conteo físico" />
+      </mat-form-field>
+
+      <mat-form-field appearance="outline" class="span2">
+        <mat-label>Notas del ítem (opcional)</mat-label>
+        <textarea matInput formControlName="item_notes" rows="2"
+                  placeholder="Se anota en el lote al confirmar el movimiento"></textarea>
       </mat-form-field>
 
       <!-- Advertencia: ajuste negativo excede stock -->
@@ -926,6 +938,12 @@
           <input matInput formControlName="reason" />
         </mat-form-field>
 
+        <mat-form-field appearance="outline" class="span2">
+          <mat-label>Notas del ítem (opcional)</mat-label>
+          <textarea matInput formControlName="item_notes" rows="2"
+                    placeholder="Se anota en el lote al confirmar el movimiento"></textarea>
+        </mat-form-field>
+
       } <!-- /!hasZeroStock -->
 
     }
@@ -1055,6 +1073,12 @@
             {{ form.get('loss_reason_category')?.value === 'other' ? 'Detalle del motivo *' : 'Detalle adicional (opcional)' }}
           </mat-label>
           <textarea matInput formControlName="reason" rows="2" placeholder="Describe la causa de la baja"></textarea>
+        </mat-form-field>
+
+        <mat-form-field appearance="outline" class="span2">
+          <mat-label>Notas del ítem (opcional)</mat-label>
+          <textarea matInput formControlName="item_notes" rows="2"
+                    placeholder="Se anota en el lote al confirmar el movimiento"></textarea>
         </mat-form-field>
 
         <!-- Advertencia: cantidad excede el stock disponible en el lote/ubicación elegidos -->

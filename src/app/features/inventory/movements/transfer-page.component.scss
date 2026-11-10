@@ -240,3 +240,10 @@
 .btn-spinner {
   display: inline-block; margin-right: 0.5rem; vertical-align: middle;
 }
+
+.list-item-notes {
+  font-size: 0.75rem; color: #718096; font-style: italic; white-space: pre-line;
+  padding-left: 0.25rem; border-left: 2px solid #e2e8f0;
+}
+
+.lot-note-field { flex-basis: 100%; width: 100%; .mat-mdc-form-field-subscript-wrapper { display: none; } }

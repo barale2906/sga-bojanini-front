@@ -28,6 +28,8 @@ interface CartItem {
   fefo:        BatchDetail[];    // solo lotes con cantidad > 0, en orden FEFO
   lotQtys:     Record<string, number>; // qty por lot_number → para el payload
   isKit:       boolean;
+  notes:       string;           // solo kits: nota del ítem
+  lotNotes:    Record<string, string>; // nota por lot_number; se anota en ese lote al confirmar
 }
 
 @Component({
@@ -81,6 +83,8 @@ export class ExitPageComponent implements OnInit {
   draftLotQtys     = signal<Record<string, number>>({});
   /** Para kits: cantidad única */
   draftQtyKit      = signal<number | null>(null);
+  draftNotes       = signal('');   // solo kits
+  draftLotNotes    = signal<Record<string, string>>({});
   loadingDraftFefo = signal(false);
   draftFetchError  = signal<string | null>(null);
   _kitAvailable    = signal<number | null>(null);
@@ -181,6 +185,7 @@ export class ExitPageComponent implements OnInit {
     this.draftProduct.set(product);
     this.draftFefo.set([]);
     this.draftLotQtys.set({});
+    this.draftLotNotes.set({});
     this.draftQtyKit.set(null);
     this.draftFetchError.set(null);
     this._kitAvailable.set(null);
@@ -264,10 +269,20 @@ export class ExitPageComponent implements OnInit {
       fefo:        selectedBatches,
       lotQtys:     isKit ? {} : { ...this.draftLotQtys() },
       isKit,
+      notes:       isKit ? this.draftNotes().trim() : '',
+      lotNotes:    isKit ? {} : Object.fromEntries(
+        selectedBatches
+          .map(b => [b.lot_number, (this.draftLotNotes()[b.lot_number] ?? '').trim()] as [string, string])
+          .filter(([, n]) => n),
+      ),
     }]);
 
     setTimeout(() => this.productScannerRef?.focus(), 50);
     this._clearDraft();
+  }
+
+  setLotNote(lotNumber: string, value: string): void {
+    this.draftLotNotes.update(prev => ({ ...prev, [lotNumber]: value }));
   }
 
   removeItem(i: number): void {
@@ -275,6 +290,8 @@ export class ExitPageComponent implements OnInit {
   }
 
   private _clearDraft(): void {
+    this.draftNotes.set('');
+    this.draftLotNotes.set({});
     this.draftProduct.set(null);
     this.draftFefo.set([]);
     this.draftLotQtys.set({});
@@ -305,6 +322,7 @@ export class ExitPageComponent implements OnInit {
           return [{
             generic_product_id: item.product.id,
             quantity:           Number(item.quantity),
+            notes:              item.notes || undefined,
           }];
         }
         // Un ítem por lote seleccionado, en orden FEFO (fefo ya está filtrado y ordenado)
@@ -313,6 +331,7 @@ export class ExitPageComponent implements OnInit {
             generic_product_id: item.product.id,
             batch_id:           b.id,
             quantity:           item.lotQtys[b.lot_number] || 0,
+            notes:              item.lotNotes[b.lot_number] || undefined,
           }))
           .filter(i => i.quantity > 0);
       }),

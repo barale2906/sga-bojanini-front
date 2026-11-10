@@ -383,8 +383,8 @@ export class InventoryService {
   return_(payload: any): Observable<ApiResponse<any>> {
     return this.http.post<ApiResponse<any>>(`${this.api}/movements/return`, payload);
   }
-  writeOff(batchId: number): Observable<ApiResponse<any>> {
-    return this.http.post<ApiResponse<any>>(`${this.api}/movements/write-off`, { batch_id: batchId });
+  writeOff(batchId: number, notes?: string): Observable<ApiResponse<any>> {
+    return this.http.post<ApiResponse<any>>(`${this.api}/movements/write-off`, { batch_id: batchId, ...(notes ? { notes } : {}) });
   }
   /** Baja de inventario por daño, muestra, pérdida/robo o vencimiento — requiere `batch_id` y `location_id` elegidos explícitamente por el usuario (no aplica FEFO). */
   loss(payload: any): Observable<ApiResponse<any>> {
