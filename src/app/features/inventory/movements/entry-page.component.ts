@@ -12,7 +12,7 @@ import { MatTooltipModule } from '@angular/material/tooltip';
 import { MatDividerModule } from '@angular/material/divider';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { finalize, Observable, of, map, catchError, forkJoin } from 'rxjs';
-import { InventoryService, MovementDocument } from '../inventory.service';
+import { InventoryService, MovementDocument, CostCenter } from '../inventory.service';
 import { WarehouseService, Warehouse, Location, LocationCapacity } from '../../warehouse/warehouse.service';
 import { CatalogService, Product, ProductVariant, ProductPresentation } from '../../catalog/catalog.service';
 import { PurchasingService, PurchaseOrder, PurchaseOrderItem } from '../../purchasing/purchasing.service';
@@ -84,6 +84,8 @@ export class EntryPageComponent implements OnInit {
   warehouseId     = signal<number | null>(null);
   movementDate    = signal('');
   invoiceNumber   = signal('');
+  costCenterId    = signal<number | null>(null);
+  costCenters     = signal<CostCenter[]>([]);
   temperature     = signal<number | null>(null);
   reason          = signal('');
 
@@ -191,6 +193,8 @@ export class EntryPageComponent implements OnInit {
 
   ngOnInit(): void {
     this.wSvc.getWarehouses().subscribe({ next: r => this.warehouses.set(r.data), error: () => {} });
+
+    this.invSvc.getCostCenters({ is_active: true }).subscribe({ next: r => this.costCenters.set(r.data ?? []), error: () => {} });
 
     const poId = this.route.snapshot.queryParamMap.get('po_id');
     if (poId) this._loadPoItems(Number(poId));
@@ -352,6 +356,8 @@ export class EntryPageComponent implements OnInit {
           if (!this.poReceivable()) return;
           if (order.warehouse_id) this.onWarehouseChange(order.warehouse_id);
           this.reason.set(`Recepción ${order.code}`);
+          // El centro de costos de la OC se precarga por defecto (editable)
+          if (order.cost_center_id) this.costCenterId.set(order.cost_center_id);
         },
         error: () => this.errors.set(['No se pudo cargar la orden de compra']),
       });
@@ -456,6 +462,7 @@ export class EntryPageComponent implements OnInit {
       warehouse_id:      this.warehouseId(),
       movement_date:     this.movementDate() || undefined,
       invoice_number:    this.invoiceNumber() || undefined,
+      cost_center_id:    this.costCenterId() ?? undefined,
       entry_temperature: this.temperature() ?? undefined,
       reason:            this.reason() || undefined,
       items: this.items().map(item => ({

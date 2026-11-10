@@ -30,6 +30,12 @@
           @for (w of data.warehouses; track w.id) { <mat-option [value]="w.id">{{ w.name }}</mat-option> }
         </mat-select>
       </mat-form-field>
+      <mat-form-field appearance="outline"><mat-label>Centro de costos</mat-label>
+        <mat-select formControlName="cost_center_id">
+          <mat-option [value]="null">— Sin centro de costos —</mat-option>
+          @for (c of costCenters(); track c.id) { <mat-option [value]="c.id">{{ c.code }} · {{ c.name }}</mat-option> }
+        </mat-select>
+      </mat-form-field>
       <mat-form-field appearance="outline"><mat-label>Fecha entrega esperada</mat-label><input matInput type="date" formControlName="expected_delivery_date" /></mat-form-field>
     </div>
     <mat-form-field appearance="outline" class="w-full"><mat-label>Notas</mat-label><textarea matInput formControlName="notes" rows="2"></textarea></mat-form-field>

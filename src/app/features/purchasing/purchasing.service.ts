@@ -24,6 +24,8 @@ export interface PurchaseOrderItem {
 
 export interface PurchaseOrder {
   id: number; code: string; supplier_id: number; warehouse_id: number;
+  cost_center_id?: number | null;
+  cost_center?: { id: number; code: string; name: string; type: string } | null;
   status: string; notes: string | null; expected_delivery_date: string | null;
   subtotal: number | string; tax_amount: number | string; total_amount: number | string;
   created_at: string;

@@ -10,6 +10,7 @@
   <div class="info-grid">
     <div><label>Proveedor</label><p>{{ order().supplier?.name || '—' }}</p></div>
     <div><label>Almacén</label><p>{{ order().warehouse?.name || '—' }}</p></div>
+    <div><label>Centro de costos</label><p>{{ order().cost_center ? order().cost_center!.code + ' · ' + order().cost_center!.name : '—' }}</p></div>
     <div><label>Fecha creación</label><p>{{ order().created_at | dateFormat:'datetime' }}</p></div>
     <div><label>Total</label><p><strong>{{ formatCurrency(order().total_amount) }}</strong></p></div>
   </div>

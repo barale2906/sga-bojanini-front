@@ -3,7 +3,7 @@ import { CommonModule } from '@angular/common';
 import { FormBuilder, ReactiveFormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { forkJoin, of } from 'rxjs';
-import { map, catchError } from 'rxjs/operators';
+import { map, catchError, debounceTime } from 'rxjs/operators';
 import { MatTabsModule } from '@angular/material/tabs';
 import { MatTableModule } from '@angular/material/table';
 import { MatSortModule, Sort } from '@angular/material/sort';
@@ -20,7 +20,7 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { DateAdapter, MAT_DATE_FORMATS } from '@angular/material/core';
 import { MatDialog } from '@angular/material/dialog';
 import { MatSnackBar } from '@angular/material/snack-bar';
-import { InventoryService, Batch, StockItem, Movement, MovementSignatureRecord, MovementDocument } from './inventory.service';
+import { InventoryService, Batch, StockItem, Movement, MovementSignatureRecord, MovementDocument, CostCenter } from './inventory.service';
 import { AuthService } from '../../core/services/auth.service';
 import { MovementPdfService, MovementPdfSignature } from '../../shared/services/movement-pdf.service';
 import { WarehouseService, Warehouse, Location } from '../warehouse/warehouse.service';
@@ -52,6 +52,7 @@ interface MovementRow {
   quantity: number;
   user_name: string;
   date: string;
+  notes: string | null;
 }
 
 const MOV_TYPE_LABELS: Record<string, string> = {
@@ -108,7 +109,7 @@ export class InventoryPageComponent implements OnInit {
   batchMeta = signal<PaginationMeta>({ current_page: 1, last_page: 1, per_page: 25, total: 0 });
   expiringBatches = signal<Batch[]>([]);
   batchCols = ['lot_number', 'product', 'category', 'warehouse', 'status', 'quantity', 'expiration_date', 'days'];
-  batchFilters = this.fb.group({ status: [''], warehouse_id: [''], category_id: [''], generic_product_id: [''] });
+  batchFilters = this.fb.group({ status: [''], warehouse_id: [''], category_id: [''], generic_product_id: [''], cost_center_id: [''], notes: [''] });
   batchFilterProduct = signal<Product | null>(null);
 
   // Stock
@@ -116,7 +117,7 @@ export class InventoryPageComponent implements OnInit {
   stockMeta = signal<PaginationMeta>({ current_page: 1, last_page: 1, per_page: 25, total: 0 });
   lowStock = signal<StockItem[]>([]);
   stockCols = ['product', 'category', 'warehouse', 'available', 'total'];
-  stockFilters = this.fb.group({ warehouse_id: [''], category_id: [''], generic_product_id: [''] });
+  stockFilters = this.fb.group({ warehouse_id: [''], category_id: [''], generic_product_id: [''], cost_center_id: [''], notes: [''] });
 
   // Movements
   moveDisplayRows = signal<MovementRow[]>([]);
@@ -127,6 +128,8 @@ export class InventoryPageComponent implements OnInit {
     warehouse_id: [''],
     category_id: [''],
     generic_product_id: [''],
+    cost_center_id: [''],
+    notes: [''],
     date_from: [null as Date | null],
     date_to: [null as Date | null],
   });
@@ -154,6 +157,7 @@ export class InventoryPageComponent implements OnInit {
   warehouses = signal<Warehouse[]>([]);
   products = signal<Product[]>([]);
   categories = signal<Category[]>([]);
+  costCenters = signal<CostCenter[]>([]);
   locations = signal<Location[]>([]);
   loading = signal(false);
 
@@ -190,6 +194,7 @@ export class InventoryPageComponent implements OnInit {
   ];
 
   ngOnInit(): void {
+    this.svc.getCostCenters({ is_active: true }).subscribe({ next: r => this.costCenters.set(r.data ?? []), error: () => {} });
     // Carga inicial de almacenes, productos y categorías
     forkJoin([
       this.wSvc.getWarehouses(),
@@ -205,18 +210,21 @@ export class InventoryPageComponent implements OnInit {
     });
 
     this.loadBatches(); this.loadExpiringBatches(); this.loadStock(); this.loadLowStock(); this.loadMovements();
-    this.batchFilters.valueChanges.subscribe(() => this.loadBatches(1));
-    this.stockFilters.valueChanges.subscribe(() => this.loadStock(1));
-    this.moveFilters.valueChanges.subscribe(() => this.loadMovements(1));
+    // debounce: el campo de notas dispara un cambio por cada tecla
+    this.batchFilters.valueChanges.pipe(debounceTime(300)).subscribe(() => this.loadBatches(1));
+    this.stockFilters.valueChanges.pipe(debounceTime(300)).subscribe(() => this.loadStock(1));
+    this.moveFilters.valueChanges.pipe(debounceTime(300)).subscribe(() => this.loadMovements(1));
   }
 
   loadBatches(page = 1): void {
-    const { status, warehouse_id, category_id, generic_product_id } = this.batchFilters.value;
+    const { status, warehouse_id, category_id, generic_product_id, cost_center_id, notes } = this.batchFilters.value;
     this.svc.getBatches({
       status:             status             || undefined,
       warehouse_id:       warehouse_id       ? Number(warehouse_id)      : undefined,
       category_id:        category_id        ? Number(category_id)       : undefined,
       generic_product_id: generic_product_id ? Number(generic_product_id): undefined,
+      cost_center_id:     cost_center_id     ? Number(cost_center_id)    : undefined,
+      notes:              notes?.trim()      || undefined,
       page,
       per_page: this.batchMeta().per_page,
     }).subscribe({
@@ -230,12 +238,14 @@ export class InventoryPageComponent implements OnInit {
   }
 
   loadStock(page = 1): void {
-    const { warehouse_id, category_id, generic_product_id } = this.stockFilters.value;
+    const { warehouse_id, category_id, generic_product_id, cost_center_id, notes } = this.stockFilters.value;
     this.loading.set(true);
     this.svc.getStock({
       warehouse_id:       warehouse_id       ? Number(warehouse_id)       : undefined,
       category_id:        category_id        ? Number(category_id)        : undefined,
       generic_product_id: generic_product_id ? Number(generic_product_id) : undefined,
+      cost_center_id:     cost_center_id     ? Number(cost_center_id)     : undefined,
+      notes:              notes?.trim()      || undefined,
       page,
       per_page: this.stockMeta().per_page,
     }).subscribe({
@@ -249,12 +259,14 @@ export class InventoryPageComponent implements OnInit {
   }
 
   loadMovements(page = 1): void {
-    const { movement_type, warehouse_id, category_id, generic_product_id, date_from, date_to } = this.moveFilters.value;
+    const { movement_type, warehouse_id, category_id, generic_product_id, cost_center_id, notes, date_from, date_to } = this.moveFilters.value;
     this.svc.getMovements({
       movement_type:      movement_type      || undefined,
       warehouse_id:       warehouse_id       ? Number(warehouse_id)       : undefined,
       category_id:        category_id        ? Number(category_id)        : undefined,
       generic_product_id: generic_product_id ? Number(generic_product_id) : undefined,
+      cost_center_id:     cost_center_id     ? Number(cost_center_id)     : undefined,
+      notes:              notes?.trim()      || undefined,
       date_from:     date_from     ? this.toApiDate(date_from)  : undefined,
       date_to:       date_to       ? this.toApiDate(date_to)    : undefined,
       page,
@@ -279,6 +291,7 @@ export class InventoryPageComponent implements OnInit {
           quantity: m.quantity,
           user_name: m.user_name || '—',
           date: m.movement_date ?? m.created_at,
+          notes: m.notes ?? m.reason ?? null,
         }));
         this.moveDisplayRows.set(rows);
         this.moveMeta.set(r.meta);

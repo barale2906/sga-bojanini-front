@@ -78,6 +78,7 @@ export interface StockItem {
   warehouse: { id: number; name: string; code: string } | null;
   total_quantity: number; reserved_quantity: number; available_quantity: number;
   last_movement_at: string | null;
+  last_note?: string | null;
 }
 
 export interface CostCenter {
@@ -175,6 +176,7 @@ export interface Movement {
   movement_type: string;
   quantity: number;
   reason: string | null;
+  notes?: string | null;
   movement_date?: string | null;
   user_id: number;
   created_at: string;
@@ -232,13 +234,15 @@ export class InventoryService {
   private api = environment.apiUrl;
 
   // Batches
-  getBatches(f: { product_variant_id?: number; generic_product_id?: number; category_id?: number; status?: string; warehouse_id?: number; per_page?: number; page?: number } = {}): Observable<PaginatedResponse<Batch>> {
+  getBatches(f: { product_variant_id?: number; generic_product_id?: number; category_id?: number; status?: string; warehouse_id?: number; cost_center_id?: number; notes?: string; per_page?: number; page?: number } = {}): Observable<PaginatedResponse<Batch>> {
     let p = new HttpParams();
     if (f.product_variant_id)  p = p.set('product_variant_id',  String(f.product_variant_id));
     if (f.generic_product_id)  p = p.set('generic_product_id',  String(f.generic_product_id));
     if (f.category_id)         p = p.set('category_id',         String(f.category_id));
     if (f.status)              p = p.set('status', f.status);
     if (f.warehouse_id)        p = p.set('warehouse_id',         String(f.warehouse_id));
+    if (f.cost_center_id)      p = p.set('cost_center_id',       String(f.cost_center_id));
+    if (f.notes)               p = p.set('notes',                f.notes);
     if (f.per_page)            p = p.set('per_page',             String(f.per_page));
     if (f.page)                p = p.set('page',                 String(f.page));
     return this.http.get<PaginatedResponse<Batch>>(`${this.api}/batches`, { params: p });
@@ -284,11 +288,13 @@ export class InventoryService {
   }
 
   // Stock
-  getStock(f: { warehouse_id?: number; generic_product_id?: number; category_id?: number; per_page?: number; page?: number } = {}): Observable<PaginatedResponse<StockItem>> {
+  getStock(f: { warehouse_id?: number; generic_product_id?: number; category_id?: number; cost_center_id?: number; notes?: string; per_page?: number; page?: number } = {}): Observable<PaginatedResponse<StockItem>> {
     let p = new HttpParams();
     if (f.warehouse_id)        p = p.set('warehouse_id',        String(f.warehouse_id));
     if (f.generic_product_id)  p = p.set('generic_product_id',  String(f.generic_product_id));
     if (f.category_id)         p = p.set('category_id',         String(f.category_id));
+    if (f.cost_center_id)      p = p.set('cost_center_id',      String(f.cost_center_id));
+    if (f.notes)               p = p.set('notes',               f.notes);
     if (f.per_page) p = p.set('per_page', String(f.per_page));
     if (f.page) p = p.set('page', String(f.page));
     return this.http.get<PaginatedResponse<StockItem>>(`${this.api}/stock`, { params: p });
@@ -334,6 +340,7 @@ export class InventoryService {
     cost_center_id?: number;
     cost_center_type?: 'internal' | 'external';
     status?: 'pending_signature' | 'confirmed';
+    notes?: string;
     date_from?: string;
     date_to?: string;
     seller?: string;
@@ -351,6 +358,7 @@ export class InventoryService {
     if (f.cost_center_id)   p = p.set('cost_center_id',   String(f.cost_center_id));
     if (f.cost_center_type) p = p.set('cost_center_type', f.cost_center_type);
     if (f.status)           p = p.set('status',           f.status);
+    if (f.notes)            p = p.set('notes',            f.notes);
     if (f.date_from)        p = p.set('date_from',        f.date_from);
     if (f.date_to)          p = p.set('date_to',          f.date_to);
     if (f.seller)           p = p.set('seller',           f.seller);

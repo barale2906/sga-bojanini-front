@@ -12,6 +12,7 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { forkJoin, of } from 'rxjs';
 import { catchError } from 'rxjs/operators';
+import { CostCenterService, CostCenter } from '../../cost-centers/cost-center.service';
 import { PurchasingService } from '../purchasing.service';
 import { CatalogService, Product, ProductPresentation, ProductSupplier, ProductVariant, Supplier } from '../../catalog/catalog.service';
 import { FormErrorsComponent } from '../../../shared/components/form-errors/form-errors.component';
@@ -28,6 +29,9 @@ export class PurchaseOrderFormDialogComponent implements OnInit {
   data: any = inject(MAT_DIALOG_DATA);
   private ref = inject(MatDialogRef<PurchaseOrderFormDialogComponent>);
   private fb = inject(FormBuilder);
+  private ccSvc = inject(CostCenterService);
+
+  costCenters = signal<CostCenter[]>([]);
 
   saving = signal(false);
   errors = signal<string[]>([]);
@@ -83,6 +87,7 @@ export class PurchaseOrderFormDialogComponent implements OnInit {
   form = this.fb.group({
     supplier_id: [null as number | null, Validators.required],
     warehouse_id: [null as number | null, Validators.required],
+    cost_center_id: [null as number | null],
     notes: [''],
     expected_delivery_date: [''],
     items: this.fb.array([]),
@@ -94,6 +99,7 @@ export class PurchaseOrderFormDialogComponent implements OnInit {
 
   ngOnInit(): void {
     this.filteredSuppliers.set(this.data.suppliers ?? []);
+    this.ccSvc.getCostCenters({ is_active: true }).subscribe({ next: r => this.costCenters.set(r.data ?? []), error: () => {} });
     if (this.isEditMode) {
       this.loadExistingOrder();
     } else {
@@ -112,6 +118,7 @@ export class PurchaseOrderFormDialogComponent implements OnInit {
     this.form.patchValue({
       supplier_id: order.supplier_id,
       warehouse_id: order.warehouse_id,
+      cost_center_id: order.cost_center_id ?? null,
       notes: order.notes || '',
       expected_delivery_date: order.expected_delivery_date || '',
     });
@@ -407,6 +414,7 @@ export class PurchaseOrderFormDialogComponent implements OnInit {
     const v = this.form.value;
     const payload = {
       supplier_id: v.supplier_id, warehouse_id: v.warehouse_id,
+      cost_center_id: v.cost_center_id ?? null,
       notes: v.notes || undefined, expected_delivery_date: v.expected_delivery_date || undefined,
       items: v.items,
     };

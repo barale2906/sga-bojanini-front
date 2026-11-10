@@ -99,6 +99,17 @@
         <mat-icon matSuffix>warehouse</mat-icon>
       </mat-form-field>
 
+      <mat-form-field appearance="outline" class="full-field">
+        <mat-label>Centro de costos</mat-label>
+        <mat-select [ngModel]="costCenterId()" (ngModelChange)="costCenterId.set($event)">
+          <mat-option [value]="null">— Sin centro de costos —</mat-option>
+          @for (c of costCenters(); track c.id) {
+            <mat-option [value]="c.id">{{ c.code }} · {{ c.name }}</mat-option>
+          }
+        </mat-select>
+        <mat-icon matSuffix>account_balance</mat-icon>
+      </mat-form-field>
+
       <!-- Campos que se activan al seleccionar almacén -->
       @if (warehouseSelected) {
         <div class="two-col">
