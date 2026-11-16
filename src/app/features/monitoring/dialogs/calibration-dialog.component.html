@@ -1,0 +1,122 @@
+<h2 mat-dialog-title>
+  <mat-icon>workspace_premium</mat-icon>
+  Certificados de calibración — {{ data.sensor.name }}
+</h2>
+
+<mat-dialog-content>
+  @if (loading()) {
+    <div class="center"><mat-spinner diameter="32"></mat-spinner></div>
+  } @else {
+    <!-- Vigente -->
+    @if (current(); as c) {
+      <div class="current {{ meta[c.status].css }}">
+        <mat-icon class="big">{{ meta[c.status].icon }}</mat-icon>
+        <div class="current-body">
+          <div class="current-title">
+            Certificado vigente <span class="chip {{ meta[c.status].css }}">{{ c.status_label }}</span>
+          </div>
+          <div class="current-exp">
+            Vence el <strong>{{ c.expires_at | dateFormat }}</strong> · {{ daysLeftLabel(c.days_left) }}
+          </div>
+          <div class="meta">
+            @if (c.certificate_number) { <span>N.º {{ c.certificate_number }}</span> }
+            @if (c.laboratory) { <span>{{ c.laboratory }}</span> }
+            @if (c.calibrated_at) { <span>Calibrado {{ c.calibrated_at | dateFormat }}</span> }
+            @if (c.uploaded_by) { <span>Cargado por {{ c.uploaded_by.name }}</span> }
+          </div>
+          @if (c.notes) { <p class="notes">{{ c.notes }}</p> }
+        </div>
+        <div class="row-actions">
+          <button mat-icon-button (click)="download(c)" matTooltip="Descargar {{ c.original_name }}"><mat-icon>download</mat-icon></button>
+          <button *sgaPermission="'sensores.editar'" mat-icon-button color="warn" (click)="remove(c)" matTooltip="Retirar (cargado por error)"><mat-icon>delete</mat-icon></button>
+        </div>
+      </div>
+    } @else {
+      <div class="current cal--missing">
+        <mat-icon class="big">help_outline</mat-icon>
+        <div class="current-body">
+          <div class="current-title">Este equipo no tiene certificado de calibración</div>
+          <div class="current-exp">Cárguelo para que el sistema avise antes de su vencimiento.</div>
+        </div>
+      </div>
+    }
+
+    <!-- Cargar nuevo -->
+    <ng-container *sgaPermission="'sensores.editar'">
+      @if (!showForm()) {
+        <button mat-stroked-button color="primary" class="new-btn" (click)="showForm.set(true)">
+          <mat-icon>upload_file</mat-icon> {{ current() ? 'Cargar certificado de reemplazo' : 'Cargar certificado' }}
+        </button>
+      } @else {
+        <form [formGroup]="form" class="upload">
+          <h3>{{ current() ? 'Nuevo certificado (el actual pasará al historial)' : 'Cargar certificado' }}</h3>
+          <app-form-errors [errors]="errors()"></app-form-errors>
+          <div class="file-pick">
+            <button mat-stroked-button type="button" (click)="fileInput.click()">
+              <mat-icon>attach_file</mat-icon> {{ file() ? 'Cambiar archivo' : 'Seleccionar archivo' }}
+            </button>
+            <input #fileInput type="file" hidden accept=".pdf,.jpg,.jpeg,.png" (change)="onFile($event)" />
+            <span class="file-name">{{ file()?.name ?? 'PDF, JPG o PNG · máx. 10 MB' }}</span>
+          </div>
+          <div class="grid">
+            <mat-form-field appearance="outline">
+              <mat-label>Fecha de calibración</mat-label>
+              <input matInput type="date" formControlName="calibrated_at" [max]="today" />
+            </mat-form-field>
+            <mat-form-field appearance="outline">
+              <mat-label>Vence el</mat-label>
+              <input matInput type="date" formControlName="expires_at" required />
+              @if (form.controls.expires_at.touched && form.controls.expires_at.invalid) { <mat-error>Indique el vencimiento</mat-error> }
+            </mat-form-field>
+            <mat-form-field appearance="outline">
+              <mat-label>N.º de certificado</mat-label>
+              <input matInput formControlName="certificate_number" />
+            </mat-form-field>
+            <mat-form-field appearance="outline">
+              <mat-label>Laboratorio</mat-label>
+              <input matInput formControlName="laboratory" />
+            </mat-form-field>
+            <mat-form-field appearance="outline" class="full">
+              <mat-label>Observaciones</mat-label>
+              <textarea matInput rows="2" formControlName="notes"></textarea>
+            </mat-form-field>
+          </div>
+          <div class="upload-actions">
+            @if (current()) { <button mat-button type="button" (click)="showForm.set(false)" [disabled]="saving()">Cancelar</button> }
+            <button mat-raised-button color="primary" type="button" (click)="upload()" [disabled]="saving() || !file() || form.invalid">
+              @if (saving()) { <mat-spinner diameter="18"></mat-spinner> } Guardar certificado
+            </button>
+          </div>
+        </form>
+      }
+    </ng-container>
+
+    <!-- Historial -->
+    @if (history().length) {
+      <h3 class="hist-title"><mat-icon>history</mat-icon> Historial</h3>
+      <ul class="history">
+        @for (c of history(); track c.id) {
+          <li>
+            <div class="h-main">
+              <strong>{{ c.certificate_number || c.original_name }}</strong>
+              <span class="meta">
+                Vencía {{ c.expires_at | dateFormat }}
+                @if (c.laboratory) { · {{ c.laboratory }} }
+                @if (c.replaced_at) { · reemplazado {{ c.replaced_at | dateFormat }} }
+                · {{ formatSize(c.size) }}
+              </span>
+            </div>
+            <div class="row-actions">
+              <button mat-icon-button (click)="download(c)" matTooltip="Descargar"><mat-icon>download</mat-icon></button>
+              <button *sgaPermission="'sensores.editar'" mat-icon-button color="warn" (click)="remove(c)" matTooltip="Retirar (cargado por error)"><mat-icon>delete</mat-icon></button>
+            </div>
+          </li>
+        }
+      </ul>
+    }
+  }
+</mat-dialog-content>
+
+<mat-dialog-actions align="end">
+  <button mat-button (click)="close()">Cerrar</button>
+</mat-dialog-actions>

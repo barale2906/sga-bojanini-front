@@ -1,4 +1,4 @@
-import { Component, inject, signal, OnInit, AfterViewInit, ViewChild, ElementRef } from '@angular/core';
+import { Component, computed, inject, signal, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { MatTabsModule } from '@angular/material/tabs';
@@ -20,6 +20,8 @@ import { DateFormatPipe } from '../../shared/pipes/date-format.pipe';
 import { ConfirmDialogComponent } from '../../shared/components/confirm-dialog/confirm-dialog.component';
 import { SensorFormDialogComponent } from './dialogs/sensor-form-dialog.component';
 import { ReadingFormDialogComponent } from './dialogs/reading-form-dialog.component';
+import { CalibrationDialogComponent } from './dialogs/calibration-dialog.component';
+import { CALIBRATION_STATUS_META, SENSOR_TYPE_LABELS, daysLeftLabel, httpErrors, localDateStr, rangeForType } from './monitoring.utils';
 import { SpcChartComponent } from './spc-chart/spc-chart.component';
 
 @Component({
@@ -49,10 +51,32 @@ export class MonitoringPageComponent implements OnInit {
   stats = signal<SensorStats | null>(null);
   loading = signal(false);
   loadingStats = signal(false);
+  exporting = signal(false);
   activeTab = signal(0);
 
-  sensorCols = ['actions', 'name', 'zone', 'type', 'is_active'];
-  sensorFilters = this.fb.group({ zone_id: [''], type: [''] });
+  readonly calMeta: Record<string, { label: string; icon: string; css: string }> = CALIBRATION_STATUS_META;
+  readonly typeLabels = SENSOR_TYPE_LABELS;
+  readonly daysLeftLabel = daysLeftLabel;
+
+  sensorCols = ['actions', 'name', 'zone', 'type', 'calibration', 'last_reading', 'is_active'];
+  sensorFilters = this.fb.group({ warehouse_id: [''], zone_id: [''], type: [''], calibration: [''] });
+  private filterWarehouse = signal<number | null>(null);
+
+  /** Zonas del filtro, limitadas al almacén elegido. */
+  filterZones = computed(() => {
+    const wid = this.filterWarehouse();
+    return wid ? this.zones().filter(z => z.warehouse_id === wid) : this.zones();
+  });
+
+  /** Equipos con certificado vencido, por vencer o sin certificado (para el aviso superior). */
+  calibrationIssues = computed(() => {
+    const all = this.allSensors().filter(s => s.is_active);
+    return {
+      expired: all.filter(s => s.calibration?.status === 'expired').length,
+      expiring: all.filter(s => s.calibration?.status === 'expiring').length,
+      missing: all.filter(s => s.calibration?.status === 'missing').length,
+    };
+  });
 
   chartDateForm = this.fb.group({
     date_from: [this.getDefaultDateFrom(), Validators.required],
@@ -63,6 +87,11 @@ export class MonitoringPageComponent implements OnInit {
     this.wSvc.getZones().subscribe({ next: r => this.zones.set(r.data ?? []), error: () => {} });
     this.wSvc.getWarehouses().subscribe({ next: r => this.warehouses.set(r.data ?? []), error: () => {} });
     this.loadSensors();
+    this.sensorFilters.controls.warehouse_id.valueChanges.subscribe(wid => {
+      this.filterWarehouse.set(wid ? Number(wid) : null);
+      const zid = Number(this.sensorFilters.controls.zone_id.value);
+      if (zid && !this.filterZones().some(z => z.id === zid)) this.sensorFilters.controls.zone_id.setValue('', { emitEvent: false });
+    });
     this.sensorFilters.valueChanges.subscribe(() => this.applyFilters());
   }
 
@@ -74,11 +103,21 @@ export class MonitoringPageComponent implements OnInit {
   }
 
   applyFilters(): void {
-    const { zone_id, type } = this.sensorFilters.value;
+    const { warehouse_id, zone_id, type, calibration } = this.sensorFilters.value;
     let filtered = this.allSensors();
+    if (warehouse_id) filtered = filtered.filter(s => this.warehouseIdOf(s) === Number(warehouse_id));
     if (zone_id) filtered = filtered.filter(s => s.zone_id === Number(zone_id));
     if (type) filtered = filtered.filter(s => s.type === type);
+    if (calibration) filtered = filtered.filter(s => s.calibration?.status === calibration);
     this.sensors.set(filtered);
+  }
+
+  filterByCalibration(status: string): void {
+    this.sensorFilters.patchValue({ calibration: status });
+  }
+
+  private warehouseIdOf(s: Sensor): number | undefined {
+    return s.zone?.warehouse_id ?? this.getZone(s.zone_id)?.warehouse_id;
   }
 
   getZone(zoneId: number): Zone | undefined {
@@ -86,22 +125,18 @@ export class MonitoringPageComponent implements OnInit {
   }
 
   zoneRangeLabel(sensor: Sensor): string {
-    const z = this.getZone(sensor.zone_id);
-    if (!z) return '';
-    if (sensor.type === 'temperature' && z.temp_min != null && z.temp_max != null) {
-      return `${z.temp_min}°C – ${z.temp_max}°C`;
-    }
-    if (sensor.type === 'humidity' && z.humidity_min != null && z.humidity_max != null) {
-      return `${z.humidity_min}% – ${z.humidity_max}%`;
-    }
-    if (z.temp_min != null && z.temp_max != null) {
-      return `${z.temp_min}°C – ${z.temp_max}°C`;
-    }
-    return '';
+    return rangeForType(sensor.zone ?? this.getZone(sensor.zone_id), sensor.type) ?? '';
+  }
+
+  warehouseName(sensor: Sensor): string {
+    return sensor.zone?.warehouse_name ?? this.warehouses().find(w => w.id === this.warehouseIdOf(sensor))?.name ?? '';
   }
 
   openSensorForm(sensor?: Sensor): void {
-    this.dialog.open(SensorFormDialogComponent, { data: { sensor: sensor || null, zones: this.zones(), warehouses: this.warehouses() }, width: '500px' })
+    this.dialog.open(SensorFormDialogComponent, {
+      data: { sensor: sensor || null, zones: this.zones(), warehouses: this.warehouses() },
+      width: '980px', maxWidth: '95vw', autoFocus: false,
+    })
       .afterClosed().subscribe(ok => { if (ok) { this.snack.open(sensor ? 'Sensor actualizado' : 'Sensor creado', 'OK', { duration: 3000 }); this.loadSensors(); } });
   }
 
@@ -111,8 +146,27 @@ export class MonitoringPageComponent implements OnInit {
   }
 
   openReading(sensor: Sensor): void {
-    this.dialog.open(ReadingFormDialogComponent, { data: { sensor, monitoringSvc: this.svc }, width: '460px' })
-      .afterClosed().subscribe(ok => { if (ok) this.snack.open('Lectura registrada', 'OK', { duration: 3000 }); });
+    this.dialog.open(ReadingFormDialogComponent, { data: { sensor, monitoringSvc: this.svc }, width: '480px', maxWidth: '95vw' })
+      .afterClosed().subscribe(ok => { if (ok) { this.snack.open('Lectura registrada', 'OK', { duration: 3000 }); this.loadSensors(); } });
+  }
+
+  openCalibrations(sensor: Sensor): void {
+    this.dialog.open(CalibrationDialogComponent, { data: { sensor }, width: '720px', maxWidth: '95vw', autoFocus: false })
+      .afterClosed().subscribe(changed => { if (changed) this.loadSensors(); });
+  }
+
+  exportExcel(): void {
+    const s = this.selectedSensor();
+    const { date_from, date_to } = this.chartDateForm.value;
+    if (!s || !date_from || !date_to || this.exporting()) return;
+    this.exporting.set(true);
+    this.svc.exportReadings(s.id, date_from, date_to).subscribe({
+      next: () => this.exporting.set(false),
+      error: err => {
+        this.exporting.set(false);
+        this.snack.open(httpErrors(err)[0], 'OK', { duration: 5000 });
+      },
+    });
   }
 
   selectSensorForChart(sensor: Sensor): void {
@@ -141,17 +195,11 @@ export class MonitoringPageComponent implements OnInit {
     });
   }
 
-  /** Fecha LOCAL en formato YYYY-MM-DD (no UTC) */
-  private localDateStr(d = new Date()): string {
-    const p = (n: number) => String(n).padStart(2, '0');
-    return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
-  }
-
   getDefaultDateFrom(): string {
     const d = new Date();
     d.setMonth(d.getMonth() - 1);
-    return this.localDateStr(d);
+    return localDateStr(d);
   }
 
-  getTodayDate(): string { return this.localDateStr(); }
+  getTodayDate(): string { return localDateStr(); }
 }

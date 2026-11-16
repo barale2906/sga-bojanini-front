@@ -7,11 +7,33 @@
   <!-- Sensores -->
   <mat-tab label="Sensores">
     <div class="tab-body">
+      @if (calibrationIssues().expired || calibrationIssues().expiring || calibrationIssues().missing) {
+        <div class="cal-banner">
+          <mat-icon>workspace_premium</mat-icon>
+          <span>Calibración de equipos:</span>
+          @if (calibrationIssues().expired) {
+            <button type="button" class="cal-pill cal--expired" (click)="filterByCalibration('expired')">{{ calibrationIssues().expired }} vencido(s)</button>
+          }
+          @if (calibrationIssues().expiring) {
+            <button type="button" class="cal-pill cal--expiring" (click)="filterByCalibration('expiring')">{{ calibrationIssues().expiring }} por vencer</button>
+          }
+          @if (calibrationIssues().missing) {
+            <button type="button" class="cal-pill cal--missing" (click)="filterByCalibration('missing')">{{ calibrationIssues().missing }} sin certificado</button>
+          }
+        </div>
+      }
+
       <div class="tab-toolbar" [formGroup]="sensorFilters">
+        <mat-form-field appearance="outline" class="sel"><mat-label>Almacén</mat-label>
+          <mat-select formControlName="warehouse_id">
+            <mat-option value="">Todas</mat-option>
+            @for (w of warehouses(); track w.id) { <mat-option [value]="w.id">{{ w.name }}</mat-option> }
+          </mat-select>
+        </mat-form-field>
         <mat-form-field appearance="outline" class="sel"><mat-label>Zona</mat-label>
           <mat-select formControlName="zone_id">
             <mat-option value="">Todas</mat-option>
-            @for (z of zones(); track z.id) { <mat-option [value]="z.id">{{ z.name }}</mat-option> }
+            @for (z of filterZones(); track z.id) { <mat-option [value]="z.id">{{ z.name }}</mat-option> }
           </mat-select>
         </mat-form-field>
         <mat-form-field appearance="outline" class="sel"><mat-label>Tipo</mat-label>
@@ -19,11 +41,20 @@
             <mat-option value="">Todos</mat-option>
             <mat-option value="temperature">Temperatura</mat-option>
             <mat-option value="humidity">Humedad</mat-option>
-            <mat-option value="pressure">Presión</mat-option>
           </mat-select>
         </mat-form-field>
+        <mat-form-field appearance="outline" class="sel"><mat-label>Calibración</mat-label>
+          <mat-select formControlName="calibration">
+            <mat-option value="">Todas</mat-option>
+            <mat-option value="valid">Vigente</mat-option>
+            <mat-option value="expiring">Por vencer</mat-option>
+            <mat-option value="expired">Vencido</mat-option>
+            <mat-option value="missing">Sin certificado</mat-option>
+          </mat-select>
+        </mat-form-field>
+        <span class="spacer"></span>
         <button *sgaPermission="'sensores.crear'" mat-raised-button color="primary" (click)="openSensorForm()">
-          <mat-icon>add</mat-icon> Nuevo Sensor
+          <mat-icon>add</mat-icon> Nuevo equipo
         </button>
       </div>
 
@@ -34,13 +65,35 @@
           <ng-container matColumnDef="zone">
             <th mat-header-cell *matHeaderCellDef>Zona</th>
             <td mat-cell *matCellDef="let s">
-              <span class="zone-name">{{ getZone(s.zone_id)?.name || s.zone?.name || '—' }}</span>
+              @if (warehouseName(s)) { <small class="zone-wh">{{ warehouseName(s) }}</small><br> }
+              <span class="zone-name">{{ s.zone?.name || getZone(s.zone_id)?.name || '—' }}</span>
               @if (zoneRangeLabel(s)) {
                 <br><small class="zone-range">{{ zoneRangeLabel(s) }}</small>
               }
             </td>
           </ng-container>
-          <ng-container matColumnDef="type"><th mat-header-cell *matHeaderCellDef>Tipo</th><td mat-cell *matCellDef="let s"><span class="type-badge type-{{ s.type }}">{{ s.type }}</span></td></ng-container>
+          <ng-container matColumnDef="type"><th mat-header-cell *matHeaderCellDef>Tipo</th><td mat-cell *matCellDef="let s"><span class="type-badge type-{{ s.type }}">{{ typeLabels[s.type] || s.type }}</span></td></ng-container>
+          <ng-container matColumnDef="calibration">
+            <th mat-header-cell *matHeaderCellDef>Calibración</th>
+            <td mat-cell *matCellDef="let s">
+              @if (s.calibration; as cal) {
+                <button type="button" class="cal-chip {{ calMeta[cal.status].css }}" (click)="openCalibrations(s)"
+                  [matTooltip]="cal.expires_at ? 'Vence ' + (cal.expires_at | dateFormat) : 'Cargar certificado'">
+                  <mat-icon>{{ calMeta[cal.status].icon }}</mat-icon>{{ cal.status_label }}
+                </button>
+                @if (cal.days_left !== null && cal.status !== 'valid') { <br><small class="cal-days">{{ daysLeftLabel(cal.days_left) }}</small> }
+              }
+            </td>
+          </ng-container>
+          <ng-container matColumnDef="last_reading">
+            <th mat-header-cell *matHeaderCellDef>Último registro</th>
+            <td mat-cell *matCellDef="let s">
+              @if (s.last_reading; as l) {
+                <span class="last-val">{{ l.value }} {{ s.unit }}</span><br>
+                <small class="last-date" [matTooltip]="l.user_name ? 'Por ' + l.user_name : ''">{{ l.recorded_at | dateFormat:'datetime' }}</small>
+              } @else { <small class="muted">Sin registros</small> }
+            </td>
+          </ng-container>
           <ng-container matColumnDef="is_active"><th mat-header-cell *matHeaderCellDef>Estado</th>
             <td mat-cell *matCellDef="let s"><span class="badge" [class.badge--on]="s.is_active" [class.badge--off]="!s.is_active">{{ s.is_active ? 'Activo' : 'Inactivo' }}</span></td>
           </ng-container>
@@ -48,13 +101,14 @@
             <td mat-cell *matCellDef="let s" class="act">
               <button *sgaPermission="'lecturas.crear'" mat-icon-button color="accent" (click)="openReading(s)" matTooltip="Registrar lectura"><mat-icon>add_chart</mat-icon></button>
               <button mat-icon-button color="primary" (click)="selectSensorForChart(s)" matTooltip="Ver gráfico SPC"><mat-icon>show_chart</mat-icon></button>
+              <button mat-icon-button (click)="openCalibrations(s)" matTooltip="Certificados de calibración"><mat-icon>workspace_premium</mat-icon></button>
               <button *sgaPermission="'sensores.editar'" mat-icon-button color="primary" (click)="openSensorForm(s)" matTooltip="Editar"><mat-icon>edit</mat-icon></button>
               <button *sgaPermission="'sensores.eliminar'" mat-icon-button color="warn" (click)="deleteSensor(s)" matTooltip="Eliminar"><mat-icon>delete</mat-icon></button>
             </td>
           </ng-container>
           <tr mat-header-row *matHeaderRowDef="sensorCols"></tr>
           <tr mat-row *matRowDef="let r; columns: sensorCols;"></tr>
-          <tr class="mat-row" *matNoDataRow><td class="no-data" [attr.colspan]="sensorCols.length">Sin sensores registrados</td></tr>
+          <tr class="mat-row" *matNoDataRow><td class="no-data" [attr.colspan]="sensorCols.length">Sin equipos para los filtros seleccionados</td></tr>
         </table>
       </div>
     </div>
@@ -88,13 +142,21 @@
         <div class="chart-header">
           <div>
             <h3>{{ selectedSensor()!.name }}</h3>
-            <p class="hint">{{ selectedSensor()!.type }} ({{ selectedSensor()!.unit }})</p>
+            <p class="hint">
+              {{ typeLabels[selectedSensor()!.type] || selectedSensor()!.type }} ({{ selectedSensor()!.unit }})
+              @if (warehouseName(selectedSensor()!)) { · {{ warehouseName(selectedSensor()!) }} / {{ selectedSensor()!.zone?.name }} }
+              @if (zoneRangeLabel(selectedSensor()!)) { · Rango {{ zoneRangeLabel(selectedSensor()!) }} }
+            </p>
           </div>
           <div class="chart-date-form" [formGroup]="chartDateForm">
             <mat-form-field appearance="outline" class="sm"><mat-label>Desde</mat-label><input matInput type="date" formControlName="date_from" /></mat-form-field>
             <mat-form-field appearance="outline" class="sm"><mat-label>Hasta</mat-label><input matInput type="date" formControlName="date_to" /></mat-form-field>
             <button mat-raised-button color="primary" (click)="loadStats()" [disabled]="chartDateForm.invalid || loadingStats()">
               <mat-icon>refresh</mat-icon> Actualizar
+            </button>
+            <button mat-stroked-button (click)="exportExcel()" [disabled]="chartDateForm.invalid || exporting()"
+              matTooltip="Descargar en Excel las lecturas del periodo seleccionado">
+              <mat-icon>table_view</mat-icon> {{ exporting() ? 'Generando…' : 'Exportar Excel' }}
             </button>
           </div>
         </div>

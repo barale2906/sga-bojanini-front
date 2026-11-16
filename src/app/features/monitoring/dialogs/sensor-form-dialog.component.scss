@@ -1,0 +1,108 @@
+h2 mat-icon { vertical-align: middle; margin-right: 0.5rem; }
+
+.layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr);
+  gap: 1.5rem;
+  padding-top: 0.5rem;
+  @media (max-width: 760px) { grid-template-columns: 1fr; }
+}
+
+.col { display: flex; flex-direction: column; min-width: 0; }
+.w { width: 100%; }
+.row { display: flex; gap: 0.75rem; flex-wrap: wrap; .grow { flex: 1 1 160px; } .unit { width: 110px; } }
+
+.step {
+  display: flex; align-items: center; gap: 0.5rem;
+  font-size: 0.95rem; font-weight: 600; color: #1E2A3B; margin: 0 0 0.75rem;
+}
+.step-n {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 22px; height: 22px; border-radius: 50%;
+  background: var(--color-primary, #FFCF01); color: #1E2A3B; font-size: 0.75rem; font-weight: 700;
+}
+
+.opt-hint { color: #718096; font-size: 0.8rem; }
+.label { margin: 0 0 0.5rem; font-size: 0.8rem; font-weight: 600; color: #4a5568; .req { color: #c53030; } }
+.field-error { color: #c53030; font-size: 0.75rem; margin: 0.4rem 0 0; }
+.empty { color: #a0aec0; font-size: 0.875rem; grid-column: 1 / -1; }
+
+.placeholder {
+  display: flex; gap: 0.75rem; align-items: center;
+  padding: 1.25rem; border: 1px dashed #cbd5e0; border-radius: 8px;
+  color: #718096; font-size: 0.875rem; background: #f7fafc;
+  mat-icon { color: #a0aec0; flex-shrink: 0; }
+}
+
+/* ── Tarjetas de zona ── */
+.zone-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+  gap: 0.75rem;
+  max-height: 340px;
+  overflow-y: auto;
+  padding: 2px;
+}
+
+.zone-card {
+  --zone-color: #4a5568;
+  display: flex; flex-direction: column; gap: 0.35rem; text-align: left;
+  padding: 0.75rem 0.85rem; border-radius: 10px; cursor: pointer;
+  background: #fff; border: 1px solid #e2e8f0; border-left: 4px solid var(--zone-color);
+  font: inherit; color: inherit;
+  transition: box-shadow 120ms, border-color 120ms, background 120ms;
+
+  &:hover { box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08); }
+  &:focus-visible { outline: 2px solid var(--zone-color); outline-offset: 2px; }
+
+  &.selected {
+    border-color: var(--zone-color);
+    background: color-mix(in srgb, var(--zone-color) 8%, #fff);
+    box-shadow: 0 0 0 1px var(--zone-color);
+  }
+
+  &.zone--ambient    { --zone-color: #dd6b20; }
+  &.zone--cold       { --zone-color: #3182ce; }
+  &.zone--frozen     { --zone-color: #5a67d8; }
+  &.zone--controlled { --zone-color: #38a169; }
+}
+
+.zone-head { display: flex; align-items: center; gap: 0.4rem; }
+.zone-icon { color: var(--zone-color); font-size: 20px; width: 20px; height: 20px; }
+.zone-name { font-weight: 600; font-size: 0.9rem; flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.check { color: var(--zone-color); font-size: 20px; width: 20px; height: 20px; }
+.zone-condition { font-size: 0.78rem; font-weight: 600; color: var(--zone-color); text-transform: uppercase; letter-spacing: 0.03em; }
+.zone-ranges {
+  display: flex; flex-direction: column; gap: 0.15rem; font-size: 0.8rem; color: #4a5568;
+  span { display: inline-flex; align-items: center; gap: 0.25rem; }
+  mat-icon { font-size: 15px; width: 15px; height: 15px; color: #a0aec0; }
+}
+
+/* ── Datos ── */
+.selected-zone {
+  display: flex; gap: 0.5rem; align-items: flex-start;
+  padding: 0.6rem 0.75rem; margin-bottom: 1rem; border-radius: 8px;
+  background: #ebf8ff; color: #2c5282; font-size: 0.82rem;
+  mat-icon { font-size: 18px; width: 18px; height: 18px; flex-shrink: 0; }
+}
+
+.cert {
+  border-top: 1px solid #edf2f7; padding-top: 0.85rem; margin-top: 0.25rem;
+  display: flex; flex-direction: column; gap: 0.6rem;
+  .hint { margin: 0; color: #718096; font-size: 0.8rem; line-height: 1.4; }
+}
+.file-pick {
+  display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap;
+  .file-name { font-size: 0.8rem; color: #4a5568; overflow-wrap: anywhere; }
+}
+
+.cal-box {
+  display: flex; gap: 0.5rem; align-items: flex-start; margin-top: 1rem;
+  padding: 0.6rem 0.75rem; border-radius: 8px; font-size: 0.82rem;
+  mat-icon { font-size: 18px; width: 18px; height: 18px; flex-shrink: 0; }
+  small { color: inherit; opacity: 0.8; }
+  &.cal--valid    { background: #f0fff4; color: #276749; }
+  &.cal--expiring { background: #fffaf0; color: #c05621; }
+  &.cal--expired  { background: #fff5f5; color: #c53030; }
+  &.cal--missing  { background: #f7fafc; color: #4a5568; }
+}

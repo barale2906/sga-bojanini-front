@@ -1,0 +1,161 @@
+<h2 mat-dialog-title>
+  <mat-icon>sensors</mat-icon>
+  {{ isEdit ? 'Editar equipo de monitoreo' : 'Nuevo equipo de monitoreo' }}
+</h2>
+
+<mat-dialog-content>
+  <app-form-errors [errors]="errors()"></app-form-errors>
+
+  <form [formGroup]="form" class="layout">
+    <!-- ── 1. Ubicación: almacén → zona ── -->
+    <section class="col col--place">
+      <h3 class="step"><span class="step-n">1</span> ¿Dónde estará el equipo?</h3>
+
+      <mat-form-field appearance="outline" class="w">
+        <mat-label>Almacén</mat-label>
+        <mat-select formControlName="warehouse_id">
+          @for (w of warehouses(); track w.id) {
+            <mat-option [value]="w.id">
+              {{ w.name }} <span class="opt-hint">· {{ warehouseZoneCount(w.id) }} zona(s)</span>
+            </mat-option>
+          }
+        </mat-select>
+        @if (warehouses().length === 0) { <mat-hint>No hay almacenes con zonas activas.</mat-hint> }
+      </mat-form-field>
+
+      @if (form.controls.warehouse_id.value) {
+        <p class="label">Zona <span class="req">*</span></p>
+        <div class="zone-grid" role="radiogroup" aria-label="Zona del equipo">
+          @for (z of zonesOfWarehouse(); track z.id) {
+            <button type="button" class="zone-card zone--{{ z.type }}" role="radio"
+              [class.selected]="form.controls.zone_id.value === z.id"
+              [attr.aria-checked]="form.controls.zone_id.value === z.id"
+              (click)="selectZone(z)">
+              <span class="zone-head">
+                <mat-icon class="zone-icon">{{ zoneMeta[z.type].icon }}</mat-icon>
+                <span class="zone-name">{{ z.name }}</span>
+                @if (form.controls.zone_id.value === z.id) { <mat-icon class="check">check_circle</mat-icon> }
+              </span>
+              <span class="zone-condition">{{ zoneMeta[z.type].condition }}</span>
+              <span class="zone-ranges">
+                <span><mat-icon>device_thermostat</mat-icon>{{ tempRange(z) ?? 'Sin rango' }}</span>
+                <span><mat-icon>water_drop</mat-icon>{{ humidityRange(z) ?? 'Sin rango' }}</span>
+              </span>
+            </button>
+          } @empty {
+            <p class="empty">Este almacén no tiene zonas activas.</p>
+          }
+        </div>
+        @if (form.controls.zone_id.touched && form.controls.zone_id.invalid) {
+          <p class="field-error">Seleccione la zona donde se instalará el equipo.</p>
+        }
+      } @else {
+        <div class="placeholder">
+          <mat-icon>place</mat-icon>
+          <span>Seleccione el almacén para ver sus zonas y las condiciones que debe cumplir cada una.</span>
+        </div>
+      }
+    </section>
+
+    <!-- ── 2. Datos del equipo ── -->
+    <section class="col col--data">
+      <h3 class="step"><span class="step-n">2</span> Datos del equipo</h3>
+
+      <mat-form-field appearance="outline" class="w">
+        <mat-label>Nombre</mat-label>
+        <input matInput formControlName="name" placeholder="Ej: Termohigrómetro nevera 1" />
+      </mat-form-field>
+
+      <div class="row">
+        <mat-form-field appearance="outline" class="grow">
+          <mat-label>Variable que mide</mat-label>
+          <mat-select formControlName="type">
+            <mat-option value="temperature">Temperatura</mat-option>
+            <mat-option value="humidity">Humedad</mat-option>
+          </mat-select>
+        </mat-form-field>
+        <mat-form-field appearance="outline" class="unit">
+          <mat-label>Unidad</mat-label>
+          <input matInput formControlName="unit" />
+        </mat-form-field>
+      </div>
+
+      @if (selectedZone(); as z) {
+        <div class="selected-zone">
+          <mat-icon>info</mat-icon>
+          <span>
+            El equipo debe mantener
+            <strong>{{ (form.controls.type.value === 'humidity' ? humidityRange(z) : tempRange(z)) ?? 'un rango aún no definido' }}</strong>
+            en <strong>{{ z.name }}</strong>.
+          </span>
+        </div>
+      }
+
+      @if (isEdit) {
+        <mat-slide-toggle formControlName="is_active" color="primary">
+          {{ form.controls.is_active.value ? 'Activo' : 'Inactivo' }}
+        </mat-slide-toggle>
+
+        @if (data.sensor?.calibration; as cal) {
+          <div class="cal-box {{ calMeta[cal.status].css }}">
+            <mat-icon>{{ calMeta[cal.status].icon }}</mat-icon>
+            <span>
+              Calibración: <strong>{{ cal.status_label }}</strong>
+              @if (cal.expires_at) { — {{ cal.expires_at | dateFormat }} ({{ daysLeftLabel(cal.days_left) }}) }
+              <br><small>Los certificados se gestionan desde el botón «Certificados» del equipo.</small>
+            </span>
+          </div>
+        }
+      } @else {
+        <!-- ── 3. Certificado de calibración (opcional) ── -->
+        <div class="cert">
+          <mat-slide-toggle color="primary" [checked]="attachCertificate()" (change)="toggleCertificate($event.checked)">
+            Adjuntar certificado de calibración ahora
+          </mat-slide-toggle>
+          @if (!attachCertificate()) {
+            <p class="hint">Si no lo tiene a la mano puede cargarlo después desde «Certificados». Mientras tanto el equipo aparecerá como <em>Sin certificado</em>.</p>
+          } @else {
+            <div class="file-pick">
+              <button mat-stroked-button type="button" (click)="fileInput.click()">
+                <mat-icon>upload_file</mat-icon> {{ certificateFile() ? 'Cambiar archivo' : 'Seleccionar archivo' }}
+              </button>
+              <input #fileInput type="file" hidden accept=".pdf,.jpg,.jpeg,.png" (change)="onFile($event)" />
+              <span class="file-name">{{ certificateFile()?.name ?? 'PDF, JPG o PNG · máx. 10 MB' }}</span>
+            </div>
+
+            <div class="row" [formGroup]="certForm">
+              <mat-form-field appearance="outline" class="grow">
+                <mat-label>Fecha de calibración</mat-label>
+                <input matInput type="date" formControlName="calibrated_at" [max]="today" />
+              </mat-form-field>
+              <mat-form-field appearance="outline" class="grow">
+                <mat-label>Vence el</mat-label>
+                <input matInput type="date" formControlName="expires_at" required />
+                @if (certForm.controls.expires_at.touched && certForm.controls.expires_at.invalid) {
+                  <mat-error>Indique el vencimiento</mat-error>
+                }
+              </mat-form-field>
+            </div>
+            <div class="row" [formGroup]="certForm">
+              <mat-form-field appearance="outline" class="grow">
+                <mat-label>N.º de certificado</mat-label>
+                <input matInput formControlName="certificate_number" />
+              </mat-form-field>
+              <mat-form-field appearance="outline" class="grow">
+                <mat-label>Laboratorio</mat-label>
+                <input matInput formControlName="laboratory" />
+              </mat-form-field>
+            </div>
+          }
+        </div>
+      }
+    </section>
+  </form>
+</mat-dialog-content>
+
+<mat-dialog-actions align="end">
+  <button mat-button [mat-dialog-close]="false" [disabled]="saving()">Cancelar</button>
+  <button mat-raised-button color="primary" (click)="save()" [disabled]="!canSave()">
+    @if (saving()) { <mat-spinner diameter="18"></mat-spinner> } {{ isEdit ? 'Guardar' : 'Crear equipo' }}
+  </button>
+</mat-dialog-actions>

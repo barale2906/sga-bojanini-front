@@ -1,4 +1,4 @@
-import { Component, inject, signal } from '@angular/core';
+import { Component, inject, OnInit, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { MatDialogModule, MAT_DIALOG_DATA, MatDialogRef } from '@angular/material/dialog';
@@ -7,7 +7,9 @@ import { MatInputModule } from '@angular/material/input';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
-import { MonitoringService, Sensor } from '../monitoring.service';
+import { LastReading, MonitoringService, Sensor } from '../monitoring.service';
+import { DateFormatPipe } from '../../../shared/pipes/date-format.pipe';
+import { rangeForType } from '../monitoring.utils';
 import { FormErrorsComponent } from '../../../shared/components/form-errors/form-errors.component';
 
 /**
@@ -28,7 +30,7 @@ function localDatetimeString(date = new Date()): string {
   selector: 'app-reading-form-dialog',
   standalone: true,
   imports: [CommonModule, ReactiveFormsModule, MatDialogModule, MatFormFieldModule,
-    MatInputModule, MatButtonModule, MatIconModule, MatProgressSpinnerModule, FormErrorsComponent],
+    MatInputModule, MatButtonModule, MatIconModule, MatProgressSpinnerModule, FormErrorsComponent, DateFormatPipe],
   template: `
     <h2 mat-dialog-title>
       <mat-icon>add_chart</mat-icon>
@@ -47,6 +49,28 @@ function localDatetimeString(date = new Date()): string {
             </div>
           }
         </div>
+      }
+
+      <!-- Último registro del equipo -->
+      <div class="last" [class.last--none]="!loadingLast() && !last()">
+        <mat-icon>history</mat-icon>
+        @if (loadingLast()) {
+          <span>Consultando último registro…</span>
+        } @else if (last(); as l) {
+          <span>
+            Último registro: <strong>{{ l.recorded_at | dateFormat:'datetime' }}</strong>
+            · {{ l.value }} {{ data.sensor.unit }}
+            @if (l.user_name) { · por {{ l.user_name }} }
+            @if (l.reading_source === 'iot') { · automático (IoT) }
+            <br><small>{{ l.recorded_at | dateFormat:'relative' }}</small>
+          </span>
+        } @else {
+          <span>Este equipo aún no tiene registros.</span>
+        }
+      </div>
+
+      @if (range) {
+        <p class="range">Rango permitido de la zona: <strong>{{ range }}</strong></p>
       }
 
       <form [formGroup]="form" class="df">
@@ -76,9 +100,15 @@ function localDatetimeString(date = new Date()): string {
     `.alert-item { display:flex; gap:0.5rem; align-items:center; margin-top:0.4rem;
        color:#c53030; }`,
     `h2 mat-icon { vertical-align:middle; margin-right:0.5rem; }`,
+    `.last { display:flex; gap:0.6rem; align-items:flex-start; padding:0.65rem 0.85rem; margin-bottom:0.75rem;
+       border-radius:8px; background:#ebf8ff; color:#2c5282; font-size:0.85rem; line-height:1.35; }
+     .last mat-icon { font-size:20px; width:20px; height:20px; flex-shrink:0; }
+     .last small { opacity:0.8; }
+     .last--none { background:#f7fafc; color:#718096; }
+     .range { margin:0 0 0.75rem; font-size:0.8rem; color:#4a5568; }`,
   ],
 })
-export class ReadingFormDialogComponent {
+export class ReadingFormDialogComponent implements OnInit {
   data: { sensor: Sensor; monitoringSvc: MonitoringService } = inject(MAT_DIALOG_DATA);
   private ref = inject(MatDialogRef<ReadingFormDialogComponent>);
   private fb = inject(FormBuilder);
@@ -87,6 +117,18 @@ export class ReadingFormDialogComponent {
   closing = signal(false);
   errors  = signal<string[]>([]);
   alerts  = signal<any[]>([]);
+  last    = signal<LastReading | null>(null);
+  loadingLast = signal(true);
+  readonly range = rangeForType(this.data.sensor.zone, this.data.sensor.type);
+
+  ngOnInit(): void {
+    // Se consulta al abrir (no se usa el dato del listado) para mostrar el
+    // registro más reciente aunque otro usuario haya registrado después.
+    this.data.monitoringSvc.getLatestReading(this.data.sensor.id).subscribe({
+      next: r => { this.last.set(r.data ?? null); this.loadingLast.set(false); },
+      error: () => { this.last.set(this.data.sensor.last_reading ?? null); this.loadingLast.set(false); },
+    });
+  }
 
   form = this.fb.group({
     value: [null as number | null, [Validators.required]],
@@ -126,9 +168,9 @@ export class ReadingFormDialogComponent {
         },
         error: (err) => {
           this.saving.set(false);
-          if (err.status === 422) {
-            this.errors.set(Object.values(err.error?.errors || {}).flat() as string[]);
-          }
+          this.errors.set(err.status === 422
+            ? Object.values(err.error?.errors || {}).flat() as string[]
+            : [err.error?.message || 'No fue posible registrar la lectura.']);
         },
       });
   }

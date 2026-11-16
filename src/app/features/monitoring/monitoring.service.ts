@@ -5,11 +5,58 @@ import { saveAs } from 'file-saver';
 import { environment } from '../../../environments/environment';
 import { ApiResponse } from '../../core/models/api-response.model';
 import { User } from '../../core/models/user.model';
+import { FileDownloadService } from '../../shared/services/file-download.service';
+
+export type ZoneType = 'ambient' | 'cold' | 'frozen' | 'controlled';
+
+/** Zona del sensor con su almacén y las condiciones que debe cumplir. */
+export interface SensorZone {
+  id: number; name: string; code: string; type: ZoneType;
+  temp_min: number | null; temp_max: number | null;
+  humidity_min: number | null; humidity_max: number | null;
+  warehouse_id: number; warehouse_name: string | null;
+}
+
+export type CalibrationStatus = 'missing' | 'valid' | 'expiring' | 'expired';
+
+export interface CalibrationSummary {
+  status: CalibrationStatus; status_label: string;
+  id: number | null; expires_at: string | null; days_left: number | null;
+}
+
+export interface LastReading {
+  id: number; value: number; recorded_at: string; created_at: string | null;
+  reading_source: 'manual' | 'iot'; user_name: string | null;
+}
 
 export interface Sensor {
-  id: number; zone_id: number; name: string;
-  type: 'temperature' | 'humidity' | 'pressure'; unit: string; is_active: boolean;
-  zone?: { id: number; name: string };
+  id: number; zone_id: number; code?: string; name: string;
+  type: 'temperature' | 'humidity'; unit: string; is_active: boolean;
+  zone?: SensorZone | null;
+  calibration?: CalibrationSummary;
+  last_reading?: LastReading | null;
+}
+
+export interface CalibrationCertificate {
+  id: number; sensor_id: number;
+  certificate_number: string | null; laboratory: string | null;
+  calibrated_at: string | null; expires_at: string; days_left: number;
+  is_current: boolean;
+  status: CalibrationStatus | 'replaced'; status_label: string;
+  replaced_at: string | null;
+  original_name: string; mime_type: string; size: number; notes: string | null;
+  uploaded_by: { id: number; name: string } | null;
+  created_at: string | null;
+}
+
+/** Campos del certificado (multipart). */
+export interface CalibrationPayload {
+  file: File; expires_at: string; calibrated_at?: string | null;
+  certificate_number?: string | null; laboratory?: string | null; notes?: string | null;
+}
+
+export interface SensorPayload {
+  zone_id: number; name: string; type: string; unit: string; is_active?: boolean;
 }
 
 export interface SensorReading {
@@ -35,6 +82,7 @@ export interface AlertRule {
 export class MonitoringService {
   private http = inject(HttpClient);
   private api = environment.apiUrl;
+  private files = inject(FileDownloadService);
 
   getSensors(f: { zone_id?: number; type?: string; is_active?: string } = {}): Observable<ApiResponse<Sensor[]>> {
     let p = new HttpParams();
@@ -44,11 +92,24 @@ export class MonitoringService {
     return this.http.get<ApiResponse<Sensor[]>>(`${this.api}/sensors`, { params: p });
   }
 
-  createSensor(payload: Partial<Sensor>): Observable<ApiResponse<Sensor>> {
-    return this.http.post<ApiResponse<Sensor>>(`${this.api}/sensors`, payload);
+  /**
+   * Crea el sensor. Si se adjunta el certificado de calibración se envía
+   * todo en un único multipart (campos `certificate_*`); si no, JSON.
+   */
+  createSensor(payload: SensorPayload, certificate?: CalibrationPayload | null): Observable<ApiResponse<Sensor>> {
+    if (!certificate) {
+      return this.http.post<ApiResponse<Sensor>>(`${this.api}/sensors`, payload);
+    }
+    const fd = new FormData();
+    fd.append('zone_id', String(payload.zone_id));
+    fd.append('name', payload.name);
+    fd.append('type', payload.type);
+    fd.append('unit', payload.unit);
+    this.appendCertificate(fd, certificate, 'certificate_');
+    return this.http.post<ApiResponse<Sensor>>(`${this.api}/sensors`, fd);
   }
 
-  updateSensor(id: number, payload: Partial<Sensor>): Observable<ApiResponse<Sensor>> {
+  updateSensor(id: number, payload: SensorPayload): Observable<ApiResponse<Sensor>> {
     return this.http.put<ApiResponse<Sensor>>(`${this.api}/sensors/${id}`, payload);
   }
 
@@ -65,6 +126,49 @@ export class MonitoringService {
     if (dateFrom) p = p.set('date_from', dateFrom);
     if (dateTo) p = p.set('date_to', dateTo);
     return this.http.get<ApiResponse<SensorReading[]>>(`${this.api}/sensors/${sensorId}/readings`, { params: p });
+  }
+
+  /** Último registro del equipo (null si aún no tiene lecturas). */
+  getLatestReading(sensorId: number): Observable<ApiResponse<LastReading | null>> {
+    return this.http.get<ApiResponse<LastReading | null>>(`${this.api}/sensors/${sensorId}/readings/latest`);
+  }
+
+  /** Descarga en Excel las lecturas del periodo (con resumen estadístico). */
+  exportReadings(sensorId: number, dateFrom: string, dateTo: string): Observable<void> {
+    return this.files.download(
+      `${this.api}/sensors/${sensorId}/readings/export`,
+      `lecturas_${dateFrom}_${dateTo}.xlsx`,
+      { date_from: dateFrom, date_to: dateTo },
+    );
+  }
+
+  // ── Certificados de calibración ─────────────────────────────
+
+  getCalibrations(sensorId: number): Observable<ApiResponse<CalibrationCertificate[]>> {
+    return this.http.get<ApiResponse<CalibrationCertificate[]>>(`${this.api}/sensors/${sensorId}/calibrations`);
+  }
+
+  uploadCalibration(sensorId: number, payload: CalibrationPayload): Observable<ApiResponse<CalibrationCertificate>> {
+    const fd = new FormData();
+    this.appendCertificate(fd, payload);
+    return this.http.post<ApiResponse<CalibrationCertificate>>(`${this.api}/sensors/${sensorId}/calibrations`, fd);
+  }
+
+  downloadCalibration(cert: CalibrationCertificate): Observable<void> {
+    return this.files.download(`${this.api}/calibrations/${cert.id}/download`, cert.original_name);
+  }
+
+  deleteCalibration(id: number): Observable<ApiResponse<null>> {
+    return this.http.delete<ApiResponse<null>>(`${this.api}/calibrations/${id}`);
+  }
+
+  private appendCertificate(fd: FormData, c: CalibrationPayload, prefix = ''): void {
+    fd.append(`${prefix}file`, c.file);
+    fd.append(`${prefix}expires_at`, c.expires_at);
+    if (c.calibrated_at) fd.append(`${prefix}calibrated_at`, c.calibrated_at);
+    if (c.certificate_number) fd.append(`${prefix}certificate_number`, c.certificate_number);
+    if (c.laboratory) fd.append(`${prefix}laboratory`, c.laboratory);
+    if (c.notes) fd.append(`${prefix}notes`, c.notes);
   }
 
   createReading(sensorId: number, payload: { value: number; reading_source: string; recorded_at: string }): Observable<ApiResponse<{ reading: SensorReading; alerts: any[] }>> {
