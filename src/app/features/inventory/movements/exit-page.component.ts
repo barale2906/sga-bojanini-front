@@ -293,6 +293,18 @@ export class ExitPageComponent implements OnInit {
     return (item.fefo ?? []).filter(b => !!b.notes).length;
   }
 
+  /** Lotes (del producto en selección) con todos sus comentarios desplegados */
+  draftNotesExpanded = signal<string[]>([]);
+
+  /** Separa las notas de un lote en entradas individuales ("[fecha · ...] texto") */
+  splitNotes(notes: string): string[] {
+    return notes.split(/\n(?=\[)/).map(l => l.trim()).filter(Boolean);
+  }
+
+  toggleDraftNotes(lot: string): void {
+    this.draftNotesExpanded.update(a => a.includes(lot) ? a.filter(x => x !== lot) : [...a, lot]);
+  }
+
   toggleNotes(item: unknown): void {
     this.notesOpen.update(arr => arr.includes(item) ? arr.filter(x => x !== item) : [...arr, item]);
   }

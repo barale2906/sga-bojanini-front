@@ -169,10 +169,18 @@
                     </mat-form-field>
                   </div>
                   @if (b.notes) {
+                    @let entries = splitNotes(b.notes);
+                    @let expanded = draftNotesExpanded().includes(b.lot_number);
                     <div class="lot-notes">
                       <mat-icon>comment</mat-icon>
-                      <span>{{ b.notes }}</span>
+                      <span class="lot-notes-text">{{ (expanded ? entries : entries.slice(0, 3)).join('\n') }}</span>
                     </div>
+                    @if (entries.length > 3) {
+                      <button type="button" class="lot-notes-toggle" (click)="toggleDraftNotes(b.lot_number)">
+                        <mat-icon>{{ expanded ? 'expand_less' : 'expand_more' }}</mat-icon>
+                        {{ expanded ? 'Ocultar comentarios anteriores' : 'Ver ' + (entries.length - 3) + ' comentarios más' }}
+                      </button>
+                    }
                   }
                   @if ((draftLotQtys()[b.lot_number] || 0) > 0) {
                     <mat-form-field appearance="outline" class="lot-note-field">
