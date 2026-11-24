@@ -285,6 +285,18 @@ export class ExitPageComponent implements OnInit {
     this.draftLotNotes.update(prev => ({ ...prev, [lotNumber]: value }));
   }
 
+  /** Ítems del carrito con el panel de comentarios desplegado */
+  notesOpen = signal<unknown[]>([]);
+
+  /** Cantidad de comentarios históricos de los lotes (los que van en el desplegable) */
+  itemNotesCount(item: { fefo: { notes?: string | null }[] }): number {
+    return (item.fefo ?? []).filter(b => !!b.notes).length;
+  }
+
+  toggleNotes(item: unknown): void {
+    this.notesOpen.update(arr => arr.includes(item) ? arr.filter(x => x !== item) : [...arr, item]);
+  }
+
   removeItem(i: number): void {
     this.cartItems.update(arr => arr.filter((_, idx) => idx !== i));
   }

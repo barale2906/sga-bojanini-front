@@ -7,7 +7,7 @@ echo "🚀 Configurando Claude Code para SGA Bojanini Frontend..."
 echo ""
 
 # Detectar directorio del proyecto
-PROJECT_DIR="/mnt/trabajo/repos/Front/sga-bojanini-front"
+PROJECT_DIR="/mnt/trabajo/Proyectos_programacion/bojanini/front/sga-bojanini-front"
 
 if [ ! -d "$PROJECT_DIR" ]; then
     echo "❌ Directorio del proyecto no encontrado: $PROJECT_DIR"

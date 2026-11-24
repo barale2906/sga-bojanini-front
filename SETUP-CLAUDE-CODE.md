@@ -1,7 +1,7 @@
 # 🎯 Configuración Claude Code para SGA Bojanini Frontend
 
 ## 📍 Ubicación detectada
-Tu proyecto está en: `/mnt/trabajo/repos/Front/sga-bojanini-front`
+Tu proyecto está en: `/mnt/trabajo/Proyectos_programacion/bojanini/front/sga-bojanini-front`
 
 ---
 
@@ -10,7 +10,7 @@ Tu proyecto está en: `/mnt/trabajo/repos/Front/sga-bojanini-front`
 Crea este archivo en la **raíz de tu proyecto Angular**:
 
 ```bash
-cd /mnt/trabajo/repos/Front/sga-bojanini-front
+cd /mnt/trabajo/Proyectos_programacion/bojanini/front/sga-bojanini-front
 
 # Crear el archivo
 cat > .claudecontext << 'EOF'
@@ -122,7 +122,7 @@ echo "✅ Archivo .claudecontext creado"
 Crea también este archivo para instrucciones específicas de Claude Code:
 
 ```bash
-cd /mnt/trabajo/repos/Front/sga-bojanini-front
+cd /mnt/trabajo/Proyectos_programacion/bojanini/front/sga-bojanini-front
 
 cat > .claude/instructions.md << 'EOF'
 # Instrucciones para Claude Code - SGA Bojanini Frontend
@@ -269,7 +269,7 @@ echo "✅ Configuración global creada"
 Crea un script para facilitar el uso:
 
 ```bash
-cat > /mnt/trabajo/repos/Front/sga-bojanini-front/claude-helper.sh << 'EOF'
+cat > /mnt/trabajo/Proyectos_programacion/bojanini/front/sga-bojanini-front/claude-helper.sh << 'EOF'
 #!/bin/bash
 
 # Helper script para Claude Code - SGA Bojanini
@@ -316,7 +316,7 @@ case "$1" in
 esac
 EOF
 
-chmod +x /mnt/trabajo/repos/Front/sga-bojanini-front/claude-helper.sh
+chmod +x /mnt/trabajo/Proyectos_programacion/bojanini/front/sga-bojanini-front/claude-helper.sh
 echo "✅ Helper script creado"
 ```
 
@@ -350,7 +350,7 @@ echo "✅ Helper script creado"
 ## 🧪 Prueba que funciona:
 
 ```bash
-cd /mnt/trabajo/repos/Front/sga-bojanini-front
+cd /mnt/trabajo/Proyectos_programacion/bojanini/front/sga-bojanini-front
 
 # Verificar configuración
 ./claude-helper.sh check

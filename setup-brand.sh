@@ -3,7 +3,7 @@
 # Script para configurar el manual de marca Bojanini en Claude Code
 # Este script te guiará para extraer los valores del PDF y actualizar la configuración
 
-PROJECT_DIR="/mnt/trabajo/repos/Front/sga-bojanini-front"
+PROJECT_DIR="/mnt/trabajo/Proyectos_programacion/bojanini/front/sga-bojanini-front"
 PDF_PATH="$PROJECT_DIR/recursos/identidad.pdf"
 CONTEXT_FILE="$PROJECT_DIR/.claudecontext"
 

@@ -313,7 +313,18 @@
                 }
               }
             }
+            @if (itemNotesCount(item) > 0) {
+              <button type="button" class="meta-chip meta-chip--notes"
+                      [class.meta-chip--notes-open]="notesOpen().includes(item)"
+                      [attr.aria-expanded]="notesOpen().includes(item)"
+                      matTooltip="Ver comentarios"
+                      (click)="toggleNotes(item)">
+                <mat-icon>comment</mat-icon>{{ itemNotesCount(item) }}
+                <mat-icon class="chev">{{ notesOpen().includes(item) ? 'expand_less' : 'expand_more' }}</mat-icon>
+              </button>
+            }
           </div>
+          <!-- Nota registrada en esta salida: siempre visible para validar -->
           @if (item.notes) {
             <div class="list-item-notes">{{ item.notes }}</div>
           }
@@ -321,12 +332,19 @@
             @if (item.lotNotes[b.lot_number]) {
               <div class="list-item-notes"><strong>{{ b.lot_number }}:</strong> {{ item.lotNotes[b.lot_number] }}</div>
             }
-            @if (b.notes) {
-              <div class="lot-notes">
-                <mat-icon>comment</mat-icon>
-                <span><strong>{{ b.lot_number }}:</strong> {{ b.notes }}</span>
-              </div>
-            }
+          }
+          <!-- Comentarios históricos del lote: desplegables -->
+          @if (itemNotesCount(item) > 0 && notesOpen().includes(item)) {
+            <div class="list-item-notes-panel">
+              @for (b of item.fefo; track b.lot_number) {
+                @if (b.notes) {
+                  <div class="lot-notes">
+                    <mat-icon>comment</mat-icon>
+                    <span><strong>{{ b.lot_number }}:</strong> {{ b.notes }}</span>
+                  </div>
+                }
+              }
+            </div>
           }
         </div>
       }

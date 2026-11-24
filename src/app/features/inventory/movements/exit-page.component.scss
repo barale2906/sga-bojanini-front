@@ -291,3 +291,12 @@
 }
 
 .lot-note-field { flex-basis: 100%; width: 100%; .mat-mdc-form-field-subscript-wrapper { display: none; } }
+
+.meta-chip--notes {
+  cursor: pointer; border: 1px solid #f59e0b; background: #fffbeb; color: #92400e;
+  font: inherit; font-size: 0.72rem; display: inline-flex; align-items: center; gap: 0.15rem;
+  padding: 0.1rem 0.4rem; border-radius: 9999px;
+  mat-icon { font-size: 0.85rem; height: 0.85rem; width: 0.85rem; }
+  &:hover, &.meta-chip--notes-open { background: #fef3c7; }
+}
+.list-item-notes-panel { display: flex; flex-direction: column; gap: 0.25rem; margin-top: 0.35rem; }

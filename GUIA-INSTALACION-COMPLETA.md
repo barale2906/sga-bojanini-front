@@ -14,7 +14,7 @@ Esta guía configura Claude Code para que automáticamente:
 ### **Paso 1: Configurar Claude Code básico**
 
 ```bash
-cd /mnt/trabajo/repos/Front/sga-bojanini-front
+cd /mnt/trabajo/Proyectos_programacion/bojanini/front/sga-bojanini-front
 
 # Copiar archivos base (ya los tienes descargados)
 # Si aún no los has movido:
@@ -38,7 +38,7 @@ drwxr-xr-x  2 user user  4096 may 20 22:40 .claude
 
 ```bash
 # Actualizar .claudecontext con versión que incluye manual de marca
-cd /mnt/trabajo/repos/Front/sga-bojanini-front
+cd /mnt/trabajo/Proyectos_programacion/bojanini/front/sga-bojanini-front
 
 # Descargar el nuevo .claudecontext-v2 y renombrarlo
 mv .claudecontext .claudecontext.backup
@@ -111,7 +111,7 @@ sga-bojanini-front/
 
 ```bash
 # En Claude Code terminal
-cd /mnt/trabajo/repos/Front/sga-bojanini-front
+cd /mnt/trabajo/Proyectos_programacion/bojanini/front/sga-bojanini-front
 ```
 
 Luego pregunta:
